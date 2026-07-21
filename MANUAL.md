@@ -131,34 +131,40 @@ Default: **100 zona** kerja. Mean capacity tiap trade: **5 unit per periode**.
 
 Pahami ini agar grafik tidak “ajaib”.
 
-### Mobilisasi berjenjang (default)
+### Sekuens per zona (default — penting untuk grafik LOB)
 
-Seperti parade di lapangan, **tiap trade mulai selisih 1 periode**:
+Setiap **unit/zona** melewati trade secara berurutan dengan **jeda minimal 1 periode**:
 
-| Trade | Mulai di periode |
-|-------|------------------|
-| 1 Bekisting | 1 |
-| 2 Tulangan | 2 |
-| 3 Cor | 3 |
-| 4 Bongkar | 4 |
-| 5 Finishing | 5 |
+```text
+Zona k:  Bekisting (periode t)
+      →  Tulangan  (periode t+1)
+      →  Cor       (periode t+2)
+      →  Bongkar   (periode t+3)
+      →  Finishing (periode t+4)
+```
 
-Di Line of Balance, garis tiap trade akan **bergeser ke kanan**.  
-Opsi ini bisa dimatikan di UI jika Anda ingin semua trade siap dari periode 1.
+Artinya: output trade hulu **baru tersedia** bagi trade hilir di **periode berikutnya** (bukan di periode yang sama).
+
+Akibatnya pada Line of Balance:
+
+| Trade | Mulai kerja (tanpa variability, capacity 5) |
+|-------|-----------------------------------------------|
+| 1 Bekisting | periode 1 |
+| 2 Tulangan | periode 2 |
+| 3 Cor | periode 3 |
+| 4 Bongkar | periode 4 |
+| 5 Finishing | periode 5 |
+
+Beberapa zona bisa dikerjakan **paralel di tahap berbeda** (itulah “parade”).  
+Di UI, opsi *Hand-off langsung* meniru classic computer game (output bisa diambil di periode yang sama) — garis LOB bisa menumpuk.
 
 ### Setiap periode (misalnya “satu minggu”)
 
-1. Hanya trade yang **sudah dimobilisasi** dan belum selesai yang bekerja.
-2. Trade diproses **dari hulu ke hilir**.
-3. Trade aktif mendapat **capacity** dari “dadu virtual” 50/50: *low* atau *high*.
-4. Yang benar-benar dikerjakan:
-
-```text
-aktual = minimum dari (capacity, sediaan dari trade di depan, sisa pekerjaan)
-```
-
-5. Hasil trade hulu **langsung bisa** diambil trade hilir **di periode yang sama** (jika trade hilir sudah aktif).
-6. Proyek selesai ketika trade **terakhir** menyelesaikan semua zona.
+1. Trade yang punya sediaan (buffer dari periode sebelumnya) dan sisa pekerjaan me-roll capacity 50/50.
+2. Trade diproses dari hulu ke hilir.
+3. Aktual = min(capacity, sediaan di **awal** periode, sisa pekerjaan).
+4. Produksi baru masuk buffer hilir **setelah** periode berakhir (mode default).
+5. Selesai ketika trade terakhir menyelesaikan semua zona.
 
 ### Istilah penting
 

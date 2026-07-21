@@ -368,6 +368,7 @@ def run_replications(
             seed=seed,
             takt_rate=config.takt_rate,
             standby_capacity=config.standby_capacity,
+            same_period_handoff=config.same_period_handoff,
             staggered_mobilization=config.staggered_mobilization,
         )
         sim = ParadeOfTrades(cfg)
@@ -496,12 +497,16 @@ def compare_tommelein2020(
     n_reps: int = 100,
     seed_base: int = 0,
     total_units: int = 100,
-    staggered: bool = True,
+    staggered: bool = False,
+    same_period_handoff: bool = False,
     verbose: bool = True,
 ) -> ScenarioComparison:
     """Replicate the three scenarios from Tommelein (2020)."""
     configs = tommelein2020_scenarios(
-        total_units=total_units, seed=None, staggered=staggered
+        total_units=total_units,
+        seed=None,
+        staggered=staggered,
+        same_period_handoff=same_period_handoff,
     )
     return compare_scenarios(
         configs, n_reps=n_reps, seed_base=seed_base, verbose=verbose

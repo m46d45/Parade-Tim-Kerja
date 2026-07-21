@@ -161,7 +161,8 @@ def _build_config_from_pairs(
     trade_names: Optional[Sequence[str]] = None,
     takt_rate: Optional[int] = None,
     standby_capacity: int = 0,
-    staggered_mobilization: bool = True,
+    same_period_handoff: bool = False,
+    staggered_mobilization: bool = False,
 ) -> ParadeConfig:
     return ParadeConfig.from_pairs(
         pairs=list(pairs),
@@ -170,6 +171,7 @@ def _build_config_from_pairs(
         seed=seed,
         takt_rate=takt_rate,
         standby_capacity=standby_capacity,
+        same_period_handoff=same_period_handoff,
         staggered_mobilization=staggered_mobilization,
     )
 
@@ -303,31 +305,46 @@ def _trade_table(result: ParadeResult) -> None:
         st.dataframe(buf_rows, use_container_width=True, hide_index=True)
 
 
-def _stagger_control(key_prefix: str = "stag", default: bool = True) -> bool:
+def _flow_controls(
+    key_prefix: str = "flow",
+) -> Tuple[bool, bool]:
     """
-    Mobilisasi berjenjang: trade ke-i mulai di periode i
-    (selisih 1 periode antar crew) — default aktif seperti parade di lapangan.
+    Zone sequence / handoff controls.
+
+    Returns (same_period_handoff, staggered_mobilization).
+    Default: next-period handoff (each zone waits 1 period between trades).
     """
-    staggered = st.checkbox(
-        "Mobilisasi berjenjang (stagger) — tiap trade mulai +1 periode",
-        value=default,
-        key=f"{key_prefix}_stag",
+    mode = st.radio(
+        "Alur zona antar trade",
+        options=[
+            "Sekuens zona (disarankan): T1 selesai dulu → baru T2 di periode berikutnya",
+            "Hand-off langsung (classic game): output T1 bisa diambil T2 di periode yang sama",
+        ],
+        index=0,
+        key=f"{key_prefix}_handoff",
         help=(
-            "Trade 1 mulai periode 1, trade 2 periode 2, dst. "
-            "Meniru parade di lapangan / Tommelein (2020). "
-            "Matikan jika semua trade siap dari periode 1."
+            "Mode sekuens: setiap unit/zona dikerjakan trade demi trade dengan jeda "
+            "minimal 1 periode. Line of Balance akan bergeser jelas per trade."
         ),
     )
-    if staggered:
+    same_period = mode.startswith("Hand-off langsung")
+    if same_period:
         st.caption(
-            "Parade: T1@p1 → T2@p2 → T3@p3 → … "
-            "(Line of Balance akan terlihat bergeser ke kanan per trade.)"
+            "Classic computer game: buffer di-update sekuensial dalam satu periode "
+            "(trade hilir bisa langsung memakai output hulu hari yang sama)."
+        )
+        staggered = st.checkbox(
+            "Tambah mobilisasi berjenjang (T_i mulai periode i)",
+            value=False,
+            key=f"{key_prefix}_stag",
         )
     else:
         st.caption(
-            "Semua trade aktif dari periode 1 (hand-off sekuensial dalam periode yang sama)."
+            "Per zona: Bekisting (periode t) → Tulangan (t+1) → Cor (t+2) → … "
+            "Beberapa zona bisa dikerjakan paralel di tahap berbeda (parade)."
         )
-    return staggered
+        staggered = False
+    return same_period, staggered
 
 
 def _takt_controls(key_prefix: str = "takt") -> Tuple[Optional[int], int]:
@@ -590,7 +607,7 @@ def tab_single_run(total_units: int, seed: Optional[int], n_trades: int) -> None
             default_preset="medium",
             uniform=uniform,
         )
-        staggered = _stagger_control("single", default=True)
+        same_period, staggered = _flow_controls("single")
         takt_rate, standby = _takt_controls("single_takt")
 
         # Preview pairs
@@ -599,12 +616,12 @@ def tab_single_run(total_units: int, seed: Optional[int], n_trades: int) -> None
             for i in range(n_trades)
         ]
         preview = " → ".join(f"{labels[i][:12]} ({pairs[i][0]}/{pairs[i][1]})" for i in range(n_trades))
-        if staggered:
-            starts = " · ".join(f"T{i+1}@p{i+1}" for i in range(n_trades))
-            st.caption(f"Parade: {preview}")
-            st.caption(f"Mulai: {starts}")
-        else:
-            st.caption(f"Parade: {preview}")
+        st.caption(f"Parade: {preview}")
+        if not same_period:
+            st.caption(
+                "Urutan per zona: "
+                + " → ".join(f"T{i+1}(p+{i})" for i in range(n_trades))
+            )
 
     with col_ctrl:
         st.markdown("##### Controls")
@@ -616,7 +633,8 @@ def tab_single_run(total_units: int, seed: Optional[int], n_trades: int) -> None
 
         _init_step_state()
         full_sig = (
-            tuple(pairs), total_units, seed, takt_rate, standby, staggered
+            tuple(pairs), total_units, seed, takt_rate, standby,
+            same_period, staggered,
         )
 
         def _make_cfg() -> ParadeConfig:
@@ -624,6 +642,7 @@ def tab_single_run(total_units: int, seed: Optional[int], n_trades: int) -> None
                 pairs, total_units, seed,
                 takt_rate=takt_rate,
                 standby_capacity=standby,
+                same_period_handoff=same_period,
                 staggered_mobilization=staggered,
             )
 
@@ -761,7 +780,7 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
         )
         st.caption(" → ".join(f"{p[0]}/{p[1]}" for p in pairs_b))
 
-    staggered = _stagger_control("cmp", default=True)
+    same_period, staggered = _flow_controls("cmp")
     run_cmp = st.button("▶ Run comparison", type="primary", key="run_cmp")
 
     if run_cmp or st.session_state.get("cmp_results"):
@@ -775,10 +794,14 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
 
         if run_cmp:
             cfg_a = _build_config_from_pairs(
-                pairs_a, total_units, seed, staggered_mobilization=staggered
+                pairs_a, total_units, seed,
+                same_period_handoff=same_period,
+                staggered_mobilization=staggered,
             )
             cfg_b = _build_config_from_pairs(
-                pairs_b, total_units, seed, staggered_mobilization=staggered
+                pairs_b, total_units, seed,
+                same_period_handoff=same_period,
+                staggered_mobilization=staggered,
             )
             # Each scenario gets its own RNG from the same seed (fair settings compare)
             res_a = _run_config(cfg_a)
@@ -877,7 +900,7 @@ def tab_sweep(total_units: int, seed: Optional[int], n_trades: int) -> None:
         default=PRESET_OPTIONS,
         format_func=lambda x: PRESET_LABELS.get(x, x),
     )
-    staggered = _stagger_control("sweep", default=True)
+    same_period, staggered = _flow_controls("sweep")
     run = st.button("▶ Run sweep", type="primary", key="run_sweep")
 
     if not selected:
@@ -892,6 +915,7 @@ def tab_sweep(total_units: int, seed: Optional[int], n_trades: int) -> None:
                 pairs = [_pair_from_preset(p)] * n_trades
                 cfg = _build_config_from_pairs(
                     pairs, total_units, seed,
+                    same_period_handoff=same_period,
                     staggered_mobilization=staggered,
                 )
                 results[p] = _run_config(cfg)
@@ -973,11 +997,11 @@ dibanding S3 yang mean lebih tinggi tapi std dev lebih besar.
         c2.number_input("Seed base", min_value=0, value=seed if seed is not None else 0,
                         key="takt_seedbase")
     )
-    staggered = c3.checkbox(
-        "Mobilisasi berjenjang (+1 periode)",
-        value=True,
-        key="takt_stag",
-        help="Trade i mulai di periode i — default parade di lapangan",
+    same_period = c3.checkbox(
+        "Hand-off same-period (classic)",
+        value=False,
+        key="takt_same_period",
+        help="Jika off (default): sekuens zona next-period",
     )
 
     run = st.button("▶ Run Tommelein 2020 comparison", type="primary", key="run_takt2020")
@@ -988,7 +1012,8 @@ dibanding S3 yang mean lebih tinggi tapi std dev lebih besar.
                 n_reps=n_reps,
                 seed_base=seed_base,
                 total_units=total_units,
-                staggered=staggered,
+                staggered=False,
+                same_period_handoff=same_period,
                 verbose=False,
             )
             st.session_state.takt2020 = cmp
@@ -1080,7 +1105,7 @@ def tab_replications(total_units: int, seed: Optional[int], n_trades: int) -> No
             default_preset="medium",
             uniform=mode == "Uniform",
         )
-        staggered = _stagger_control("rep", default=True)
+        same_period, staggered = _flow_controls("rep")
         takt_rate, standby = _takt_controls("rep_takt")
 
     with col_r:
@@ -1110,6 +1135,7 @@ def tab_replications(total_units: int, seed: Optional[int], n_trades: int) -> No
                 pairs, total_units, None,
                 takt_rate=takt_rate,
                 standby_capacity=standby,
+                same_period_handoff=same_period,
                 staggered_mobilization=staggered,
             )
             batches = {
@@ -1125,6 +1151,7 @@ def tab_replications(total_units: int, seed: Optional[int], n_trades: int) -> No
                     cfg = ParadeConfig.from_preset(
                         preset, n_trades=n_trades, total_units=total_units,
                         takt_rate=takt_rate, standby_capacity=standby,
+                        same_period_handoff=same_period,
                         staggered_mobilization=staggered,
                     )
                     batches[label] = run_replications(

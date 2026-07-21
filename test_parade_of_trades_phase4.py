@@ -29,7 +29,7 @@ class TestTaktStandby(unittest.TestCase):
             seed=0,
             takt_rate=5,
             standby_capacity=1,
-            staggered_mobilization=False,
+            same_period_handoff=True,
         )
         sim = ParadeOfTrades(cfg)
         rec = sim.step()
@@ -45,7 +45,7 @@ class TestTaktStandby(unittest.TestCase):
             seed=0,
             takt_rate=5,
             standby_capacity=1,
-            staggered_mobilization=False,
+            same_period_handoff=True,
         )
         sim = ParadeOfTrades(cfg)
         rec = sim.step()
@@ -62,27 +62,27 @@ class TestTaktStandby(unittest.TestCase):
             seed=1,
             takt_rate=5,
             standby_capacity=1,
-            staggered_mobilization=True,
+            same_period_handoff=False,
         )
         cfg_equiv = ParadeConfig.from_pairs(
             [(5, 5), (5, 5)],
             total_units=20,
             seed=1,
-            staggered_mobilization=True,
+            same_period_handoff=False,
         )
         r1 = ParadeOfTrades(cfg_takt).run()
         r2 = ParadeOfTrades(cfg_equiv).run()
         self.assertEqual(r1.duration, r2.duration)
-        # 20/5 = 4 work periods + 1 lag for trade 2
+        # 20/5 = 4 work + 1 next-period lag between 2 trades
         self.assertEqual(r1.duration, 5)
 
     def test_classic_unchanged_without_takt(self):
         r = run_preset("no_variability", seed=0, total_units=100, verbose=False)
-        # Default stagger: 20 work + 4 pipeline lags
+        # Default next-period handoff: 20 work + 4 zone-sequence lags
         self.assertEqual(r.duration, 24)
         self.assertEqual(r.total_standby_used, 0)
         self.assertFalse(r.config.takt_enabled)
-        self.assertTrue(r.config.staggered_mobilization)
+        self.assertFalse(r.config.same_period_handoff)
 
     def test_staggered_mobilization_delays_downstream(self):
         cfg = ParadeConfig.from_pairs(

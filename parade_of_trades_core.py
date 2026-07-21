@@ -118,10 +118,17 @@ class ParadeConfig:
     # Takt / capacity-buffer options (None takt_rate ⇒ classic Parade)
     takt_rate: Optional[int] = None
     standby_capacity: int = 0
-    # Parade stagger: trade i mobilizes at period (i+1) so each crew starts
-    # one period after the upstream crew (Tommelein 2020 / field parade).
-    # Default True for educational realism; set False for all-on-site-from-day-1.
-    staggered_mobilization: bool = True
+    # Handoff between trades:
+    #   False (default) = "next period": output of trade i becomes available to
+    #     trade i+1 only in the *following* period. Each zone therefore flows
+    #     T1 → (wait) → T2 → (wait) → … so LOB lines are clearly sequenced.
+    #   True = "same period": classic computer-game rule where upstream output
+    #     may be taken by downstream in the same period (sequential update).
+    same_period_handoff: bool = False
+    # Optional extra gate: trade i may not work before period (i+1).
+    # Usually unnecessary when same_period_handoff is False (lag already
+    # creates the cascade). Kept for Tommelein (2020) style experiments.
+    staggered_mobilization: bool = False
 
     def __post_init__(self) -> None:
         if not self.trades:
@@ -146,13 +153,23 @@ class ParadeConfig:
     def takt_enabled(self) -> bool:
         return self.takt_rate is not None
 
+    @property
+    def zone_sequence_lag(self) -> bool:
+        """True when each zone waits one period between consecutive trades."""
+        return not self.same_period_handoff
+
     def mode_label(self) -> str:
-        if not self.takt_enabled:
-            return "classic"
-        return (
-            f"takt={self.takt_rate}, standby={self.standby_capacity}"
-            + (", staggered" if self.staggered_mobilization else "")
-        )
+        parts = []
+        if self.same_period_handoff:
+            parts.append("handoff=same_period")
+        else:
+            parts.append("handoff=next_period")
+        if self.staggered_mobilization:
+            parts.append("staggered")
+        if self.takt_enabled:
+            parts.append(f"takt={self.takt_rate}")
+            parts.append(f"standby={self.standby_capacity}")
+        return ", ".join(parts) if parts else "classic"
 
     @classmethod
     def from_preset(
@@ -164,26 +181,14 @@ class ParadeConfig:
         seed: Optional[int] = None,
         takt_rate: Optional[int] = None,
         standby_capacity: int = 0,
-        staggered_mobilization: bool = True,
+        same_period_handoff: bool = False,
+        staggered_mobilization: bool = False,
     ) -> "ParadeConfig":
         """
         Build config from named variability preset(s).
 
-        Parameters
-        ----------
-        preset :
-            Single preset name applied to all trades, or a sequence of preset
-            names (one per trade). Valid names: no_variability, low, medium,
-            high, very_high.
-        n_trades :
-            Number of sequential trades (default 5). Ignored if ``preset`` is
-            a sequence (length of that sequence is used).
-        trade_names :
-            Optional display names. Defaults to Indonesian floor-cycle names
-            for the first five trades, then "Trade k".
-        takt_rate / standby_capacity / staggered_mobilization :
-            Optional Tommelein (2020) options. Stagger default True:
-            trade *i* starts at period *i+1*.
+        Default handoff is *next period*: each zone finishes trade *i* in one
+        period and only then becomes available to trade *i+1* next period.
         """
         if isinstance(preset, str):
             if preset not in CAPACITY_PRESETS:
@@ -216,6 +221,7 @@ class ParadeConfig:
             seed=seed,
             takt_rate=takt_rate,
             standby_capacity=standby_capacity,
+            same_period_handoff=same_period_handoff,
             staggered_mobilization=staggered_mobilization,
         )
         cfg._preset_labels = preset_labels  # type: ignore[attr-defined]
@@ -230,7 +236,8 @@ class ParadeConfig:
         seed: Optional[int] = None,
         takt_rate: Optional[int] = None,
         standby_capacity: int = 0,
-        staggered_mobilization: bool = True,
+        same_period_handoff: bool = False,
+        staggered_mobilization: bool = False,
     ) -> "ParadeConfig":
         """Build config from explicit (low, high) capacity pairs per trade."""
         if not pairs:
@@ -246,6 +253,7 @@ class ParadeConfig:
             seed=seed,
             takt_rate=takt_rate,
             standby_capacity=standby_capacity,
+            same_period_handoff=same_period_handoff,
             staggered_mobilization=staggered_mobilization,
         )
 
@@ -332,6 +340,7 @@ class ParadeResult:
             "mode": self.config.mode_label(),
             "takt_rate": self.config.takt_rate,
             "standby_capacity": self.config.standby_capacity,
+            "same_period_handoff": self.config.same_period_handoff,
             "staggered_mobilization": self.config.staggered_mobilization,
             "trades": [
                 {
@@ -486,11 +495,21 @@ class ParadeOfTrades:
 
     def step(self) -> PeriodRecord:
         """
-        Execute one period for all trades (sequential buffer updates).
+        Execute one period for all trades.
+
+        Handoff modes
+        -------------
+        *next period* (default, ``same_period_handoff=False``):
+            Each trade pulls only from inventory present at the *start* of the
+            period. Production is released to the next trade at period end.
+            Therefore every zone waits at least one full period between
+            consecutive trades (T1 → T2 → T3 …) — the correct parade sequence.
+
+        *same period* (``same_period_handoff=True``):
+            Classic computer-game rule: upstream production may be taken by
+            the next trade within the same period (sequential update).
 
         With takt enabled, standby capacity covers shortfalls below takt_rate.
-        Returns the PeriodRecord for this period.
-        Raises RuntimeError if the simulation is already complete.
         """
         if self.is_complete:
             raise RuntimeError("Simulation already complete; call reset()")
@@ -498,6 +517,7 @@ class ParadeOfTrades:
         self.period += 1
         n = self.config.n_trades
         total = self.config.total_units
+        same_period = self.config.same_period_handoff
 
         capacities = [0] * n
         effectives = [0] * n
@@ -505,10 +525,18 @@ class ParadeOfTrades:
         productions = [0] * n
         idles = [0] * n
 
+        # Working inventories for this period
+        if same_period:
+            raw = self.raw_remaining
+            bufs = list(self.buffers)
+        else:
+            # Snapshot start-of-period stock; new production not usable until next period
+            raw = self.raw_remaining
+            bufs = list(self.buffers)
+
         for i in range(n):
             remaining_for_trade = total - self.cumulative[i]
 
-            # Finished, or not yet mobilized → skip
             if remaining_for_trade <= 0 or not self._is_mobilized(i):
                 capacities[i] = 0
                 effectives[i] = 0
@@ -517,36 +545,47 @@ class ParadeOfTrades:
                 idles[i] = 0
                 continue
 
-            if self._start_period[i] is None:
-                self._start_period[i] = self.period
+            if i == 0:
+                available = raw
+            else:
+                available = bufs[i - 1]
+
+            # Not yet on this zone's parade position: no input and never produced
+            # → skip without rolling (crew has not "arrived" for this work yet).
+            # Once started, empty buffer counts as starvation (idle capacity).
+            already_started = self.cumulative[i] > 0
+            if available <= 0 and not already_started:
+                capacities[i] = 0
+                effectives[i] = 0
+                standbys[i] = 0
+                productions[i] = 0
+                idles[i] = 0
+                continue
 
             base = self._roll_capacity(i)
             effective, standby_used = self._apply_standby(base)
-
-            if i == 0:
-                available = self.raw_remaining
-            else:
-                available = self.buffers[i - 1]
-
             actual = min(effective, available, remaining_for_trade)
 
-            # Consume upstream
+            # Consume from this period's working stock
             if i == 0:
-                self.raw_remaining -= actual
+                raw -= actual
             else:
-                self.buffers[i - 1] -= actual
+                bufs[i - 1] -= actual
 
-            # Produce
-            self.cumulative[i] += actual
-            if i < n - 1:
-                self.buffers[i] += actual
+            if same_period and i < n - 1:
+                # Immediate handoff: output available to next trade this period
+                bufs[i] += actual
 
+            productions[i] = actual
             capacities[i] = base
             effectives[i] = effective
             standbys[i] = standby_used
-            productions[i] = actual
             idles[i] = effective - actual
 
+            if actual > 0 and self._start_period[i] is None:
+                self._start_period[i] = self.period
+
+            self.cumulative[i] += actual
             self._executions[i] += 1
             self._total_capacity[i] += base
             self._total_effective[i] += effective
@@ -557,8 +596,15 @@ class ParadeOfTrades:
             if self.cumulative[i] >= total and self._finish_period[i] is None:
                 self._finish_period[i] = self.period
 
-        # Max WIP is tracked on end-of-period buffer state (after all trades
-        # in the parade have acted), matching Tommelein / Choo buffer profiles.
+        # Commit inventories at period end
+        self.raw_remaining = raw
+        if same_period:
+            self.buffers = bufs
+        else:
+            # Leftover start-stock after pulls + this period's production
+            for i in range(self.config.n_interfaces):
+                self.buffers[i] = bufs[i] + productions[i]
+
         for j in range(self.config.n_interfaces):
             if self.buffers[j] > self.max_buffer[j]:
                 self.max_buffer[j] = self.buffers[j]
@@ -673,9 +719,14 @@ class ParadeOfTrades:
             bottleneck_mean = min(means) if means else DEFAULT_MEAN_CAPACITY
 
         ideal = total / bottleneck_mean if bottleneck_mean > 0 else float("inf")
-        # Staggered mobilization adds pipeline fill time for the last trade
+        # Pipeline fill: last trade cannot finish until first units have passed
+        # every upstream handoff lag (next-period) and/or staggered starts.
+        pipeline_lags = 0
+        if not self.config.same_period_handoff:
+            pipeline_lags = max(pipeline_lags, self.config.n_trades - 1)
         if self.config.staggered_mobilization:
-            ideal += self.config.n_trades - 1
+            pipeline_lags = max(pipeline_lags, self.config.n_trades - 1)
+        ideal += pipeline_lags
 
         duration = self.period
         throughput = total / duration if duration > 0 else 0.0
@@ -775,7 +826,8 @@ class ParadeOfTrades:
 def tommelein2020_scenarios(
     total_units: int = DEFAULT_TOTAL_UNITS,
     seed: Optional[int] = None,
-    staggered: bool = True,
+    staggered: bool = False,
+    same_period_handoff: bool = False,
 ) -> Dict[str, ParadeConfig]:
     """
     The three scenarios from Tommelein (2020) IGLC28:
@@ -785,20 +837,18 @@ def tommelein2020_scenarios(
       S3 classic 5/7  (add capacity outright — more variability)
     """
     n = 5
+    kw = dict(
+        total_units=total_units,
+        seed=seed,
+        staggered_mobilization=staggered,
+        same_period_handoff=same_period_handoff,
+    )
     return {
-        "S1_classic_4/6": ParadeConfig.from_pairs(
-            [(4, 6)] * n, total_units=total_units, seed=seed,
-            staggered_mobilization=staggered,
-        ),
+        "S1_classic_4/6": ParadeConfig.from_pairs([(4, 6)] * n, **kw),
         "S2_takt_4/6+stby1": ParadeConfig.from_pairs(
-            [(4, 6)] * n, total_units=total_units, seed=seed,
-            takt_rate=5, standby_capacity=1,
-            staggered_mobilization=staggered,
+            [(4, 6)] * n, takt_rate=5, standby_capacity=1, **kw
         ),
-        "S3_classic_5/7": ParadeConfig.from_pairs(
-            [(5, 7)] * n, total_units=total_units, seed=seed,
-            staggered_mobilization=staggered,
-        ),
+        "S3_classic_5/7": ParadeConfig.from_pairs([(5, 7)] * n, **kw),
     }
 
 
@@ -814,7 +864,8 @@ def run_preset(
     verbose: bool = True,
     takt_rate: Optional[int] = None,
     standby_capacity: int = 0,
-    staggered_mobilization: bool = True,
+    same_period_handoff: bool = False,
+    staggered_mobilization: bool = False,
 ) -> ParadeResult:
     """One-liner: configure, run, optionally print, return result."""
     cfg = ParadeConfig.from_preset(
@@ -824,6 +875,7 @@ def run_preset(
         seed=seed,
         takt_rate=takt_rate,
         standby_capacity=standby_capacity,
+        same_period_handoff=same_period_handoff,
         staggered_mobilization=staggered_mobilization,
     )
     sim = ParadeOfTrades(cfg)
