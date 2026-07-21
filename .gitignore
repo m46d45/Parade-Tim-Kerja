@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local env & secrets
+.env
+.env.*
+!.env.example
+
+# Streamlit secrets (jangan di-commit)
+.streamlit/secrets.toml
+
+# Generated outputs (contoh lokal; app tidak membutuhkannya di cloud)
+output/
+*.xlsx
+!requirements.txt
+
+# Session / tooling noise
+.grok/

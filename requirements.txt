@@ -1,0 +1,5 @@
+# Parade of Trades – dependencies (Streamlit Community Cloud)
+streamlit>=1.28,<2
+matplotlib>=3.7,<4
+openpyxl>=3.1,<4
+numpy>=1.24
