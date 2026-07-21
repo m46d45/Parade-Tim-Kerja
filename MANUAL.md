@@ -131,18 +131,34 @@ Default: **100 zona** kerja. Mean capacity tiap trade: **5 unit per periode**.
 
 Pahami ini agar grafik tidak “ajaib”.
 
+### Mobilisasi berjenjang (default)
+
+Seperti parade di lapangan, **tiap trade mulai selisih 1 periode**:
+
+| Trade | Mulai di periode |
+|-------|------------------|
+| 1 Bekisting | 1 |
+| 2 Tulangan | 2 |
+| 3 Cor | 3 |
+| 4 Bongkar | 4 |
+| 5 Finishing | 5 |
+
+Di Line of Balance, garis tiap trade akan **bergeser ke kanan**.  
+Opsi ini bisa dimatikan di UI jika Anda ingin semua trade siap dari periode 1.
+
 ### Setiap periode (misalnya “satu minggu”)
 
-1. Trade diproses **dari hulu ke hilir** (Bekisting dulu, Finishing belakangan).
-2. Trade yang belum selesai mendapat **capacity** dari “dadu virtual” 50/50: nilai *low* atau *high*.
-3. Yang benar-benar dikerjakan:
+1. Hanya trade yang **sudah dimobilisasi** dan belum selesai yang bekerja.
+2. Trade diproses **dari hulu ke hilir**.
+3. Trade aktif mendapat **capacity** dari “dadu virtual” 50/50: *low* atau *high*.
+4. Yang benar-benar dikerjakan:
 
 ```text
 aktual = minimum dari (capacity, sediaan dari trade di depan, sisa pekerjaan)
 ```
 
-4. Hasil trade hulu **langsung bisa** diambil trade hilir **di periode yang sama** (update buffer berurutan).
-5. Proyek selesai ketika trade **terakhir** menyelesaikan semua zona.
+5. Hasil trade hulu **langsung bisa** diambil trade hilir **di periode yang sama** (jika trade hilir sudah aktif).
+6. Proyek selesai ketika trade **terakhir** menyelesaikan semua zona.
 
 ### Istilah penting
 

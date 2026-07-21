@@ -1,0 +1,22 @@
+field,value
+seed,42
+total_units,100
+mode,"takt=5, standby=1"
+duration,20
+throughput,5.0
+ideal_duration,18.181818181818183
+total_idle,27
+total_standby,55
+
+trade,low,high,executions,production,idle,utilization,finish,time_on_site,standby_used
+Pemasangan Bekisting,4,6,19,100,2,0.9804,19,19,12
+Pemasangan Tulangan,4,6,19,100,5,0.9524,19,19,9
+Pengecoran Beton,4,6,19,100,4,0.9615,19,19,10
+Pembongkaran Bekisting,4,6,20,100,11,0.9009,20,20,9
+Finishing Lantai,4,6,20,100,5,0.9524,20,20,15
+
+buffer,max_wip
+1,1
+2,3
+3,1
+4,2

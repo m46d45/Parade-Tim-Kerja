@@ -496,7 +496,7 @@ def compare_tommelein2020(
     n_reps: int = 100,
     seed_base: int = 0,
     total_units: int = 100,
-    staggered: bool = False,
+    staggered: bool = True,
     verbose: bool = True,
 ) -> ScenarioComparison:
     """Replicate the three scenarios from Tommelein (2020)."""

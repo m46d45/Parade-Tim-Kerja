@@ -76,18 +76,52 @@ class TestParadeConfig(unittest.TestCase):
         self.assertEqual(cfg.trades[1].name, "Beta")
 
 
-class TestNoVariabilityBaseline(unittest.TestCase):
-    """With 5/5 everywhere, perfect flow: duration = total/5, zero WIP residual."""
+class TestNoVariabilityStaggered(unittest.TestCase):
+    """Default parade: staggered start, 5/5 capacity, pipeline fill lag."""
 
     def setUp(self):
         self.cfg = ParadeConfig.from_preset(
             "no_variability", total_units=100, seed=42
         )
+        self.assertTrue(self.cfg.staggered_mobilization)
+        self.sim = ParadeOfTrades(self.cfg)
+        self.result = self.sim.run()
+
+    def test_duration_includes_pipeline_fill(self):
+        # 100/5 = 20 work periods + 4 lag periods for trade 5
+        self.assertEqual(self.result.duration, 24)
+        self.assertEqual(self.result.ideal_duration, 24.0)
+
+    def test_staggered_start_periods(self):
+        for i, m in enumerate(self.result.trade_metrics):
+            self.assertEqual(m.start_period, i + 1)
+            self.assertEqual(m.periods_to_finish, 20 + i)
+            self.assertEqual(m.total_production, 100)
+            self.assertEqual(m.time_on_site, 20)
+
+    def test_pipeline_wip_of_one_batch(self):
+        # Steady-state lag inventory ≈ 5 per interface after fill
+        self.assertEqual(self.result.max_buffer, [5, 5, 5, 5])
+
+    def test_first_period_only_trade1(self):
+        rec = self.result.history[0]
+        self.assertEqual(rec.production[0], 5)
+        self.assertEqual(rec.production[1:], [0, 0, 0, 0])
+        self.assertEqual(rec.buffers[0], 5)
+
+
+class TestNoVariabilitySimultaneous(unittest.TestCase):
+    """All trades on site from period 1: perfect hand-off, zero residual WIP."""
+
+    def setUp(self):
+        self.cfg = ParadeConfig.from_preset(
+            "no_variability", total_units=100, seed=42,
+            staggered_mobilization=False,
+        )
         self.sim = ParadeOfTrades(self.cfg)
         self.result = self.sim.run()
 
     def test_duration_is_ideal(self):
-        # 100 units / 5 per period = 20
         self.assertEqual(self.result.duration, 20)
         self.assertEqual(self.result.ideal_duration, 20.0)
 
@@ -99,7 +133,6 @@ class TestNoVariabilityBaseline(unittest.TestCase):
             self.assertEqual(m.total_idle, 0)
 
     def test_no_buffer_buildup(self):
-        # Sequential same-period handoff with equal capacity → buffers stay 0
         for rec in self.result.history:
             self.assertEqual(rec.buffers, [0, 0, 0, 0])
         self.assertEqual(self.result.max_buffer, [0, 0, 0, 0])
@@ -114,11 +147,13 @@ class TestNoVariabilityBaseline(unittest.TestCase):
 
 
 class TestSequentialBufferUpdate(unittest.TestCase):
-    """Upstream production must be available to downstream in the same period."""
+    """Upstream production available to downstream in the same period (no stagger)."""
 
     def test_first_period_all_can_work_if_capacity_allows(self):
-        # Constant capacity 5: in period 1 every trade produces 5
-        cfg = ParadeConfig.from_preset("no_variability", total_units=100, seed=0)
+        cfg = ParadeConfig.from_preset(
+            "no_variability", total_units=100, seed=0,
+            staggered_mobilization=False,
+        )
         sim = ParadeOfTrades(cfg)
         rec = sim.step()
         self.assertEqual(rec.production, [5, 5, 5, 5, 5])
@@ -126,13 +161,12 @@ class TestSequentialBufferUpdate(unittest.TestCase):
         self.assertEqual(rec.buffers, [0, 0, 0, 0])
 
     def test_starvation_when_upstream_low(self):
-        # Trade 1 always 1, trade 2 always 9 → trade 2 limited by buffer
         cfg = ParadeConfig.from_pairs(
-            [(1, 1), (9, 9)], total_units=10, seed=0
+            [(1, 1), (9, 9)], total_units=10, seed=0,
+            staggered_mobilization=False,
         )
         sim = ParadeOfTrades(cfg)
         rec = sim.step()
-        # T1 produces 1 → buffer1 gets 1; T2 wants 9 but only 1 available
         self.assertEqual(rec.production[0], 1)
         self.assertEqual(rec.production[1], 1)
         self.assertEqual(rec.idle_capacity[1], 8)
@@ -140,11 +174,11 @@ class TestSequentialBufferUpdate(unittest.TestCase):
 
     def test_buffer_builds_when_downstream_low(self):
         cfg = ParadeConfig.from_pairs(
-            [(9, 9), (1, 1)], total_units=20, seed=0
+            [(9, 9), (1, 1)], total_units=20, seed=0,
+            staggered_mobilization=False,
         )
         sim = ParadeOfTrades(cfg)
         rec = sim.step()
-        # T1 produces 9; T2 takes only 1 → buffer = 8
         self.assertEqual(rec.production[0], 9)
         self.assertEqual(rec.production[1], 1)
         self.assertEqual(rec.buffers[0], 8)
@@ -153,19 +187,24 @@ class TestSequentialBufferUpdate(unittest.TestCase):
 
 class TestCapacityAndRemainingWork(unittest.TestCase):
     def test_cannot_exceed_total_units(self):
-        cfg = ParadeConfig.from_pairs([(8, 8)], total_units=10, seed=0)
+        cfg = ParadeConfig.from_pairs(
+            [(8, 8)], total_units=10, seed=0, staggered_mobilization=False
+        )
         sim = ParadeOfTrades(cfg)
         r1 = sim.step()
         self.assertEqual(r1.production[0], 8)
         r2 = sim.step()
-        self.assertEqual(r2.production[0], 2)  # only 2 remaining
+        self.assertEqual(r2.production[0], 2)
         self.assertTrue(sim.is_complete)
         self.assertEqual(sim.cumulative[0], 10)
 
     def test_trade_stops_after_finish(self):
-        cfg = ParadeConfig.from_pairs([(5, 5), (5, 5)], total_units=5, seed=0)
+        cfg = ParadeConfig.from_pairs(
+            [(5, 5), (5, 5)], total_units=5, seed=0,
+            staggered_mobilization=False,
+        )
         sim = ParadeOfTrades(cfg)
-        sim.step()  # both finish in period 1
+        sim.step()
         self.assertTrue(sim.is_complete)
         self.assertEqual(sim._executions, [1, 1])
 
@@ -259,10 +298,11 @@ class TestVariabilityImpact(unittest.TestCase):
             verbose=False,
         )
         no_var = results["no_variability"]
-        self.assertEqual(no_var.duration, 20)
+        # Default stagger: 20 work periods + 4 start lags
+        self.assertEqual(no_var.duration, 24)
         self.assertEqual(no_var.total_idle_capacity, 0)
 
-        # With variability, duration should be >= ideal (almost always >)
+        # With variability, duration should be >= no-var baseline
         for name in ["low", "medium", "high", "very_high"]:
             self.assertGreaterEqual(
                 results[name].duration,

@@ -118,7 +118,10 @@ class ParadeConfig:
     # Takt / capacity-buffer options (None takt_rate ⇒ classic Parade)
     takt_rate: Optional[int] = None
     standby_capacity: int = 0
-    staggered_mobilization: bool = False
+    # Parade stagger: trade i mobilizes at period (i+1) so each crew starts
+    # one period after the upstream crew (Tommelein 2020 / field parade).
+    # Default True for educational realism; set False for all-on-site-from-day-1.
+    staggered_mobilization: bool = True
 
     def __post_init__(self) -> None:
         if not self.trades:
@@ -161,7 +164,7 @@ class ParadeConfig:
         seed: Optional[int] = None,
         takt_rate: Optional[int] = None,
         standby_capacity: int = 0,
-        staggered_mobilization: bool = False,
+        staggered_mobilization: bool = True,
     ) -> "ParadeConfig":
         """
         Build config from named variability preset(s).
@@ -179,7 +182,8 @@ class ParadeConfig:
             Optional display names. Defaults to Indonesian floor-cycle names
             for the first five trades, then "Trade k".
         takt_rate / standby_capacity / staggered_mobilization :
-            Optional Tommelein (2020) takt-planning options.
+            Optional Tommelein (2020) options. Stagger default True:
+            trade *i* starts at period *i+1*.
         """
         if isinstance(preset, str):
             if preset not in CAPACITY_PRESETS:
@@ -226,7 +230,7 @@ class ParadeConfig:
         seed: Optional[int] = None,
         takt_rate: Optional[int] = None,
         standby_capacity: int = 0,
-        staggered_mobilization: bool = False,
+        staggered_mobilization: bool = True,
     ) -> "ParadeConfig":
         """Build config from explicit (low, high) capacity pairs per trade."""
         if not pairs:
@@ -771,7 +775,7 @@ class ParadeOfTrades:
 def tommelein2020_scenarios(
     total_units: int = DEFAULT_TOTAL_UNITS,
     seed: Optional[int] = None,
-    staggered: bool = False,
+    staggered: bool = True,
 ) -> Dict[str, ParadeConfig]:
     """
     The three scenarios from Tommelein (2020) IGLC28:
@@ -810,7 +814,7 @@ def run_preset(
     verbose: bool = True,
     takt_rate: Optional[int] = None,
     standby_capacity: int = 0,
-    staggered_mobilization: bool = False,
+    staggered_mobilization: bool = True,
 ) -> ParadeResult:
     """One-liner: configure, run, optionally print, return result."""
     cfg = ParadeConfig.from_preset(

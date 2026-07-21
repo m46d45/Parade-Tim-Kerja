@@ -29,6 +29,7 @@ class TestTaktStandby(unittest.TestCase):
             seed=0,
             takt_rate=5,
             standby_capacity=1,
+            staggered_mobilization=False,
         )
         sim = ParadeOfTrades(cfg)
         rec = sim.step()
@@ -44,6 +45,7 @@ class TestTaktStandby(unittest.TestCase):
             seed=0,
             takt_rate=5,
             standby_capacity=1,
+            staggered_mobilization=False,
         )
         sim = ParadeOfTrades(cfg)
         rec = sim.step()
@@ -53,34 +55,34 @@ class TestTaktStandby(unittest.TestCase):
         self.assertEqual(rec.production, [6, 6])
 
     def test_takt_4_6_equivalent_to_5_6_production(self):
-        # Same seed: S2 (4/6 + stby1 takt5) should match production path of (5,6) die
-        # Not always identical period-by-period if 5/6 mapping differs from 4→5,6→6
-        # But duration distribution should be similar; for identical RNG:
-        # when 4/6 rolls 4 → 5; rolls 6 → 6. A true 5/6 die with same 50/50:
-        # we map via choice([5,6]) vs choice([4,6])+standby — different RNG sequences
-        # unless we force low==4 always.
+        # Force constant low die + standby → same as constant 5, with stagger.
         cfg_takt = ParadeConfig.from_pairs(
             [(4, 4), (4, 4)],
             total_units=20,
             seed=1,
             takt_rate=5,
             standby_capacity=1,
+            staggered_mobilization=True,
         )
         cfg_equiv = ParadeConfig.from_pairs(
             [(5, 5), (5, 5)],
             total_units=20,
             seed=1,
+            staggered_mobilization=True,
         )
         r1 = ParadeOfTrades(cfg_takt).run()
         r2 = ParadeOfTrades(cfg_equiv).run()
         self.assertEqual(r1.duration, r2.duration)
-        self.assertEqual(r1.duration, 4)  # 20/5
+        # 20/5 = 4 work periods + 1 lag for trade 2
+        self.assertEqual(r1.duration, 5)
 
     def test_classic_unchanged_without_takt(self):
         r = run_preset("no_variability", seed=0, total_units=100, verbose=False)
-        self.assertEqual(r.duration, 20)
+        # Default stagger: 20 work + 4 pipeline lags
+        self.assertEqual(r.duration, 24)
         self.assertEqual(r.total_standby_used, 0)
         self.assertFalse(r.config.takt_enabled)
+        self.assertTrue(r.config.staggered_mobilization)
 
     def test_staggered_mobilization_delays_downstream(self):
         cfg = ParadeConfig.from_pairs(
