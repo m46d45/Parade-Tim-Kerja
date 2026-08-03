@@ -1179,3 +1179,52 @@ def plot_wip_th_ct(
     ax2.grid(False)
     return ax
 
+def plot_inventory_fill_rate(
+    result: ParadeResult,
+    ax: Optional[Axes] = None,
+    title: Optional[str] = None,
+) -> Axes:
+    """
+    Inventory (X) vs fill rate (Y) — classic service–inventory tradeoff.
+
+    Curve: theoretical base-stock / normal-loss shape (diminishing returns).
+    Point: system operating point from the run (avg buffer inventory, fill rate).
+    Extra markers: each interface buffer B1..B4.
+    """
+    if ax is None:
+        _, ax = plt.subplots(figsize=(9, 4.6))
+    from parade_of_trades_analysis import inventory_fill_rate_curve
+
+    d = inventory_fill_rate_curve(result)
+    inv, fr = d["inventory"], d["fill_rate"]
+    # sort by inventory
+    order = sorted(range(len(inv)), key=lambda i: inv[i])
+    inv_s = [inv[i] for i in order]
+    fr_s = [fr[i] for i in order]
+
+    ax.plot(inv_s, [100 * f for f in fr_s], color="#0f766e", linewidth=2.2,
+            label="Kurva teoritis (base-stock)")
+    ax.scatter(
+        [d["op_inventory"]], [100 * d["op_fill_rate"]],
+        s=100, zorder=5, color="#0f172a", edgecolors="white", linewidths=1.2,
+        label=f"Sistem (I̅={d['op_inventory']:.2f}, FR={100*d['op_fill_rate']:.1f}%)",
+    )
+    colors = ["#2563eb", "#ea580c", "#16a34a", "#dc2626"]
+    for i, row in enumerate(d.get("interfaces") or []):
+        ax.scatter(
+            [row["avg_inventory"]], [100 * row["fill_rate"]],
+            s=70, zorder=4, color=colors[i % len(colors)],
+            edgecolors="white", marker="D",
+            label=f"{row['buffer']} FR={100*row['fill_rate']:.0f}%",
+        )
+
+    ax.set_xlabel("Inventory / WIP buffer (zona, rata-rata)")
+    ax.set_ylabel("Fill rate (%)")
+    ax.set_ylim(0, 105)
+    ax.set_xlim(left=0)
+    ax.axhline(100, color="0.75", linestyle="--", linewidth=0.9)
+    ax.set_title(title or "Inventory vs fill rate (tradeoff service–persediaan)")
+    ax.legend(loc="lower right", fontsize=7.5, framealpha=0.92)
+    _apply_axes_style(ax)
+    return ax
+

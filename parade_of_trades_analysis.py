@@ -445,6 +445,128 @@ def littles_operations_curve(
     }
 
 
+
+def _unit_normal_loss(z: float) -> float:
+    """Unit normal loss G(z) = φ(z) - z (1-Φ(z))."""
+    # φ and Φ without scipy
+    phi = math.exp(-0.5 * z * z) / math.sqrt(2.0 * math.pi)
+    # Abramowitz-Stegun approximation for Φ
+    t = 1.0 / (1.0 + 0.2316419 * abs(z))
+    d = 0.3989423 * math.exp(-0.5 * z * z)
+    p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))))
+    Phi = 1.0 - p if z >= 0 else p
+    return phi - z * (1.0 - Phi)
+
+
+def inventory_fill_rate_metrics(result: ParadeResult) -> dict:
+    """
+    Inventory vs fill-rate view of the parade.
+
+    **Inventory** = average interface buffer WIP (zona menunggu di antara tim).
+    **Fill rate** (tipe-2, analog) per tim hilir ≈
+        produksi / (produksi + idle)
+    yaitu fraksi kapasitas yang benar-benar menjadi output (bukan starvation).
+
+    Juga kurva teoritis base-stock (normal loss) untuk konteks Factory Physics:
+        safety stock ~ z·σ, fill rate naik cekung menuju 100% saat inventory naik.
+    """
+    n = result.config.n_trades
+    # Per-interface inventory
+    buf = result.buffer_series()  # [iface][period]
+    iface_rows = []
+    for j in range(result.config.n_interfaces):
+        series = buf[j] if j < len(buf) else []
+        avg_inv = sum(series) / len(series) if series else 0.0
+        peak = max(series) if series else 0.0
+        up = result.config.trades[j].name
+        down = result.config.trades[j + 1].name
+        # fill rate of downstream trade
+        m = result.trade_metrics[j + 1]
+        denom = m.total_production + m.total_idle
+        fr = (m.total_production / denom) if denom > 0 else 1.0
+        iface_rows.append({
+            "buffer": f"B{j + 1}",
+            "from": up,
+            "to": down,
+            "avg_inventory": avg_inv,
+            "peak_inventory": peak,
+            "fill_rate": fr,
+            "downstream_idle": m.total_idle,
+            "downstream_prod": m.total_production,
+        })
+
+    # System aggregates
+    avg_inv_sys = sum(r["avg_inventory"] for r in iface_rows) / max(len(iface_rows), 1)
+    # Combined fill rate: production-weighted across T2..T5
+    prod = sum(result.trade_metrics[i].total_production for i in range(1, n))
+    idle = sum(result.trade_metrics[i].total_idle for i in range(1, n))
+    fr_sys = prod / (prod + idle) if (prod + idle) > 0 else 1.0
+    # T1 often ~1 if raw infinite
+    m1 = result.trade_metrics[0]
+    d1 = m1.total_production + m1.total_idle
+    fr_t1 = m1.total_production / d1 if d1 > 0 else 1.0
+
+    return {
+        "interfaces": iface_rows,
+        "avg_inventory_system": avg_inv_sys,
+        "fill_rate_system": fr_sys,
+        "fill_rate_t1": fr_t1,
+        "peak_buffer_total": max(
+            (sum(result.history[t].buffers) for t in range(len(result.history))),
+            default=0,
+        ) if result.history else 0,
+    }
+
+
+def inventory_fill_rate_curve(
+    result: ParadeResult,
+    n_points: int = 60,
+) -> Dict[str, List[float]]:
+    """
+    Theoretical inventory–fill-rate curve (base-stock / normal demand).
+
+    Parameterize by safety factor z:
+      inventory_index = max(z, 0) * σ_proxy + cycle_stock
+      fill_rate ≈ 1 - G(z) / (μ/σ)   clipped to [0,1]
+    Shape: concave, diminishing returns of inventory on service.
+    σ_proxy scaled from run variability (c_e).
+    """
+    comb = kingman_combined(result)
+    # μ demand rate ~ TH; σ from CV ~ c_e * scale
+    ll = littles_law_metrics(result)
+    mu = max(ll.throughput, 0.1)
+    ce = max(float(comb["c_e"]), 0.05)  # minimum for visible curve
+    sigma = max(ce * mu, 0.05)
+
+    invs: List[float] = []
+    frs: List[float] = []
+    # z from -0.5 to 3.2
+    for i in range(n_points):
+        z = -0.5 + (3.2 - (-0.5)) * i / max(n_points - 1, 1)
+        # cycle stock proxy + safety
+        cycle = mu * float(comb["t_e"]) * 0.5  # rough half process
+        safety = max(z, 0.0) * sigma
+        inv = cycle + safety
+        # Type-2 style fill rate using unit normal loss
+        # FR ≈ 1 - σ*G(z) / μ   (per period demand μ)
+        G = _unit_normal_loss(z)
+        fr = 1.0 - (sigma * G) / mu
+        fr = max(0.0, min(1.0, fr))
+        invs.append(max(inv, 0.0))
+        frs.append(fr)
+
+    emp = inventory_fill_rate_metrics(result)
+    return {
+        "inventory": invs,
+        "fill_rate": frs,
+        "op_inventory": emp["avg_inventory_system"],
+        "op_fill_rate": emp["fill_rate_system"],
+        "interfaces": emp["interfaces"],
+        "mu": mu,
+        "sigma": sigma,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Statistics helpers
 # ---------------------------------------------------------------------------

@@ -21,6 +21,7 @@ _a = importlib.reload(_a)
 from parade_of_trades_analysis import (
     export_result_csv,
     export_result_excel,
+    inventory_fill_rate_metrics,
     kingman_combined,
     kingman_metrics,
     littles_law_metrics,
@@ -38,6 +39,7 @@ from parade_of_trades_plots import (
     plot_comparison_lob,
     plot_comparison_utilization,
     plot_kingman_stations,
+    plot_inventory_fill_rate,
     plot_kingman_vut_curve,
     plot_line_of_balance,
     plot_line_of_balance_detail,
@@ -46,7 +48,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-wip-th-ct-v42"
+_APP_BUILD = "2026-08-03-inv-fr-v43"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -584,8 +586,8 @@ def _export_block(result: ParadeResult, key: str) -> None:
 
 
 def _plot_single_result(result: ParadeResult) -> None:
-    tab_lob, tab_buf, tab_util, tab_ll, tab_kg = st.tabs(
-        ["Line of Balance", "Buffer / WIP", "Utilisasi", "Little's Law", "Kingman"]
+    tab_lob, tab_buf, tab_util, tab_ll, tab_kg, tab_fr = st.tabs(
+        ["Line of Balance", "Buffer / WIP", "Utilisasi", "Little's Law", "Kingman", "Inventory / FR"]
     )
     with tab_lob:
         fig, ax = plt.subplots(figsize=(10, 4.5))
@@ -673,6 +675,29 @@ def _plot_single_result(result: ParadeResult) -> None:
         fig.tight_layout()
         _fig_to_st(fig)
         st.dataframe(kg.as_rows(), use_container_width=True, hide_index=True)
+    with tab_fr:
+        fr = inventory_fill_rate_metrics(result)
+        b1, b2, b3 = st.columns(3)
+        b1.metric("Inventory ⌀ (buffer)", f"{fr['avg_inventory_system']:.2f}", help="Rata-rata WIP di semua buffer")
+        b2.metric("Fill rate sistem", f"{100 * fr['fill_rate_system']:.1f}%",
+                  help="produksi / (produksi+idle) tim hilir")
+        b3.metric("Fill rate T1", f"{100 * fr['fill_rate_t1']:.1f}%")
+        fig, ax = plt.subplots(figsize=(9, 4.6))
+        plot_inventory_fill_rate(result, ax=ax)
+        fig.tight_layout()
+        _fig_to_st(fig)
+        rows = []
+        for row in fr["interfaces"]:
+            rows.append({
+                "Buffer": row["buffer"],
+                "Dari": row["from"][:18],
+                "Ke": row["to"][:18],
+                "Inventory ⌀": round(row["avg_inventory"], 3),
+                "Puncak": row["peak_inventory"],
+                "Fill rate %": round(100 * row["fill_rate"], 1),
+                "Idle hilir": row["downstream_idle"],
+            })
+        st.dataframe(rows, use_container_width=True, hide_index=True)
 
 
 def render_sidebar():
@@ -879,8 +904,8 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
     st.markdown("##### Ringkasan")
     st.dataframe(sorted(rows, key=lambda x: x["Durasi"]), use_container_width=True, hide_index=True)
 
-    tab_lob, tab_buf, tab_util, tab_ll, tab_kg = st.tabs(
-        ["Line of Balance", "Buffer / WIP", "Utilisasi", "Little's Law", "Kingman"]
+    tab_lob, tab_buf, tab_util, tab_ll, tab_kg, tab_fr = st.tabs(
+        ["Line of Balance", "Buffer / WIP", "Utilisasi", "Little's Law", "Kingman", "Inventory / FR"]
     )
     with tab_lob:
         fig, ax = plt.subplots(figsize=(10, 5.5))
@@ -1010,6 +1035,34 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
         ax.set_ylabel("CT Kingman (periode/zona)")
         ax.set_title("Kingman: titik operasi skenario (CT vs u̅)")
         ax.legend(loc="upper left", fontsize=7.5, framealpha=0.92)
+        fig.tight_layout()
+        _fig_to_st(fig)
+    with tab_fr:
+        fr_rows = []
+        for name, r in results.items():
+            fr = inventory_fill_rate_metrics(r)
+            fr_rows.append({
+                "Skenario": name,
+                "Inventory ⌀": round(fr["avg_inventory_system"], 3),
+                "Fill rate %": round(100 * fr["fill_rate_system"], 1),
+                "FR T1 %": round(100 * fr["fill_rate_t1"], 1),
+            })
+        st.dataframe(fr_rows, use_container_width=True, hide_index=True)
+        import numpy as np
+        fig, ax = plt.subplots(figsize=(9, 4.6))
+        # theoretical curve from first scenario as backdrop
+        first = next(iter(results.values()))
+        plot_inventory_fill_rate(first, ax=ax, title="Inventory vs fill rate — titik skenario")
+        colors = ["#2563eb", "#ea580c", "#16a34a", "#dc2626", "#7c3aed"]
+        # re-scatter all scenarios on top
+        for i, (name, r) in enumerate(results.items()):
+            fr = inventory_fill_rate_metrics(r)
+            ax.scatter(
+                [fr["avg_inventory_system"]], [100 * fr["fill_rate_system"]],
+                s=100, zorder=6, color=colors[i % len(colors)],
+                edgecolors="white", label=name,
+            )
+        ax.legend(loc="lower right", fontsize=7.5, framealpha=0.92)
         fig.tight_layout()
         _fig_to_st(fig)
 

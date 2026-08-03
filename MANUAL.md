@@ -350,6 +350,32 @@ Kingman mengasumsikan antrian **stasioner** jangka panjang. Parade proyek berhin
 Bandingkan dengan **Little's Law** (sistem: WIP = TH × CT) di tab sebelahnya.
 
 
+
+
+---
+
+## 13. Inventory vs fill rate
+
+Kurva klasik **service–inventory tradeoff** (Factory Physics / inventory theory):
+
+| Sumbu | Arti |
+|-------|------|
+| **X — Inventory** | Rata-rata WIP di **buffer** antar-tim (zona menunggu) |
+| **Y — Fill rate** | % permintaan yang terpenuhi **langsung dari stok** (tanpa stockout / starvation) |
+
+### Intuisi
+
+- Inventory naik → fill rate naik, tetapi **makin datar** mendekati 100% (diminishing returns).
+- Variability tinggi → butuh **lebih banyak** inventory untuk fill rate yang sama.
+- Batch besar menumpuk inventory; one-piece menjaga inventory tipis (fill rate hilir bergantung keandalan hulu).
+
+### Di app ini
+
+- **Fill rate** analog ≈ `produksi / (produksi + idle)` pada tim hilir (idle = kelaparan buffer).
+- **Inventory** = rata-rata isi buffer B1…B4.
+- Tab **Inventory / FR**: kurva teoritis base-stock + titik operasi run / skenario.
+
+
 ## 10. Pemecahan masalah singkat
 
 | Gejala | Coba |
