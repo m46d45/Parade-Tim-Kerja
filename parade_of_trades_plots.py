@@ -982,3 +982,32 @@ def _demo() -> None:
 
 if __name__ == "__main__":
     _demo()
+
+def plot_littles_law_wip(
+    result: ParadeResult,
+    ax: Optional[Axes] = None,
+    title: Optional[str] = None,
+) -> Axes:
+    """Pipeline WIP and interface buffer WIP over time (Little's Law context)."""
+    if ax is None:
+        _, ax = plt.subplots(figsize=(9, 4.2))
+    from parade_of_trades_analysis import littles_law_series, littles_law_metrics
+
+    s = littles_law_series(result)
+    m = littles_law_metrics(result)
+    periods = s["period"]
+    ax.plot(periods, s["pipeline_wip"], color="#1a365d", linewidth=2.0, label="WIP pipeline (T1−T5)")
+    ax.plot(periods, s["buffer_wip"], color="#dd6b20", linewidth=1.8, label="WIP buffer (jumlah antrian)")
+    ax.axhline(m.avg_pipeline_wip, color="#1a365d", linestyle="--", linewidth=1.0, alpha=0.7,
+               label=f"Rata-rata pipeline={m.avg_pipeline_wip:.2f}")
+    ax.axhline(m.avg_buffer_wip, color="#dd6b20", linestyle=":", linewidth=1.0, alpha=0.7,
+               label=f"Rata-rata buffer={m.avg_buffer_wip:.2f}")
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0)
+    ax.set_xlabel("Periode")
+    ax.set_ylabel("WIP (zona)")
+    ax.set_title(title or "Little's Law — jejak WIP")
+    ax.legend(loc="upper right", fontsize=8, framealpha=0.92)
+    _apply_axes_style(ax)
+    return ax
+

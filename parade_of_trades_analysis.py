@@ -34,7 +34,178 @@ from parade_of_trades_core import (
     tommelein2020_scenarios,
 )
 
+
 PathLike = Union[str, Path]
+
+
+# ---------------------------------------------------------------------------
+# Little's Law (classic production form; yield y = 1 in this app)
+# ---------------------------------------------------------------------------
+# Reference: WIP = CT × TH  (Little; Hopp & Spearman / Factory Physics;
+# Project Production Institute — "Little's Law in Production Systems with Yield Loss")
+# Our parade model has no scrap/yield loss (y_i = 1), so classic form applies.
+
+
+@dataclass
+class LittlesLawMetrics:
+    """Time-average Little's Law metrics from a completed parade run."""
+
+    throughput: float
+    """System throughput TH (zona selesai proyek / periode) = N / duration."""
+
+    avg_pipeline_wip: float
+    """Average pipeline WIP: zona yang sudah dikerjakan T1 tetapi belum selesai di T5."""
+
+    avg_buffer_wip: float
+    """Average interface buffer WIP (jumlah semua buffer antar-tim)."""
+
+    peak_pipeline_wip: float
+    peak_buffer_wip: float
+
+    cycle_time_pipeline: float
+    """CT from Little: avg_pipeline_wip / TH (periode)."""
+
+    cycle_time_buffer: float
+    """CT if only buffer WIP is used: avg_buffer_wip / TH."""
+
+    duration: int
+    total_units: int
+    yield_assumed: float = 1.0
+    """App model has no yield loss; Y = 1 so TH_end = TH_start."""
+
+    check_pipeline: float = 0.0
+    """TH × CT_pipeline should ≈ avg_pipeline_wip."""
+
+    check_buffer: float = 0.0
+
+    def as_rows(self) -> List[dict]:
+        return [
+            {
+                "Metrik": "Throughput (TH)",
+                "Nilai": round(self.throughput, 4),
+                "Satuan": "zona / periode",
+                "Keterangan": "N ÷ durasi proyek",
+            },
+            {
+                "Metrik": "WIP pipeline (rata-rata)",
+                "Nilai": round(self.avg_pipeline_wip, 3),
+                "Satuan": "zona",
+                "Keterangan": "Rata-rata (kumulatif T1 − kumulatif T5)",
+            },
+            {
+                "Metrik": "WIP buffer (rata-rata)",
+                "Nilai": round(self.avg_buffer_wip, 3),
+                "Satuan": "zona",
+                "Keterangan": "Rata-rata jumlah semua buffer antar-tim",
+            },
+            {
+                "Metrik": "CT pipeline (Little)",
+                "Nilai": round(self.cycle_time_pipeline, 3),
+                "Satuan": "periode",
+                "Keterangan": "WIP_pipeline ÷ TH",
+            },
+            {
+                "Metrik": "CT buffer (Little)",
+                "Nilai": round(self.cycle_time_buffer, 3),
+                "Satuan": "periode",
+                "Keterangan": "WIP_buffer ÷ TH (hanya antrian antar-tim)",
+            },
+            {
+                "Metrik": "WIP puncak pipeline",
+                "Nilai": round(self.peak_pipeline_wip, 3),
+                "Satuan": "zona",
+                "Keterangan": "Maks (T1 − T5) kumulatif",
+            },
+            {
+                "Metrik": "WIP puncak buffer",
+                "Nilai": round(self.peak_buffer_wip, 3),
+                "Satuan": "zona",
+                "Keterangan": "Maks total buffer serentak",
+            },
+            {
+                "Metrik": "Cek Little (pipeline)",
+                "Nilai": round(self.check_pipeline, 3),
+                "Satuan": "zona",
+                "Keterangan": "TH × CT ≈ WIP rata-rata (harus dekat)",
+            },
+        ]
+
+
+def littles_law_metrics(result: ParadeResult) -> LittlesLawMetrics:
+    """
+    Compute Little's Law metrics from a parade result.
+
+    Classic form (no yield loss):  **WIP = TH × CT**
+
+    - **TH** = total_units / duration (average exit rate of finished zones).
+    - **WIP pipeline** at period t ≈ cumulative_T1(t) − cumulative_T5(t)
+      (zona yang sudah masuk jalur tetapi belum keluar di finishing).
+    - **WIP buffer** = sum of interface buffers (antrian antar-tim saja).
+    - **CT** = WIP / TH  (waktu tinggal rata-rata implisit).
+
+    Yield loss (artikel PPI): model app ini y_i = 1 untuk semua tahap, jadi
+    TH_end = TH_start dan bentuk klasik berlaku tanpa koreksi yield.
+    """
+    n = result.config.n_trades
+    total = result.config.total_units
+    duration = max(1, int(result.duration))
+    th = float(total) / float(duration)
+
+    pipeline_series: List[float] = []
+    buffer_series: List[float] = []
+
+    # period 0 empty
+    pipeline_series.append(0.0)
+    buffer_series.append(0.0)
+
+    for rec in result.history:
+        if rec.cumulative and len(rec.cumulative) >= n:
+            pipe = float(rec.cumulative[0] - rec.cumulative[-1])
+            pipeline_series.append(max(0.0, pipe))
+        else:
+            pipeline_series.append(0.0)
+        if rec.buffers:
+            buffer_series.append(float(sum(rec.buffers)))
+        else:
+            buffer_series.append(0.0)
+
+    avg_pipe = sum(pipeline_series) / len(pipeline_series)
+    avg_buf = sum(buffer_series) / len(buffer_series)
+    peak_pipe = max(pipeline_series) if pipeline_series else 0.0
+    peak_buf = max(buffer_series) if buffer_series else 0.0
+
+    ct_pipe = avg_pipe / th if th > 0 else float("inf")
+    ct_buf = avg_buf / th if th > 0 else float("inf")
+
+    return LittlesLawMetrics(
+        throughput=th,
+        avg_pipeline_wip=avg_pipe,
+        avg_buffer_wip=avg_buf,
+        peak_pipeline_wip=peak_pipe,
+        peak_buffer_wip=peak_buf,
+        cycle_time_pipeline=ct_pipe,
+        cycle_time_buffer=ct_buf,
+        duration=duration,
+        total_units=total,
+        yield_assumed=1.0,
+        check_pipeline=th * ct_pipe if th > 0 and math.isfinite(ct_pipe) else 0.0,
+        check_buffer=th * ct_buf if th > 0 and math.isfinite(ct_buf) else 0.0,
+    )
+
+
+def littles_law_series(result: ParadeResult) -> Dict[str, List[float]]:
+    """Time series for plotting pipeline WIP and buffer WIP."""
+    n = result.config.n_trades
+    pipe = [0.0]
+    buf = [0.0]
+    for rec in result.history:
+        if rec.cumulative and len(rec.cumulative) >= n:
+            pipe.append(max(0.0, float(rec.cumulative[0] - rec.cumulative[-1])))
+        else:
+            pipe.append(0.0)
+        buf.append(float(sum(rec.buffers)) if rec.buffers else 0.0)
+    return {"pipeline_wip": pipe, "buffer_wip": buf, "period": list(range(len(pipe)))}
+
 
 
 # ---------------------------------------------------------------------------

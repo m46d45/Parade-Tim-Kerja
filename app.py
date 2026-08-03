@@ -21,6 +21,7 @@ _a = importlib.reload(_a)
 from parade_of_trades_analysis import (
     export_result_csv,
     export_result_excel,
+    littles_law_metrics,
 )
 from parade_of_trades_core import (
     CAPACITY_PRESETS,
@@ -36,10 +37,11 @@ from parade_of_trades_plots import (
     plot_comparison_utilization,
     plot_line_of_balance,
     plot_line_of_balance_detail,
+    plot_littles_law_wip,
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-manual-v38"
+_APP_BUILD = "2026-08-03-littles-law-v39"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -577,7 +579,9 @@ def _export_block(result: ParadeResult, key: str) -> None:
 
 
 def _plot_single_result(result: ParadeResult) -> None:
-    tab_lob, tab_buf, tab_util = st.tabs(["Line of Balance", "Buffer / WIP", "Utilisasi"])
+    tab_lob, tab_buf, tab_util, tab_ll = st.tabs(
+        ["Line of Balance", "Buffer / WIP", "Utilisasi", "Little's Law"]
+    )
     with tab_lob:
         fig, ax = plt.subplots(figsize=(10, 4.5))
         plot_line_of_balance_detail(result, ax=ax, max_period=min(16, result.duration + 1))
@@ -623,6 +627,22 @@ def _plot_single_result(result: ParadeResult) -> None:
                 "Utilisasi %": round(100.0 * m.utilization, 1),
             })
         st.dataframe(util_rows, use_container_width=True, hide_index=True)
+    with tab_ll:
+        ll = littles_law_metrics(result)
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Throughput (TH)", f"{ll.throughput:.3f}", help="zona / periode")
+        c2.metric("WIP pipeline ⌀", f"{ll.avg_pipeline_wip:.2f}", help="zona")
+        c3.metric("CT pipeline", f"{ll.cycle_time_pipeline:.2f}", help="periode · WIP÷TH")
+        d1, d2, d3 = st.columns(3)
+        d1.metric("WIP buffer ⌀", f"{ll.avg_buffer_wip:.2f}")
+        d2.metric("CT buffer", f"{ll.cycle_time_buffer:.2f}")
+        d3.metric("TH × CT (cek)", f"{ll.check_pipeline:.2f}",
+                  help="Harus ≈ WIP pipeline rata-rata")
+        fig, ax = plt.subplots(figsize=(9, 4.2))
+        plot_littles_law_wip(result, ax=ax)
+        fig.tight_layout()
+        _fig_to_st(fig)
+        st.dataframe(ll.as_rows(), use_container_width=True, hide_index=True)
 
 
 def render_sidebar():
@@ -810,6 +830,7 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
     rows = []
     for name, r in results.items():
         m = meta.get(name, {})
+        ll = littles_law_metrics(r)
         rows.append({
             "Skenario": name,
             "Variability": m.get("var_label", "—"),
@@ -819,14 +840,18 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
             "vs Ideal": round(r.duration - r.ideal_duration, 1),
             "Idle": r.total_idle_capacity,
             "Puncak WIP": _peak_wip(r),
-            "Throughput": round(r.system_throughput, 3),
+            "TH": round(ll.throughput, 3),
+            "WIP⌀": round(ll.avg_pipeline_wip, 2),
+            "CT": round(ll.cycle_time_pipeline, 2),
             "T5 selesai": r.trade_metrics[-1].periods_to_finish,
         })
     st.divider()
     st.markdown("##### Ringkasan")
     st.dataframe(sorted(rows, key=lambda x: x["Durasi"]), use_container_width=True, hide_index=True)
 
-    tab_lob, tab_buf, tab_util = st.tabs(["Line of Balance", "Buffer / WIP", "Utilisasi"])
+    tab_lob, tab_buf, tab_util, tab_ll = st.tabs(
+        ["Line of Balance", "Buffer / WIP", "Utilisasi", "Little's Law"]
+    )
     with tab_lob:
         fig, ax = plt.subplots(figsize=(10, 5.5))
         plot_comparison_lob(
@@ -853,6 +878,41 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
             ax=ax,
             title="Utilisasi per tim — perbandingan skenario",
         )
+        fig.tight_layout()
+        _fig_to_st(fig)
+    with tab_ll:
+        ll_rows = []
+        for name, r in results.items():
+            ll = littles_law_metrics(r)
+            ll_rows.append({
+                "Skenario": name,
+                "TH": round(ll.throughput, 4),
+                "WIP pipeline ⌀": round(ll.avg_pipeline_wip, 3),
+                "CT pipeline": round(ll.cycle_time_pipeline, 3),
+                "WIP buffer ⌀": round(ll.avg_buffer_wip, 3),
+                "CT buffer": round(ll.cycle_time_buffer, 3),
+                "TH×CT": round(ll.check_pipeline, 3),
+            })
+        st.dataframe(ll_rows, use_container_width=True, hide_index=True)
+        # Bar compare CT and WIP
+        import numpy as np
+        names = list(results.keys())
+        cts = [littles_law_metrics(results[n]).cycle_time_pipeline for n in names]
+        wips = [littles_law_metrics(results[n]).avg_pipeline_wip for n in names]
+        fig, axes = plt.subplots(1, 2, figsize=(10, 3.8))
+        x = np.arange(len(names))
+        axes[0].bar(x, wips, color="#1a365d", edgecolor="white")
+        axes[0].set_xticks(x)
+        axes[0].set_xticklabels(names, rotation=20, ha="right", fontsize=8)
+        axes[0].set_ylabel("WIP pipeline ⌀ (zona)")
+        axes[0].set_title("WIP rata-rata")
+        axes[1].bar(x, cts, color="#2b6cb0", edgecolor="white")
+        axes[1].set_xticks(x)
+        axes[1].set_xticklabels(names, rotation=20, ha="right", fontsize=8)
+        axes[1].set_ylabel("CT (periode)")
+        axes[1].set_title("Cycle time (WIP÷TH)")
+        for ax in axes:
+            ax.set_ylim(bottom=0)
         fig.tight_layout()
         _fig_to_st(fig)
 

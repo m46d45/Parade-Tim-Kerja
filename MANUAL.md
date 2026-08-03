@@ -250,6 +250,50 @@ Batch = 1  →  aliran zona paling mulus (one-piece), WIP tipis
 
 ---
 
+
+
+---
+
+## 11. Little's Law (analisis tambahan)
+
+Dasar: hubungan klasik produksi
+
+```text
+WIP  =  TH  ×  CT
+```
+
+| Simbol | Nama | Arti di Parade Tim Kerja |
+|--------|------|-------------------------|
+| **TH** | Throughput | Zona selesai proyek per periode = *total zona ÷ durasi* |
+| **WIP** | Work-In-Process | (1) **Pipeline**: zona sudah dikerjakan T1 tetapi belum selesai di T5; (2) **Buffer**: jumlah antrian antar-tim |
+| **CT** | Cycle time | Waktu tinggal rata-rata ≈ **WIP ÷ TH** (periode) |
+
+### Bentuk klasik vs yield loss
+
+Artikel [Little’s Law in Production Systems with Yield Loss](https://projectproduction.org/journal/littles-law-in-production-systems-with-yield-loss/) (Project Production Institute) membahas perluasan bila ada **kehilangan hasil (yield loss)** di tiap tahap.
+
+| | Model app ini | Jika ada yield loss |
+|--|---------------|---------------------|
+| Yield per tahap yᵢ | **yᵢ = 1** (tidak ada scrap) | 0 < yᵢ ≤ 1 |
+| Bentuk Little | **WIP = TH × CT** klasik | Perlu TH / CT “yielded” vs “observed” |
+| TH akhir | = TH sistem (semua zona selesai finishing) | TH_end = TH₀ × Y, Y = ∏ yᵢ |
+
+Di app ini **tidak ada yield loss**, jadi bentuk klasik langsung dipakai. Cek numerik: **TH × CT ≈ WIP rata-rata**.
+
+### Di mana di app?
+
+- Tab **Simulasi** → sub-tab **Little's Law** (setelah Jalankan)  
+- Tab **Perbandingan** → kolom TH / WIP⌀ / CT + sub-tab **Little's Law**
+
+### Cara baca di kelas
+
+1. Naikkan **batch** → biasanya WIP↑ dan CT↑ (meski TH turun karena durasi lebih panjang).  
+2. Naikkan **variability** → WIP dan CT cenderung naik (antrian lebih liar).  
+3. **One-piece (batch=1)** → WIP lebih tipis, CT lebih pendek, TH lebih tinggi (proyek lebih cepat).
+
+> Intuisi Factory Physics: *untuk throughput yang sama, CT proporsional terhadap WIP* — kurangi WIP (aliran lebih ramping) untuk mempercepat cycle time.
+
+
 ## 10. Pemecahan masalah singkat
 
 | Gejala | Coba |
