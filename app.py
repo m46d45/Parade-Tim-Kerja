@@ -37,7 +37,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-sim-silent-v19"
+_APP_BUILD = "2026-08-03-sim-labels-v20"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -158,7 +158,7 @@ def _render_parade_sim_banner() -> None:
     background: rgba(255,255,255,.07);
     border: 1px dashed rgba(255,255,255,.32);
     border-radius: 10px;
-    min-height: 88px;
+    min-height: 100px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -249,7 +249,9 @@ def _render_parade_sim_banner() -> None:
     const zone = document.createElement("div");
     zone.className = "zone";
     zone.id = "zone-" + z;
-    zone.innerHTML = '<div class="slot" id="slot-' + z + '"></div>';
+    zone.innerHTML =
+      '<div class="zone-label">Zona ' + z + '</div>' +
+      '<div class="slot" id="slot-' + z + '"></div>';
     grid.appendChild(zone);
   }
 
@@ -265,7 +267,7 @@ def _render_parade_sim_banner() -> None:
     const slot = document.getElementById("slot-" + zone);
     const chip = document.createElement("div");
     chip.className = "chip show " + team.cls;
-    chip.innerHTML = "<span>" + team.name + "</span>";
+    chip.innerHTML = "<span>" + team.name + "</span><small>" + team.job + "</small>";
     slot.appendChild(chip);
   }
 
@@ -273,7 +275,7 @@ def _render_parade_sim_banner() -> None:
     const slot = document.getElementById("slot-" + zone);
     const chip = document.createElement("div");
     chip.className = "chip show done-block";
-    chip.innerHTML = "<span>✓</span>";
+    chip.innerHTML = "<span>✓ Selesai</span>";
     slot.appendChild(chip);
     document.getElementById("zone-" + zone).classList.add("done");
   }
@@ -345,7 +347,7 @@ def _render_parade_sim_banner() -> None:
 </script>
 </body></html>
 """
-    components.html(html, height=140, scrolling=False)
+    components.html(html, height=168, scrolling=False)
 
 
 def _render_header() -> None:
