@@ -36,7 +36,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-comparison-n-v11"
+_APP_BUILD = "2026-08-03-cmp-batch-v12"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -65,6 +65,8 @@ VAR_LABELS = {
     "high": "High — rate zona ×0.25 atau ×1.75",
     "very_high": "Very high — rate zona ×0.1 atau ×1.9",
 }
+_BATCH_OPTIONS = [4, 5, 3, 2, 1]
+
 _SPEED_CHOICES = [
     ("Sangat lambat — 1 zona / 3 periode", 1.0 / 3.0),
     ("Lambat — 1 zona / 2 periode", 0.5),
@@ -153,8 +155,10 @@ def _build_config_from_pairs(
     seed: Optional[int],
     takt_rate=None,
     standby_capacity: int = 0,
+    batch_size: Optional[int] = None,
 ) -> ParadeConfig:
     names = [_trade_name(i) for i in range(len(pairs))]
+    bs = int(batch_size) if batch_size is not None else _batch_size()
     return ParadeConfig.from_pairs(
         pairs=list(pairs),
         trade_names=names,
@@ -165,7 +169,7 @@ def _build_config_from_pairs(
         same_period_handoff=False,
         staggered_mobilization=False,
         zone_flow=True,
-        batch_size=_batch_size(),
+        batch_size=max(1, bs),
     )
 
 
@@ -428,13 +432,22 @@ def tab_single_run(total_units: int, seed: Optional[int], n_trades: int) -> None
         _export_block(result, "single")
 
 
+def _batch_label(b: int) -> str:
+    if b == 1:
+        return "1 — One-piece"
+    if b == 4:
+        return "4 — Standar"
+    return f"{b} — Handoff tiap {b}"
+
+
 def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
     st.subheader("Comparison (2–5 skenario, zone-flow)")
     st.markdown(
         '<div class="pot-callout">'
-        "Bandingkan <strong>2 sampai 5</strong> skenario zone-flow (batch dari sidebar). "
-        "Cocok untuk kelima level variability, atau hanya 2–3 yang dipilih user. "
-        "Tiap skenario: nama + kecepatan + variability (seragam semua trade)."
+        "Bandingkan <strong>2 sampai 5</strong> skenario. "
+        "Tiap skenario punya <strong>kecepatan</strong>, <strong>variability</strong>, "
+        "dan <strong>batch handoff</strong> sendiri — cocok membandingkan "
+        "level variability <em>atau</em> one-piece vs batch besar."
         "</div>",
         unsafe_allow_html=True,
     )
@@ -447,16 +460,19 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
         "high": "High",
         "very_high": "Very high",
     }
+    sidebar_batch = _batch_size()
 
-    # --- Quick-fill buttons FIRST (mutate state before widgets bind) ---
-    c1, c2, c3 = st.columns([1, 1, 1])
-    fill_five = c1.button("Isi 5 level variability", key="cmp_fill_five", use_container_width=True)
-    fill_two = c2.button("Isi 2 (No vs Medium)", key="cmp_fill_two", use_container_width=True)
-    clear_res = c3.button("Hapus hasil", key="cmp_clear", use_container_width=True)
+    # --- Quick-fill BEFORE widgets ---
+    c1, c2, c3, c4 = st.columns(4)
+    fill_five = c1.button("5× variability", key="cmp_fill_five", use_container_width=True,
+                          help="5 skenario: No→Very high, batch sama (sidebar)")
+    fill_two = c2.button("No vs Medium", key="cmp_fill_two", use_container_width=True)
+    fill_batch = c3.button("Batch 1 vs 4", key="cmp_fill_batch", use_container_width=True,
+                           help="2 skenario No var: one-piece vs batch 4")
+    clear_res = c4.button("Hapus hasil", key="cmp_clear", use_container_width=True)
 
     if clear_res:
         st.session_state.pop("cmp_multi", None)
-        st.session_state.pop("cmp_multi_meta", None)
 
     if fill_five:
         st.session_state["cmp_n_scen"] = 5
@@ -464,22 +480,36 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
             st.session_state[f"cmp_s{i}_label"] = default_labels[v]
             st.session_state[f"cmp_s{i}_var"] = v
             st.session_state[f"cmp_s{i}_profile"] = "Normal — 1 zona / 1 periode"
+            st.session_state[f"cmp_s{i}_batch"] = sidebar_batch
 
     if fill_two:
         st.session_state["cmp_n_scen"] = 2
         st.session_state["cmp_s0_label"] = "No var"
         st.session_state["cmp_s0_var"] = "no_variability"
         st.session_state["cmp_s0_profile"] = "Normal — 1 zona / 1 periode"
+        st.session_state["cmp_s0_batch"] = sidebar_batch
         st.session_state["cmp_s1_label"] = "Medium"
         st.session_state["cmp_s1_var"] = "medium"
         st.session_state["cmp_s1_profile"] = "Normal — 1 zona / 1 periode"
+        st.session_state["cmp_s1_batch"] = sidebar_batch
 
-    # Defaults for any missing keys
+    if fill_batch:
+        st.session_state["cmp_n_scen"] = 2
+        st.session_state["cmp_s0_label"] = "One-piece (b=1)"
+        st.session_state["cmp_s0_var"] = "no_variability"
+        st.session_state["cmp_s0_profile"] = "Normal — 1 zona / 1 periode"
+        st.session_state["cmp_s0_batch"] = 1
+        st.session_state["cmp_s1_label"] = "Batch 4"
+        st.session_state["cmp_s1_var"] = "no_variability"
+        st.session_state["cmp_s1_profile"] = "Normal — 1 zona / 1 periode"
+        st.session_state["cmp_s1_batch"] = 4
+
     st.session_state.setdefault("cmp_n_scen", 5)
     for i in range(5):
         dv = default_vars[i] if i < len(default_vars) else "no_variability"
         st.session_state.setdefault(f"cmp_s{i}_label", default_labels.get(dv, f"S{i+1}"))
         st.session_state.setdefault(f"cmp_s{i}_var", dv)
+        st.session_state.setdefault(f"cmp_s{i}_batch", sidebar_batch)
 
     n_scen = int(
         st.slider(
@@ -487,13 +517,14 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
             min_value=2,
             max_value=5,
             key="cmp_n_scen",
-            help="2–5 skenario. Default 5 = semua level variability.",
+            help="2–5 skenario.",
         )
     )
 
     st.caption(
-        f"Batch = **{_batch_size()}** · Zona = **{total_units}** · "
-        f"Seed = **{seed}** (sama untuk semua skenario)."
+        f"Zona = **{total_units}** · Seed = **{seed}** (sama). "
+        f"Batch di sidebar (**{sidebar_batch}**) hanya default; "
+        "setiap skenario bisa beda batch di kolom di bawah."
     )
 
     scenarios_cfg = []
@@ -509,14 +540,23 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
                 format_func=lambda x: VAR_LABELS.get(x, x),
                 key=f"cmp_s{i}_var",
             )
+            batch_i = int(
+                st.selectbox(
+                    "Batch handoff",
+                    options=_BATCH_OPTIONS,
+                    format_func=_batch_label,
+                    key=f"cmp_s{i}_batch",
+                    help="1 = one-piece flow; 4 = standar kelas.",
+                )
+            )
             spec = _pair_from_base_and_var(base, var)
-            st.caption(_format_pair(spec))
-            scenarios_cfg.append((label.strip() or f"S{i + 1}", spec, var))
+            st.caption(f"{_format_pair(spec)} · batch **{batch_i}**")
+            scenarios_cfg.append((label.strip() or f"S{i + 1}", spec, var, batch_i))
 
     if st.button("Run comparison", type="primary", key="run_cmp", use_container_width=True):
         results = {}
         used = set()
-        for label, spec, var in scenarios_cfg:
+        for label, spec, var, batch_i in scenarios_cfg:
             name = label
             base_n, k = name, 2
             while name in used:
@@ -525,13 +565,16 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
             used.add(name)
             pairs = [spec] * n_trades
             results[name] = ParadeOfTrades(
-                _build_config_from_pairs(pairs, total_units, seed)
+                _build_config_from_pairs(pairs, total_units, seed, batch_size=batch_i)
             ).run()
         st.session_state.cmp_multi = results
-        st.success(f"Selesai · **{len(results)}** skenario · batch={_batch_size()}")
+        batches = [scenarios_cfg[i][3] for i in range(len(scenarios_cfg))]
+        st.success(
+            f"Selesai · **{len(results)}** skenario · batch per skenario = {batches}"
+        )
 
     if "cmp_multi" not in st.session_state:
-        st.info("Atur skenario (atau tombol isi cepat) → **Run comparison**.")
+        st.info("Atur skenario → **Run comparison**. Coba tombol **Batch 1 vs 4** atau **5× variability**.")
         return
 
     results = st.session_state.cmp_multi
@@ -539,6 +582,7 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
     for name, r in results.items():
         rows.append({
             "Skenario": name,
+            "Batch": r.config.batch_size,
             "Duration": r.duration,
             "vs Ideal": round(r.duration - r.ideal_duration, 1),
             "Idle": r.total_idle_capacity,
@@ -555,15 +599,19 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
     plot_comparison_lob(
         results,
         ax=ax,
-        title=f"LOB skenario (trade terakhir = selesai proyek) · batch {_batch_size()}",
+        title="LOB skenario (trade terakhir) — batch bisa beda per skenario",
         last_trade_only=True,
     )
     fig.tight_layout()
     _fig_to_st(fig)
-    st.caption("Setiap garis = satu skenario (kumulatif trade terakhir). Semakin kanan = semakin lama.")
+    st.caption(
+        "Setiap garis = satu skenario (kumulatif trade terakhir). "
+        "Kolom Batch di tabel menunjukkan handoff masing-masing."
+    )
 
     with st.expander("Detail trade satu skenario"):
         pick = st.selectbox("Skenario", list(results.keys()), key="cmp_detail_pick")
+        st.caption(f"Batch skenario ini = **{results[pick].config.batch_size}**")
         _trade_table(results[pick])
         st.caption(_starts_caption(results[pick]))
 
@@ -603,7 +651,7 @@ def tab_manual() -> None:
 
 **Tab yang dipakai**
 1. **Single run** — satu skenario, LOB / buffer / utilization  
-2. **Comparison** — 2–5 skenario (mis. kelima level variability)  
+2. **Comparison** — 2–5 skenario (var & **batch** bisa beda)  
 3. **Manual** — panduan belajar + tentang  
 
 Referensi: Tommelein, Riley & Howell (1999); Choo & Tommelein (1999); Tommelein (2020).
