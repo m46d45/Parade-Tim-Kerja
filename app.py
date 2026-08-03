@@ -37,7 +37,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-logo-lg-v24"
+_APP_BUILD = "2026-08-03-logo-lg-v25"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -436,9 +436,9 @@ def _render_header() -> None:
     # Animated parade sim replaces static photo banner
     _render_parade_sim_banner()
     if _LOGO_ICON.exists():
-        c1, c2 = st.columns([1, 8], vertical_alignment="center")
+        c1, c2 = st.columns([1.6, 5], vertical_alignment="center")
         with c1:
-            st.image(str(_LOGO_ICON), width=120)
+            st.image(str(_LOGO_ICON), width=160)
         with c2:
             st.markdown("## Parade Tim Kerja")
             st.caption("Zone-flow · batch / one-piece · kecepatan & variability **per zona**")
@@ -637,9 +637,9 @@ def _plot_single_result(result: ParadeResult) -> None:
 
 def render_sidebar():
     if _LOGO_ICON.exists():
-        st.sidebar.image(str(_LOGO_ICON), width=110)
+        st.sidebar.image(str(_LOGO_ICON), use_container_width=True)
         st.sidebar.markdown("### Parade Tim Kerja")
-            st.caption("Zone-flow · Indonesia")
+        st.sidebar.caption("Zone-flow · Indonesia")
     else:
         st.sidebar.title("Parade Tim Kerja")
     st.sidebar.success(
