@@ -1,14 +1,15 @@
 # Manual — Parade Tim Kerja
 
-**Simulasi parade tim kerja pekerjaan pengecoran lantai beton**  
-Panduan lengkap untuk mahasiswa, dosen, dan peserta workshop Lean Construction.
+**Simulasi parade tim kerja pekerjaan pengecoran lantai beton**
+
+Panduan lengkap untuk mahasiswa, dosen, dan peserta workshop Lean Construction / Project Production.
 
 | | |
 |---|---|
 | Aplikasi | **Parade Tim Kerja** (Streamlit) |
 | Model | Zone-flow classroom (zona demi zona, batch handoff) |
 | Default | Total zona **40** · Seed **12345** · Batch **4** · 5 tim (tetap) |
-| Tanpa coding | Semua di browser |
+| Bahasa UI | Indonesia (istilah teknis: batch, WIP, takt, CONWIP, dll. dipertahankan) |
 
 ---
 
@@ -20,16 +21,15 @@ Panduan lengkap untuk mahasiswa, dosen, dan peserta workshop Lean Construction.
 4. [Tab Simulasi](#4-tab-simulasi)
 5. [Tab Perbandingan](#5-tab-perbandingan)
 6. [Tab Takt plan](#6-tab-takt-plan)
-7. [Hasil analisis: Line of Balance](#7-hasil-analisis-line-of-balance)
-8. [Hasil analisis: Buffer / WIP](#8-hasil-analisis-buffer--wip)
-9. [Hasil analisis: Utilisasi](#9-hasil-analisis-utilisasi)
-10. [Hasil analisis: Little's Law](#10-hasil-analisis-littles-law)
-11. [Hasil analisis: Kingman (VUT)](#11-hasil-analisis-kingman-vut)
-12. [Hasil analisis: Inventory vs fill rate](#12-hasil-analisis-inventory-vs-fill-rate)
+7. [Line of Balance (LOB)](#7-line-of-balance-lob)
+8. [Buffer / WIP](#8-buffer--wip)
+9. [Utilisasi](#9-utilisasi)
+10. [Little's Law & kurva WIP–TH–CT](#10-littles-law--kurva-wipthct)
+11. [Kingman (VUT)](#11-kingman-vut)
+12. [Inventory vs fill rate](#12-inventory-vs-fill-rate)
 13. [Skenario latihan kelas](#13-skenario-latihan-kelas)
 14. [Batasan model](#14-batasan-model)
 15. [Literatur](#15-literatur)
-16. [Pemecahan masalah](#16-pemecahan-masalah)
 
 ---
 
@@ -41,10 +41,10 @@ Setelah memakai aplikasi ini, peserta diharapkan mampu:
 2. Membedakan **kapasitas produksi** (zona/periode) dan **variability** (perubahan kapasitas per zona).
 3. Memahami **batch handoff** vs **one-piece flow** dan dampaknya ke durasi, WIP, serta utilisasi.
 4. Membaca **Line of Balance (LOB)** yang mulai dari (0,0) dan bergeser antar tim.
-5. Menerapkan **Little's Law** (WIP = TH × CT) dan membaca kurva batas ideal (TH_max, T0, W0).
+5. Menerapkan **Little's Law** (WIP = TH × CT) serta membaca **W_min**, **W_opt**, dan **CONWIP**.
 6. Memakai intuisi **Kingman / VUT**: variability dan utilisasi menaikkan cycle time.
 7. Memahami tradeoff **inventory vs fill rate**.
-8. Menyusun dan menilai **takt plan** (rencana irama) vs aktual (reliability).
+8. Menyusun **takt plan** one-piece dengan **tiga buffer** (kapasitas, waktu, inventory) dan menilai reliability.
 
 ---
 
@@ -53,14 +53,14 @@ Setelah memakai aplikasi ini, peserta diharapkan mampu:
 ### 2.1 Parade floor cycle
 
 ```text
-T1 Pemasangan Bekisting
- → T2 Pemasangan Tulangan
-  → T3 Pengecoran Beton
-   → T4 Pembongkaran Bekisting
-    → T5 Finishing Lantai
+T1  Pemasangan Bekisting
+ → T2  Pemasangan Tulangan
+  → T3  Pengecoran Beton
+   → T4  Pembongkaran Bekisting
+    → T5  Finishing Lantai
 ```
 
-Satu zona hanya dikerjakan satu tim pada satu waktu. Tim hilir baru boleh masuk setelah zona **dilepas** oleh tim hulu (sesuai batch handoff).
+Satu zona hanya dikerjakan satu tim pada satu waktu. Tim hilir baru boleh masuk setelah zona **dilepas** oleh tim hulu (sesuai kebijakan batch / buffer inventory).
 
 ### 2.2 Zona, periode, kumulatif
 
@@ -68,7 +68,7 @@ Satu zona hanya dikerjakan satu tim pada satu waktu. Tim hilir baru boleh masuk 
 |---------|------|
 | **Zona** | Satuan lokasi kerja (pelat / bay / unit). |
 | **Periode** | Satuan waktu simulasi (hari / shift). |
-| **Kumulatif** | Jumlah zona yang sudah diselesaikan suatu tim (mulai **0**). |
+| **Kumulatif** | Jumlah zona yang sudah diselesaikan suatu tim — grafik mulai dari **0**. |
 
 ### 2.3 Kapasitas produksi (zona/periode)
 
@@ -96,24 +96,24 @@ Setiap kali tim **memulai zona baru**, kapasitas diundi sekali (lalu dikunci sam
 | Tinggi | ×0,25 atau ×1,75 (**±75%**) |
 | Sangat tinggi | ×0,1 atau ×1,9 (**±90%**) |
 
-> Bukan model “undi 0 atau 3 zona sekaligus”. Variability mengubah **laju di zona**, bukan lompat massal.
+Variability mengubah **laju di zona**, bukan “undi 0 atau 3 zona sekaligus”.
 
-### 2.5 Batch handoff
+### 2.5 Batch handoff (tab Simulasi / Perbandingan)
 
 | Batch | Perilaku |
 |-------|----------|
 | **1** (one-piece) | Tiap zona selesai langsung dilepas (periode berikutnya). |
-| **2–5** | Zona dikumpulkan; dilepas setelah batch penuh. Default **4**. |
+| **2–5** (dst.) | Zona dikumpulkan; dilepas setelah batch penuh. Default **4**. |
 | Sisa di akhir | Sisa batch tetap dilepas agar proyek tidak macet. |
 
 Handoff selalu **periode berikutnya** (ada jeda), sehingga LOB antar tim **bergeser**, tidak menumpuk.
 
-### 2.6 Idle & utilisasi (teori singkat)
+### 2.6 Idle & utilisasi (ringkas)
 
 | Istilah | Arti |
 |---------|------|
-| **Idle** | Kapasitas terbuang karena **tidak ada zona siap** (kelaparan buffer / menunggu handoff). |
-| **Utilisasi** | Produksi ÷ kapasitas efektif. Tim yang terus bekerja tanpa menunggu ≈ 100%. |
+| **Idle** | Kapasitas terbuang karena **tidak ada zona siap** (menunggu handoff / buffer kosong). |
+| **Utilisasi** | Produksi ÷ kapasitas efektif. |
 | **Buffer / WIP** | Zona sudah dilepas hulu, belum dikerjakan hilir. |
 
 ---
@@ -127,7 +127,7 @@ Handoff selalu **periode berikutnya** (ada jeda), sehingga LOB antar tim **berge
 | Logo & judul | Parade Tim Kerja |
 | **Total zona** | Ukuran proyek (default 40) |
 | **Kunci seed** + **Seed** | Reproduktibilitas undian (default 12345) |
-| **Ukuran batch handoff** | Default 4; opsi 5, 3, 2, 1 |
+| **Ukuran batch handoff** | Default 4 (Simulasi/Perbandingan) |
 
 Jumlah tim **tetap 5**.
 
@@ -135,9 +135,9 @@ Jumlah tim **tetap 5**.
 
 | Tab | Isi |
 |-----|-----|
-| **Simulasi** | Satu skenario + grafik analisis lengkap |
+| **Simulasi** | Satu skenario + suite analisis lengkap |
 | **Perbandingan** | 2–5 skenario berdampingan |
-| **Takt plan** | Rencana irama + reliability vs aktual |
+| **Takt plan** | Rencana irama one-piece + buffer + reliability |
 | **Manual** | Dokumen ini (bisa diunduh) |
 
 ---
@@ -147,8 +147,8 @@ Jumlah tim **tetap 5**.
 ### 4.1 Pengaturan
 
 - **Seragam** — semua tim sama (kapasitas + variability).
-- **Per tim** — tiap trade (Bekisting … Finishing) bisa beda.
-- Tombol **Jalankan** / **Atur ulang**.
+- **Per tim** — tiap trade (Bekisting … Finishing) bisa berbeda.
+- Tombol **Jalankan** / **Atur ulang** (simulasi tidak jalan otomatis).
 
 ### 4.2 Metrik ringkas (setelah run)
 
@@ -161,16 +161,25 @@ Jumlah tim **tetap 5**.
 | Puncak WIP | Maksimum total buffer serentak |
 | Batch | Ukuran handoff run ini |
 
-### 4.3 Sub-tab hasil (lihat bab 7–12)
+### 4.3 Sub-tab hasil
 
-Line of Balance · Buffer / WIP · Utilisasi · Little's Law · Kingman · Inventory / FR
+Setelah run, buka sub-tab:
+
+1. **Line of Balance** — kemajuan kumulatif  
+2. **Buffer / WIP** — antrian antar-tim  
+3. **Utilisasi** — % kerja vs idle  
+4. **Little's Law** — TH, WIP, CT + kurva + CONWIP  
+5. **Kingman** — CT vs utilisasi (VUT)  
+6. **Inventory / FR** — fill rate vs inventory  
+
+Teori tiap grafik: bab 7–12.
 
 ### 4.4 Latihan cepat
 
 1. Semua Normal, tanpa var, batch **4** → catat durasi & puncak WIP.  
 2. Batch **1** → durasi lebih pendek, WIP lebih tipis.  
 3. T1 **Rendah**, lain Normal → LOB T1 landai; idle/utilisasi hilir memburuk.  
-4. Variability **Sedang** → garis patah-patah; idle & WIP naik.
+4. Variability **Sedang** → garis patah-patah; WIP & CT naik.
 
 ---
 
@@ -185,20 +194,14 @@ Line of Balance · Buffer / WIP · Utilisasi · Little's Law · Kingman · Inven
 
 ### 5.2 Hasil
 
-- Tabel ringkasan (durasi, idle, TH, WIP⌀, CT, …).
-- Sub-tab sama seperti Simulasi, tetapi **multi-skenario**:
-  - LOB (tim terakhir)
-  - Buffer / WIP total
-  - Utilisasi per tim
-  - Little's Law (titik operasi)
-  - Kingman (Σ CT / CT vs u̅)
-  - Inventory / FR (titik skenario)
+- Tabel ringkasan (durasi, idle, TH, WIP, CT, W_min, W_opt, …).
+- Sub-tab multi-skenario: LOB (tim terakhir), Buffer, Utilisasi, Little's Law, Kingman, Inventory/FR.
 
 ### 5.3 Latihan cepat
 
 1. Batch 1 vs 4 → one-piece lebih cepat, WIP lebih rendah.  
 2. 5× variability → durasi & CT memburuk seiring level var.  
-3. Campur batch dan var dalam 3–5 skenario.
+3. Bandingkan W_opt vs WIP operasi antar skenario.
 
 ---
 
@@ -206,7 +209,7 @@ Line of Balance · Buffer / WIP · Utilisasi · Little's Law · Kingman · Inven
 
 ### 6.1 Prinsip
 
-Takt plan lean construction biasanya:
+Takt plan lean construction dalam app ini:
 
 1. **One-piece flow** — serah terima zona per zona (bukan batch besar).  
 2. **Jumlah zona** — variabel desain utama (menentukan panjang parade & durasi).  
@@ -239,11 +242,11 @@ Dengan variability, buffer menolong reliability dan/atau mendekati target period
 
 1. Atur **jumlah zona** dan kapasitas dasar.  
 2. Atur **3 buffer**.  
-3. **Jalankan simulasi** (tombol di atas grafik).  
+3. Tekan **Jalankan simulasi** (tombol di **atas** grafik).  
 4. Baca reliability & overlay rencana vs aktual.  
-5. Opsional: Tommelein 2020 (S1/S2/S3).
+5. Opsional: **Tommelein (2020)** — S1 classic 4/6, S2 takt 5 + standby 1, S3 classic 5/7.
 
-### 6.5 Grafik
+### 6.5 Grafik takt
 
 | Grafik | Isi |
 |--------|-----|
@@ -254,16 +257,17 @@ Dengan variability, buffer menolong reliability dan/atau mendekati target period
 ### 6.6 Contoh
 
 - 40 zona, OPF, Normal, tanpa buffer → rencana **44** periode.  
-- Tambah buffer kapasitas 20% → rate efektif naik → durasi rencana turun.  
-- Buffer waktu +1 p/zona → takt time lebih longgar → durasi naik (jadwal lebih “aman”).  
-- Buffer inventory 4 → mirip handoff tiap 4 zona (bukan OPF murni).
+- 40 zona, batch 4 (di Simulasi), Normal → **56** periode.  
+- Buffer kapasitas +20% → rate efektif naik → durasi rencana turun.  
+- Buffer waktu +1 p/zona → takt time lebih longgar → durasi naik (jadwal “aman”).  
 
+---
 
-## 7. Hasil analisis: Line of Balance
+## 7. Line of Balance (LOB)
 
 ### 7.1 Teori
 
-**Line of Balance (LOB)** memplot kemajuan kumulatif tiap trade terhadap waktu. Dalam konstruksi berulang (floor cycle, unit berulang), LOB menunjukkan **aliran** dan **interferensi** antar trade.
+**Line of Balance** memplot kemajuan kumulatif tiap trade terhadap waktu. Dalam pekerjaan berulang (floor cycle), LOB menunjukkan **aliran** dan **gesekan** antar trade.
 
 | Sumbu | Arti |
 |-------|------|
@@ -275,22 +279,22 @@ Dengan variability, buffer menolong reliability dan/atau mendekati target period
 ### 7.2 Di app
 
 - **Simulasi**: detail awal + seluruh proyek; satu garis per tim.  
-- **Perbandingan**: biasanya **tim terakhir** (penyelesaian proyek) per skenario.  
+- **Perbandingan**: biasanya **tim terakhir** per skenario.  
 - **Takt plan**: rencana (putus-putus) vs aktual (tegas).
 
 ### 7.3 Cara baca
 
-- Garis **menumpuk** = handoff terlalu “instan” atau model salah (di app yang benar, garis bergeser).  
 - Garis **landai** = kapasitas rendah atau variability menghambat.  
-- Jarak horizontal antar trade ≈ waktu tunggu / buffer kebijakan batch.
+- Jarak horizontal antar trade ≈ waktu tunggu / kebijakan batch.  
+- Garis yang **bergeser** (bukan menumpuk) = handoff next-period bekerja benar.
 
 ---
 
-## 8. Hasil analisis: Buffer / WIP
+## 8. Buffer / WIP
 
 ### 8.1 Teori
 
-**Work-In-Process (WIP)** di antara dua tim = zona yang sudah selesai hulu tetapi belum dikerjakan hilir (**buffer**). WIP berlebih menaikkan cycle time (lihat Little's Law) dan menyembunyikan masalah aliran.
+**Work-In-Process (WIP)** di antara dua tim = zona yang sudah selesai hulu tetapi belum dikerjakan hilir (**buffer**). WIP berlebih menaikkan cycle time (Little's Law) dan menyembunyikan masalah aliran.
 
 ### 8.2 Di app
 
@@ -303,15 +307,15 @@ Dengan variability, buffer menolong reliability dan/atau mendekati target period
 
 ### 8.3 Pola tipikal
 
-| Kondisi | Puncak WIP |
-|---------|------------|
+| Kondisi | Puncak WIP (kira-kira) |
+|---------|-------------------------|
 | Batch 4, seimbang, tanpa var | ≈ **4** per buffer |
 | Batch 1 (one-piece) | ≈ **1** |
 | Variability tinggi | WIP lebih liar, puncak naik |
 
 ---
 
-## 9. Hasil analisis: Utilisasi
+## 9. Utilisasi
 
 ### 9.1 Teori
 
@@ -338,9 +342,9 @@ Idle dihitung saat tim sudah mulai di lapangan tetapi **tidak ada zona siap**.
 
 ---
 
-## 10. Hasil analisis: Little's Law
+## 10. Little's Law & kurva WIP–TH–CT
 
-### 10.1 Teori
+### 10.1 Teori Little
 
 Bentuk klasik (tanpa yield loss):
 
@@ -361,71 +365,120 @@ Artikel PPI membahas perluasan bila ada **yield loss**. Di app ini **y = 1** (ti
 
 | Sumbu | Isi |
 |-------|-----|
-| **X** | WIP |
-| **Y kiri** | Throughput (TH) |
-| **Y kanan** | Cycle time (CT) |
+| **X** | WIP (zona) |
+| **Y kiri** | Throughput TH (zona/periode) |
+| **Y kanan** | Cycle time CT (periode) |
 
-### 10.3 WIP minimal, WIP optimal, dan CONWIP
+Kurva yang ditampilkan:
 
-| Konsep | Arti | Di grafik |
-|--------|------|-----------|
-| **W_min (W0)** | WIP **minimal/kritis** = TH_max × T0 (Factory Physics best case) | Garis hijau |
-| **W_opt** | WIP **optimal praktis** dengan variability: α·W0·(1 + V·α/(1−α)), α≈0,9. Jika **V=0** maka **W_opt = W_min** (benar, bukan bug). | Garis oranye |
-| **CONWIP** | *Constant WIP* — batas WIP konstan; saran awal = W_opt | Garis ungu + pita |
+| Kurva | Arti |
+|-------|------|
+| **TH / CT batas** | Kasus terbaik tanpa variasi, dibatasi bottleneck |
+| **TH / CT aktual** | Dengan variability (Kingman + perpanjangan Little) |
+| **Titik operasi** | Hasil run simulasi |
 
-**Intuisi:**  
-- V = 0 → cukup W_min untuk TH penuh → W_opt = W_min.  
-- V > 0 → antrian → butuh WIP lebih besar → **W_opt > W_min**.  
-- Terlalu sedikit WIP → TH rendah; terlalu banyak → CT membengkak.  
-- **CONWIP ≈ W_opt** menahan inventory sambil menjaga throughput.
+Sumbu X dibatasi hingga sekitar  
+`max(W_min, W_opt, CONWIP, WIP operasi) + 5`  
+agar landmark terbaca tanpa grafik terlalu panjang.
 
-Slider CONWIP di tab Little's Law (Simulasi) memindahkan batas ungu di grafik.
-
-### 10.4 Batas ideal Factory Physics (tanpa variasi)
+### 10.3 Batas ideal Factory Physics (tanpa variasi)
 
 | Simbol | Arti |
 |--------|------|
 | **TH_max** | Kapasitas mean terendah (bottleneck) di 5 tim |
 | **T0** | Jumlah waktu proses murni semua stasiun |
-| **W0** | Critical WIP = TH_max × T0 |
+| **W0 = W_min** | Critical WIP = TH_max × T0 |
 
 | Rezim | TH | CT |
 |-------|----|----|
 | **W ≤ W0** | W / T0 (naik) | **T0** (minimum, datar) |
 | **W ≥ W0** | **TH_max** (datar) | W / TH_max (naik) |
 
-Kurva aktual (dengan variability) **tidak lebih baik** dari batas: TH lebih rendah dan/atau CT lebih tinggi.
+Kurva aktual **tidak lebih baik** dari batas: TH lebih rendah dan/atau CT lebih tinggi.
 
-Contoh Normal: TH_max = 1, T0 = 5, W0 = 5.
+Contoh Normal: TH_max = 1, T0 = 5, W_min = 5.
 
-### 10.5 Jejak WIP
+### 10.4 W_min, W_opt, dan CONWIP
 
-Grafik pipeline WIP vs buffer WIP sepanjang periode — melihat “isi pipa” proyek.
+| Konsep | Arti | Tampilan |
+|--------|------|----------|
+| **W_min (W0)** | WIP **minimal/kritis** = TH_max × T0 (best case) | Garis hijau |
+| **W_opt** | WIP **optimal praktis** dengan variability | Garis oranye |
+| **CONWIP** | *Constant Work-In-Process* — batas WIP konstan | Garis ungu + pita |
+
+**Rumus W_opt (ajaran Factory Physics / VUT):**
+
+\[
+W_{\mathrm{opt}} =
+\begin{cases}
+W_{\min} & \text{jika } V \approx 0 \\[4pt]
+\alpha \cdot W_{\min} \cdot \bigl(1 + V \cdot \tfrac{\alpha}{1-\alpha}\bigr) & \text{jika } V > 0
+\end{cases}
+\]
+
+dengan α ≈ 0,9 (target fraksi kapasitas bottleneck) dan **V** = faktor variability gabungan \((c_a^2 + c_e^2)/2\).
+
+| Kondisi | W_min vs W_opt |
+|---------|----------------|
+| Tanpa variability (V ≈ 0) | **Sama** — itu benar, bukan bug |
+| Ada variability (V > 0) | **W_opt > W_min** — butuh lebih banyak WIP untuk jaga TH |
+
+**CONWIP:** kebijakan membatasi WIP di tingkat konstan; kerja baru dirilis hanya jika WIP di bawah batas. Saran awal CONWIP = W_opt.
+
+### 10.5 Slider CONWIP & prediksi dampak
+
+Di tab **Little's Law** (Simulasi):
+
+1. Geser **CONWIP — batas WIP konstan**.  
+2. Di **bawah slider** muncul prediksi:
+
+| Metrik | Arti |
+|--------|------|
+| **TH @ CONWIP** | Throughput prediksi di WIP = CONWIP (+ Δ vs operasi) |
+| **CT @ CONWIP** | Cycle time prediksi (+ Δ vs operasi; naik = lebih lambat) |
+| **Δ WIP** | CONWIP − WIP operasi |
+| **TH batas @ WIP** | Throughput kasus terbaik di WIP yang sama |
+
+Prediksi dihitung dari **kurva operasi** (interpolasi), bukan run ulang simulasi — cocok untuk what-if cepat.
+
+**Intuisi:**
+
+- CONWIP **terlalu rendah** (≪ W_opt) → CT cenderung turun, tetapi TH bisa jatuh (kelaparan).  
+- CONWIP **terlalu tinggi** → CT membengkak; TH hampir tidak naik jika sudah jenuh.  
+- CONWIP **≈ W_opt** → menahan inventory sambil menjaga throughput mendekati kapasitas.
+
+### 10.6 Jejak WIP
+
+Grafik pipeline WIP vs buffer WIP sepanjang periode — melihat “isi pipa” proyek dari waktu ke waktu.
+
+### 10.7 Perbandingan — Little's Law
+
+Tabel multi-skenario memuat TH, WIP, CT, **W_min**, **W_opt**, **CONWIP★**, dan **WIP vs W_opt**.  
+Scatter titik operasi memakai garis referensi W_min / W_opt / CONWIP dari skenario pertama.
 
 ---
 
-## 11. Hasil analisis: Kingman (VUT)
+## 11. Kingman (VUT)
 
 ### 11.1 Teori
 
 Pendekatan antrian **G/G/1** (Kingman / Factory Physics) untuk cycle time di satu stasiun:
 
 \[
-\text{CT} \approx t_e + \frac{c_a^2 + c_e^2}{2} \cdot \frac{u}{1-u} \cdot t_e
+\mathrm{CT} \approx t_e + \frac{c_a^2 + c_e^2}{2} \cdot \frac{u}{1-u} \cdot t_e
 \]
 
 | Simbol | Nama | Di app |
 |--------|------|--------|
-| **t_e** | Mean process time | Waktu 1 zona di stasiun (T = 1/C) |
+| **t_e** | Mean process time | Waktu 1 zona di stasiun |
 | **u** | Utilisasi | Dari simulasi |
 | **c_e** | CV process time | Dari variability (tanpa var → 0) |
 | **c_a** | CV kedatangan | T1 ≈ 0; hilir ≈ c_e hulu |
-| **V** | (c_a² + c_e²)/2 | Faktor variability |
-| **U** | u/(1−u) | Meledak saat u → 1 |
+| **V** | \((c_a^2 + c_e^2)/2\) | Faktor variability |
+| **U** | \(u/(1-u)\) | Meledak saat u → 1 |
 
-**VUT**: naiknya **V**ariability, **U**tilisasi, atau **T** process time menaikkan CT.
-
-Tanpa variability (c_a = c_e = 0) → wait = 0 → **CT = t_e**.
+**VUT:** naiknya **V**ariability, **U**tilisasi, atau **T** process time menaikkan CT.  
+Tanpa variability → wait = 0 → **CT = t_e**.
 
 ### 11.2 Grafik di app
 
@@ -441,7 +494,7 @@ Kingman mengasumsikan antrian **stasioner**. Proyek berhingga + batch handoff bi
 
 ---
 
-## 12. Hasil analisis: Inventory vs fill rate
+## 12. Inventory vs fill rate
 
 ### 12.1 Teori
 
@@ -457,9 +510,9 @@ Semakin tinggi target fill rate (mendekati 100%), inventory yang dibutuhkan **na
 ### 12.2 Definisi di app
 
 - **Inventory** = rata-rata isi buffer B1…B4.  
-- **Fill rate** (analog tipe-2) ≈ `produksi / (produksi + idle)` pada tim hilir (idle = kelaparan buffer).  
+- **Fill rate** (analog tipe-2) ≈ `produksi / (produksi + idle)` pada tim hilir.  
 - Kurva teoritis base-stock (unit normal loss) sebagai backdrop.  
-- Titik sistem + berlian per buffer B1…B4.
+- Titik sistem + penanda per buffer B1…B4.
 
 ### 12.3 Pola
 
@@ -476,14 +529,15 @@ Semakin tinggi target fill rate (mendekati 100%), inventory yang dibutuhkan **na
 | # | Setup | Amati |
 |---|--------|--------|
 | 1 | Normal, tanpa var, batch 4 | LOB bergeser; WIP puncak ≈ 4; util ≈ 100% |
-| 2 | Sama, batch 1 | Durasi↓, WIP↓, rencana takt lebih pendek |
+| 2 | Sama, batch 1 | Durasi↓, WIP↓ |
 | 3 | T1 Rendah, lain Normal | Idle hilir; utilisasi T2–T5 turun |
-| 4 | Variability sedang semua | LOB patah; CT Little & Kingman naik |
-| 5 | Perbandingan 5× var | Durasi & CT vs level var |
-| 6 | Takt plan + var sedang | Reliability < 100%; selisih durasi |
-| 7 | Tommelein S1/S2/S3 | Standby menekan idle vs classic |
+| 4 | Variability sedang semua | LOB patah; **W_opt > W_min**; CT naik |
+| 5 | Perbandingan 5× var | Durasi, CT, W_opt vs level var |
+| 6 | Little's Law + slider CONWIP | Prediksi TH/CT berubah di bawah slider |
+| 7 | Takt plan OPF + buffer | Reliability; target periode vs rate efektif |
+| 8 | Tommelein S1/S2/S3 | Standby (capacity buffer) menekan idle |
 
-Diskusi: *idle = menunggu zona, bukan malas*; *batch = kebijakan serah terima area*; *takt = janji irama*.
+Diskusi kunci: *idle = menunggu zona, bukan malas*; *batch = kebijakan serah terima*; *takt = janji irama*; *CONWIP ≈ W_opt menahan inventory*.
 
 ---
 
@@ -492,22 +546,23 @@ Diskusi: *idle = menunggu zona, bukan malas*; *batch = kebijakan serah terima ar
 - Satu jalur zona, 5 tim tetap; tanpa cuaca, absensi, multitasking eksplisit.  
 - Variability = undi kapasitas per zona (bukan Monte-Carlo ratusan faktor).  
 - Handoff selalu periode berikutnya (tidak instan).  
-- Kingman & kurva teoritis FR = pendekatan stasioner / base-stock untuk **intuisi**.  
+- Kingman, kurva FR, dan prediksi CONWIP = pendekatan **stasioner / teoritis** untuk intuisi.  
+- Prediksi TH/CT @ CONWIP dari **interpolasi kurva**, bukan re-simulasi penuh dengan kebijakan CONWIP di engine.  
 - Cocok untuk **pembelajaran sistem & kebijakan**, bukan penjadwalan proyek 1:1.
 
 ---
 
 ## 15. Literatur
 
-### Inti Parade of Trades & takt
+### Parade of Trades & takt
 
 1. **Tommelein, I. D., Riley, D. R., & Howell, G. A. (1999).** *Parade Game: Impact of Work Flow Variability on Trade Performance.* Journal of Construction Engineering and Management, ASCE.  
 2. **Choo, H. J., & Tommelein, I. D. (1999).** *Parade Game.* Technical Report, P²SL, University of California, Berkeley.  
 3. **Tommelein, I. D. (2020).** *Takting the Parade of Trades: Use of Capacity Buffers to Gain Work Flow Reliability.* Proc. 28th Annual Conference of the International Group for Lean Construction (IGLC28). https://doi.org/10.24928/2020/0076  
 
-### Factory Physics, Little, Kingman, inventory
+### Factory Physics, Little, Kingman, CONWIP, inventory
 
-4. **Hopp, W. J., & Spearman, M. L.** *Factory Physics* (edisi relevan). McGraw-Hill / Waveland — Little's Law, VUT/Kingman, operations curves, inventory–service.  
+4. **Hopp, W. J., & Spearman, M. L.** *Factory Physics* (edisi relevan). — Little's Law, VUT/Kingman, operations curves, **CONWIP**, critical WIP (W0), inventory–service.  
 5. **Kingman, J. F. C. (1961).** Pendekatan heavy-traffic untuk waktu tunggu G/G/1 (dasar bentuk VUT).  
 6. **Little, J. D. C. (1961).** *A Proof for the Queuing Formula: L = λW.* Operations Research.  
 7. **Project Production Institute.** *Little’s Law in Production Systems with Yield Loss.*  
@@ -517,34 +572,21 @@ Diskusi: *idle = menunggu zona, bukan malas*; *batch = kebijakan serah terima ar
 
 8. **Lean Construction Institute.** *Takt Time* / Takt planning, steering & control.  
    https://leanconstruction.org/lean-topics/takt-time/  
-9. Materi terkait **Takt Production System**, Line of Balance, dan location-based scheduling (lihat rujukan LCI & IGLC).
+9. Materi terkait **Takt Production System**, Line of Balance, dan location-based scheduling (LCI & IGLC).
 
-### Catatan pemakaian literatur di app
+### Pemetaan topik app → acuan
 
 | Topik app | Acuan utama |
 |-----------|-------------|
 | Variability & parade | Tommelein et al. (1999); Choo & Tommelein (1999) |
-| Takt + capacity buffer | Tommelein (2020) |
-| WIP = TH × CT | Little (1961); Hopp & Spearman; PPI yield-loss (konteks y=1) |
+| Takt + capacity buffer | Tommelein (2020); LCI Takt Time |
+| WIP = TH × CT | Little (1961); Hopp & Spearman; PPI (konteks y=1) |
+| W_min, W_opt, CONWIP | Hopp & Spearman (Factory Physics) |
 | CT vs u, VUT | Kingman; Hopp & Spearman |
-| Inventory–fill rate | Inventory theory / Factory Physics (service–inventory tradeoff) |
+| Inventory–fill rate | Inventory theory / Factory Physics |
 | LOB | Praktik penjadwalan berulang + literatur parade |
 
 ---
 
-## 16. Pemecahan masalah
-
-| Gejala | Coba |
-|--------|------|
-| Hasil beda tiap buka | Nyalakan **Kunci seed acak** |
-| UI / logo lama | Muat ulang paksa (Ctrl/Cmd+Shift+R) |
-| Simulasi error max periode | Turunkan zona; hindari kapasitas sangat rendah + var ekstrem bersamaan |
-| LOB menumpuk | Pastikan batch & zone-flow terbaru; handoff tidak instan |
-| Utilisasi semua 100% | Normal jika seimbang tanpa var; coba T1 lebih lambat atau naikkan var |
-| Takt reliability 100% | Tanpa var, aktual = rencana; naikkan variability untuk melihat selisih |
-| Tab Takt tidak mensimulasi | Tekan **Jalankan simulasi** (tidak otomatis) |
-
----
-
-*Parade Tim Kerja — manual zone-flow untuk pembelajaran Lean Construction.*  
-*Diselaraskan dengan tab Simulasi, Perbandingan, Takt plan, dan suite analisis (LOB, Buffer/WIP, Utilisasi, Little's Law, Kingman, Inventory/FR).*
+*Parade Tim Kerja — manual zone-flow untuk pembelajaran Lean Construction & Project Production.*  
+*Diselaraskan dengan tab Simulasi, Perbandingan, Takt plan, dan suite analisis (LOB, Buffer/WIP, Utilisasi, Little's Law + CONWIP, Kingman, Inventory/FR).*
