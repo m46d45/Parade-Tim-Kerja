@@ -25,6 +25,7 @@ from parade_of_trades_analysis import (
     kingman_combined,
     kingman_metrics,
     littles_law_metrics,
+    evaluate_at_wip,
     build_takt_plan,
     build_takt_plan_with_buffers,
     required_rate_for_duration,
@@ -56,7 +57,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-curve-plus5-v56"
+_APP_BUILD = "2026-08-03-conwip-impact-v57"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -700,6 +701,52 @@ def _plot_single_result(result: ParadeResult) -> None:
             key=_ck,
             help="Constant Work-In-Process: geser untuk memindahkan garis ungu di grafik.",
         )
+
+        # Dampak CONWIP pada TH & CT (prediksi dari kurva operasi)
+        _cw = evaluate_at_wip(result, float(conwip_lvl))
+        st.markdown("**Prediksi jika CONWIP = {:.1f}**".format(float(conwip_lvl)))
+        p1, p2, p3, p4 = st.columns(4)
+        p1.metric(
+            "TH @ CONWIP",
+            f"{_cw['th']:.3f}",
+            delta=f"{_cw['d_th']:+.3f} vs operasi",
+            help="Throughput prediksi di batas CONWIP (kurva aktual)",
+        )
+        p2.metric(
+            "CT @ CONWIP",
+            f"{_cw['ct']:.2f}",
+            delta=f"{_cw['d_ct']:+.2f} vs operasi",
+            delta_color="inverse",
+            help="Cycle time prediksi (periode). Naik = lebih lambat.",
+        )
+        p3.metric(
+            "Δ WIP",
+            f"{_cw['d_wip']:+.2f}",
+            help="CONWIP − WIP operasi saat ini",
+        )
+        p4.metric(
+            "TH batas @ WIP",
+            f"{_cw['th_best']:.3f}",
+            help="Throughput kasus terbaik (tanpa var) di WIP yang sama",
+        )
+        # short interpretation
+        if _cw["d_wip"] < -0.25:
+            st.caption(
+                f"CONWIP **di bawah** operasi ({_cw['op_wip']:.1f}): inventory lebih ketat → "
+                f"biasanya **CT turun** ({_cw['ct']:.2f} vs {_cw['op_ct']:.2f}), "
+                f"TH bisa turun jika jauh di bawah W_opt ({_cw['w_opt']:.1f})."
+            )
+        elif _cw["d_wip"] > 0.25:
+            st.caption(
+                f"CONWIP **di atas** operasi ({_cw['op_wip']:.1f}): lebih longgar → "
+                f"CT cenderung **naik** ({_cw['ct']:.2f}), TH mendekati plafon "
+                f"(TH_max={_cw['th_max']:.2f}) tanpa banyak tambahan jika sudah jenuh."
+            )
+        else:
+            st.caption(
+                f"CONWIP ≈ WIP operasi ({_cw['op_wip']:.1f}): prediksi dekat dengan hasil run "
+                f"(TH={_cw['op_th']:.3f}, CT={_cw['op_ct']:.2f})."
+            )
 
         fig, ax = plt.subplots(figsize=(9.5, 5.2))
         plot_wip_th_ct(result, ax=ax, conwip_level=float(conwip_lvl))

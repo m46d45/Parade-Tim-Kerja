@@ -392,6 +392,81 @@ def kingman_combined(result: ParadeResult) -> dict:
 
 
 
+
+def _interp_xy(xs: Sequence[float], ys: Sequence[float], x: float) -> float:
+    """Linear interpolation; clamp to ends."""
+    if not xs:
+        return float("nan")
+    if x <= xs[0]:
+        return float(ys[0])
+    if x >= xs[-1]:
+        return float(ys[-1])
+    for i in range(1, len(xs)):
+        if x <= xs[i]:
+            x0, x1 = xs[i - 1], xs[i]
+            y0, y1 = ys[i - 1], ys[i]
+            if abs(x1 - x0) < 1e-15:
+                return float(y0)
+            t = (x - x0) / (x1 - x0)
+            return float(y0 + t * (y1 - y0))
+    return float(ys[-1])
+
+
+def evaluate_at_wip(result: ParadeResult, wip_level: float) -> Dict[str, float]:
+    """
+    Predicted TH & CT if system operated at given WIP (e.g. CONWIP limit).
+
+    Uses the actual (var) operations curve; also reports best-case bounds
+    and delta vs current operating point.
+    """
+    d = littles_operations_curve(result)
+    w = max(float(wip_level), 1e-9)
+
+    # sort actual
+    aw = list(d["wip"])
+    ath = list(d["th"])
+    act = list(d["ct"])
+    if aw:
+        order = sorted(range(len(aw)), key=lambda i: aw[i])
+        aw = [aw[i] for i in order]
+        ath = [ath[i] for i in order]
+        act = [act[i] for i in order]
+    th_a = _interp_xy(aw, ath, w) if aw else float("nan")
+    ct_a = _interp_xy(aw, act, w) if aw else float("nan")
+    # consistency via Little if one missing
+    if math.isfinite(th_a) and th_a > 1e-12 and (not math.isfinite(ct_a) or ct_a <= 0):
+        ct_a = w / th_a
+    if math.isfinite(ct_a) and ct_a > 1e-12 and (not math.isfinite(th_a) or th_a <= 0):
+        th_a = w / ct_a
+
+    bw = list(d.get("bc_wip") or [])
+    bth = list(d.get("bc_th") or [])
+    bct = list(d.get("bc_ct") or [])
+    th_b = _interp_xy(bw, bth, w) if bw else float("nan")
+    ct_b = _interp_xy(bw, bct, w) if bw else float("nan")
+
+    op_w = float(d["op_wip"])
+    op_th = float(d["op_th"])
+    op_ct = float(d["op_ct"])
+
+    return {
+        "wip": w,
+        "th": th_a,
+        "ct": ct_a,
+        "th_best": th_b,
+        "ct_best": ct_b,
+        "op_wip": op_w,
+        "op_th": op_th,
+        "op_ct": op_ct,
+        "d_th": th_a - op_th,
+        "d_ct": ct_a - op_ct,
+        "d_wip": w - op_w,
+        "w_min": float(d["w_min"]),
+        "w_opt": float(d["w_opt"]),
+        "th_max": float(d["th_max"]),
+    }
+
+
 def littles_operations_curve(
     result: ParadeResult,
     n_points: int = 80,
