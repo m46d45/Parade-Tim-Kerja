@@ -36,7 +36,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-sim-banner-v16"
+_APP_BUILD = "2026-08-03-sim-zones-v17"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -125,16 +125,18 @@ def _base_speed_input(key: str, label: str = "Kecepatan dasar", default: float =
 
 
 def _render_parade_sim_banner() -> None:
-    """Short looping visual: 5 teams hand off through 5 zones (one-piece illustration)."""
+    """One-piece handoff: teams sit in zone columns Z1→Z5, staggered by 1 zone."""
     st.markdown(
         """
 <style>
 .pot-sim-banner{
   --bg0:#0f2744; --bg1:#1a365d;
   --t1:#3b82f6; --t2:#f59e0b; --t3:#10b981; --t4:#ef4444; --t5:#8b5cf6;
+  --zone-w: 20%;
+  --dwell: 10s; /* full cycle; each zone = 20% = 2s */
   background: linear-gradient(135deg, var(--bg0) 0%, var(--bg1) 55%, #234e76 100%);
   border-radius: 14px;
-  padding: 1rem 1.1rem 1.1rem;
+  padding: 1rem 1.1rem 1.05rem;
   margin: 0 0 0.75rem 0;
   color: #e8eef7;
   box-shadow: 0 8px 28px rgba(15,39,68,.28);
@@ -143,101 +145,176 @@ def _render_parade_sim_banner() -> None:
 }
 .pot-sim-banner::after{
   content:""; position:absolute; inset:0; pointer-events:none;
-  background: radial-gradient(ellipse 60% 80% at 90% 20%, rgba(255,255,255,.08), transparent 55%);
+  background: radial-gradient(ellipse 55% 70% at 88% 15%, rgba(255,255,255,.07), transparent 55%);
 }
-.pot-sim-head{ position:relative; z-index:1; margin-bottom:.55rem; }
-.pot-sim-title{ font-weight:700; font-size:1.05rem; letter-spacing:.01em; }
-.pot-sim-sub{ font-size:.8rem; opacity:.88; margin-top:.12rem; }
-.pot-sim-stage{ position:relative; z-index:1; }
-.pot-sim-zones{
-  display:grid; grid-template-columns: repeat(5,1fr); gap:8px; margin-bottom:4px;
+.pot-sim-head{ position:relative; z-index:2; margin-bottom:.6rem; }
+.pot-sim-title{ font-weight:700; font-size:1.05rem; }
+.pot-sim-sub{ font-size:.8rem; opacity:.9; margin-top:.12rem; line-height:1.35; }
+.pot-sim-stage{ position:relative; z-index:2; }
+
+/* 5 equal zone columns — teams snap to these */
+.pot-zones-wrap{
+  position: relative;
+  border-radius: 12px;
+  background: rgba(0,0,0,.16);
+  padding: 8px 6px 10px;
 }
-.pot-zone{
-  background: rgba(255,255,255,.08);
-  border: 1px dashed rgba(255,255,255,.28);
-  border-radius: 10px; min-height: 52px;
-  padding: 6px 4px; text-align: center;
+.pot-zone-row{
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin-bottom: 4px;
 }
-.pot-zone-label{
-  display:block; font-size:.72rem; font-weight:600;
-  color: rgba(255,255,255,.78);
+.pot-zone-head{
+  text-align: center;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+  color: rgba(255,255,255,.82);
+  padding: 2px 0 4px;
 }
-.pot-sim-track{
-  position: relative; height: 58px; margin: 6px 2px 8px;
-  border-radius: 10px; background: rgba(0,0,0,.18); overflow: hidden;
+.pot-zone-body{
+  position: relative;
+  height: 88px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+.pot-zone-cell{
+  border: 1px dashed rgba(255,255,255,.30);
+  border-radius: 10px;
+  background: rgba(255,255,255,.06);
+  position: relative;
+}
+/* subtle column index for alignment check */
+.pot-zone-cell::after{
+  content: attr(data-z);
+  position: absolute; bottom: 4px; left: 0; right: 0;
+  text-align: center; font-size: .62rem;
+  color: rgba(255,255,255,.35); font-weight: 600;
+}
+
+/* Teams absolutely positioned over the 5-column body */
+.pot-actors{
+  position: absolute;
+  left: 6px; right: 6px;
+  top: 0; bottom: 0;
+  pointer-events: none;
 }
 .pot-team{
-  position: absolute; top: 8px; left: 0;
-  width: calc(18% - 4px); max-width: 104px;
-  padding: 6px 6px; border-radius: 10px;
-  font-weight: 700; font-size: .78rem; line-height: 1.15;
-  box-shadow: 0 4px 12px rgba(0,0,0,.25);
-  animation: pot-march 7.5s linear infinite;
-  animation-delay: var(--delay);
-  display: flex; flex-direction: column; align-items: center;
-  will-change: transform;
+  position: absolute;
+  top: 50%;
+  width: calc(20% - 8px);
+  transform: translate(-50%, -50%);
+  padding: 8px 6px;
+  border-radius: 10px;
+  font-weight: 800;
+  font-size: .8rem;
+  line-height: 1.15;
+  text-align: center;
+  box-shadow: 0 4px 14px rgba(0,0,0,.35);
+  animation: pot-zone-walk var(--dwell) linear infinite;
+  animation-delay: calc(var(--i) * 2s); /* 1 zone = 2s @ 10s cycle */
+  will-change: left, opacity;
 }
-.pot-team small{ font-weight:600; font-size:.62rem; opacity:.9; }
+.pot-team small{
+  display: block;
+  font-weight: 600;
+  font-size: .62rem;
+  opacity: .92;
+  margin-top: 2px;
+}
 .pot-team.t1{ background: var(--t1); color:#fff; }
-.pot-team.t2{ background: var(--t2); color:#1a1a1a; }
+.pot-team.t2{ background: var(--t2); color:#1a1200; }
 .pot-team.t3{ background: var(--t3); color:#fff; }
 .pot-team.t4{ background: var(--t4); color:#fff; }
 .pot-team.t5{ background: var(--t5); color:#fff; }
-@keyframes pot-march{
-  0%   { transform: translateX(-130%); opacity: 0; }
-  5%   { opacity: 1; }
-  8%   { transform: translateX(6%); }     /* Zona 1 */
-  18%  { transform: translateX(6%); }
-  24%  { transform: translateX(112%); }   /* Zona 2 */
-  34%  { transform: translateX(112%); }
-  40%  { transform: translateX(218%); }   /* Zona 3 */
-  50%  { transform: translateX(218%); }
-  56%  { transform: translateX(324%); }   /* Zona 4 */
-  66%  { transform: translateX(324%); }
-  72%  { transform: translateX(430%); }   /* Zona 5 */
-  88%  { transform: translateX(430%); opacity: 1; }
-  100% { transform: translateX(560%); opacity: 0; }
+
+/*
+  left % is center of each zone column (of .pot-actors width):
+  Z1=10%, Z2=30%, Z3=50%, Z4=70%, Z5=90%
+  Hold ~14% of timeline per zone, transit ~6%.
+  T2 delay = 2s = 20% so T2 enters Z1 exactly when T1 leaves for Z2.
+*/
+@keyframes pot-zone-walk{
+  0%   { left: -8%;  opacity: 0; }
+  2%   { left: 10%;  opacity: 1; }   /* enter Z1 */
+  16%  { left: 10%;  opacity: 1; }   /* hold Z1 */
+  20%  { left: 30%;  opacity: 1; }   /* Z2 */
+  36%  { left: 30%; }
+  40%  { left: 50%; }                /* Z3 */
+  56%  { left: 50%; }
+  60%  { left: 70%; }                /* Z4 */
+  76%  { left: 70%; }
+  80%  { left: 90%; }                /* Z5 */
+  94%  { left: 90%;  opacity: 1; }
+  100% { left: 108%; opacity: 0; }   /* exit */
 }
+
 .pot-sim-legend{
-  display:flex; flex-wrap:wrap; gap:8px 14px; font-size:.72rem; opacity:.92;
+  display: flex; flex-wrap: wrap; gap: 6px 14px;
+  margin-top: 10px; font-size: .72rem; opacity: .93;
+  line-height: 1.35;
 }
-.pot-sim-legend b{ font-weight:700; }
+.pot-sim-legend .chip{
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(255,255,255,.08);
+  border-radius: 999px; padding: 3px 10px 3px 6px;
+}
+.pot-sim-legend i{
+  width: 10px; height: 10px; border-radius: 50%; display: inline-block;
+}
+.pot-sim-legend i.t1{ background: var(--t1); }
+.pot-sim-legend i.t2{ background: var(--t2); }
+.pot-sim-legend i.t3{ background: var(--t3); }
+.pot-sim-legend i.t4{ background: var(--t4); }
+.pot-sim-legend i.t5{ background: var(--t5); }
+
 @media (max-width: 640px){
-  .pot-sim-zones{ gap:4px; }
-  .pot-zone{ min-height:44px; }
-  .pot-zone-label{ font-size:.62rem; }
-  .pot-team{ font-size:.68rem; }
-  .pot-team small{ display:none; }
-  .pot-sim-title{ font-size:.95rem; }
+  .pot-zone-body{ height: 72px; }
+  .pot-team{ font-size: .68rem; padding: 6px 3px; width: calc(20% - 4px); }
+  .pot-team small{ display: none; }
+  .pot-sim-title{ font-size: .95rem; }
+  .pot-zone-head{ font-size: .62rem; }
 }
 </style>
 <div class="pot-sim-banner">
   <div class="pot-sim-head">
-    <div class="pot-sim-title">Simulasi pendek — dinamika tim & zona</div>
+    <div class="pot-sim-title">Simulasi pendek — handoff zona (one-piece)</div>
     <div class="pot-sim-sub">
-      T1 kerja di Zona 1, lalu pindah ke Zona 2 · Zona 1 dikerjakan T2 · kemudian T3…T5
-      (one-piece flow, ilustrasi berulang)
+      Tiap kotak = <b>satu zona</b>. Tim berdiri di zona yang dikerjakan.
+      T1 selesai Z1 → pindah Z2; bersamaan itu T2 masuk Z1 — dst. sampai T5.
     </div>
   </div>
   <div class="pot-sim-stage">
-    <div class="pot-sim-zones">
-      <div class="pot-zone"><span class="pot-zone-label">Zona 1</span></div>
-      <div class="pot-zone"><span class="pot-zone-label">Zona 2</span></div>
-      <div class="pot-zone"><span class="pot-zone-label">Zona 3</span></div>
-      <div class="pot-zone"><span class="pot-zone-label">Zona 4</span></div>
-      <div class="pot-zone"><span class="pot-zone-label">Zona 5</span></div>
-    </div>
-    <div class="pot-sim-track">
-      <div class="pot-team t1" style="--delay:0s"><span>T1</span><small>Bekisting</small></div>
-      <div class="pot-team t2" style="--delay:1.15s"><span>T2</span><small>Tulangan</small></div>
-      <div class="pot-team t3" style="--delay:2.3s"><span>T3</span><small>Cor</small></div>
-      <div class="pot-team t4" style="--delay:3.45s"><span>T4</span><small>Bongkar</small></div>
-      <div class="pot-team t5" style="--delay:4.6s"><span>T5</span><small>Finishing</small></div>
+    <div class="pot-zones-wrap">
+      <div class="pot-zone-row">
+        <div class="pot-zone-head">Zona 1</div>
+        <div class="pot-zone-head">Zona 2</div>
+        <div class="pot-zone-head">Zona 3</div>
+        <div class="pot-zone-head">Zona 4</div>
+        <div class="pot-zone-head">Zona 5</div>
+      </div>
+      <div class="pot-zone-body" style="position:relative">
+        <div class="pot-zone-cell" data-z="Z1"></div>
+        <div class="pot-zone-cell" data-z="Z2"></div>
+        <div class="pot-zone-cell" data-z="Z3"></div>
+        <div class="pot-zone-cell" data-z="Z4"></div>
+        <div class="pot-zone-cell" data-z="Z5"></div>
+        <div class="pot-actors">
+          <div class="pot-team t1" style="--i:0"><span>T1</span><small>Bekisting</small></div>
+          <div class="pot-team t2" style="--i:1"><span>T2</span><small>Tulangan</small></div>
+          <div class="pot-team t3" style="--i:2"><span>T3</span><small>Cor</small></div>
+          <div class="pot-team t4" style="--i:3"><span>T4</span><small>Bongkar</small></div>
+          <div class="pot-team t5" style="--i:4"><span>T5</span><small>Finishing</small></div>
+        </div>
+      </div>
     </div>
     <div class="pot-sim-legend">
-      <span><b>T1</b> selesai zona → pindah zona berikutnya</span>
-      <span><b>T2</b> masuk zona yang sudah dilepas T1</span>
-      <span>dst. sampai <b>T5</b> — parade handoff</span>
+      <span class="chip"><i class="t1"></i>T1 di Z1 dulu</span>
+      <span class="chip"><i class="t2"></i>T2 isi Z1 setelah T1 pindah</span>
+      <span class="chip"><i class="t3"></i>T3…T5 menyusul</span>
+      <span class="chip">1 zona = 1 “periode” di animasi</span>
     </div>
   </div>
 </div>
