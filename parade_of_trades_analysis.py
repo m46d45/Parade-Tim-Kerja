@@ -799,78 +799,72 @@ def build_takt_plan(
     handoff_lag: int = 1,
 ) -> TaktPlan:
     """
-    Ideal takt plan = hasil simulasi zone-flow deterministik (tanpa variability).
+    Ideal one-piece (or batched) takt train — **period 0-based**.
 
-    Variabel desain:
-    - ``n_zones``: jumlah zona
-    - ``batch_size``: ukuran takt / batch handoff (zona per serah-terima)
-    - ``rate``: kapasitas rencana (zona/periode)
-    - ``handoff_lag``: disimpan untuk metadata (engine memakai next-period = 1)
+    Educational wagon logic (OPF, batch=1, rate = zona/periode):
+    - T1 wagon-zona 1 starts at period **0**
+    - Work duration per zona = ceil(1/rate) periods (Normal → 1)
+    - T2 may start the same zona only after T1 finishes it + handoff_lag
+      (default lag=1 → next period), matching zone-flow handoff
 
-    Durasi rencana = durasi simulasi ideal (selaras dengan tab Simulasi
-    bila kapasitas & batch sama, tanpa var).
+    Example Normal (rate=1), lag=1:
+      T1 Z1 @ p0 · T1 Z2 & T2 Z1 @ p1 · T1 Z3 & T2 Z2 & T3 Z1 @ p2 · …
     """
     rate = max(float(rate), 1e-9)
     batch_size = max(1, int(batch_size))
     n_zones = max(1, int(n_zones))
     n_trades = max(1, int(n_trades))
+    lag = max(0, int(handoff_lag))
+    # periods of pure work for one zone at this rate
+    work_p = max(1, int(math.ceil(1.0 / rate - 1e-12)))
     tt = 1.0 / rate
 
-    pairs = [(rate, rate, 0.5, rate, True)] * n_trades
-    cfg = ParadeConfig.from_pairs(
-        pairs,
-        total_units=n_zones,
-        seed=0,
-        zone_flow=True,
-        batch_size=batch_size,
-    )
-    result = ParadeOfTrades(cfg).run()
+    # finish_end[i][z] = last period index (inclusive) trade i works on zone z
+    # start[i][z] = first period index (inclusive)
+    start: List[List[int]] = [[0] * n_zones for _ in range(n_trades)]
+    finish: List[List[int]] = [[0] * n_zones for _ in range(n_trades)]
 
-    # Infer per-zone finish periods from cumulative history
-    n = n_trades
-    actual_fin: List[List[Optional[int]]] = [[None] * n_zones for _ in range(n)]
-    actual_start: List[List[Optional[int]]] = [[None] * n_zones for _ in range(n)]
-    prev_cum = [0] * n
-    for rec in result.history:
-        for i in range(n):
-            cum = int(rec.cumulative[i])
-            if cum > prev_cum[i]:
-                for z in range(prev_cum[i], min(cum, n_zones)):
-                    actual_fin[i][z] = rec.period
-                    # start ≈ finish - ceil(tt) + 1 for rate<=1; use prev finish+1
-                    if z == 0:
-                        actual_start[i][z] = result.trade_metrics[i].start_period or rec.period
-                    else:
-                        prev_f = actual_fin[i][z - 1]
-                        actual_start[i][z] = (prev_f + 1) if prev_f else rec.period
-                prev_cum[i] = cum
+    for z in range(n_zones):
+        for i in range(n_trades):
+            candidates = [0]
+            # after own previous zone
+            if z > 0:
+                candidates.append(finish[i][z - 1] + 1)
+            # after upstream releases this zone (+ lag periods)
+            if i > 0:
+                candidates.append(finish[i - 1][z] + lag)
+            # batch constraint: trade may only start zone z after batch boundary
+            # for OPF batch=1 no extra wait beyond zone sequence
+            if batch_size > 1 and z > 0 and (z % batch_size) != 0:
+                pass  # within open batch — still sequential zone by zone for wagon clarity
+            ps = max(candidates)
+            pe = ps + work_p - 1
+            start[i][z] = ps
+            finish[i][z] = pe
 
     cells: List[TaktPlanCell] = []
-    for i in range(n):
+    for i in range(n_trades):
         for z in range(n_zones):
-            pe = actual_fin[i][z] or result.duration
-            ps = actual_start[i][z] or pe
-            if ps > pe:
-                ps = pe
             cells.append(
                 TaktPlanCell(
                     trade_index=i,
                     zone=z + 1,
-                    period_start=int(ps),
-                    period_end=int(pe),
+                    period_start=int(start[i][z]),
+                    period_end=int(finish[i][z]),
                     planned_rate=rate,
                 )
             )
 
+    duration = max(finish[i][n_zones - 1] for i in range(n_trades)) + 1  # count of periods 0..last
     return TaktPlan(
         n_trades=n_trades,
         n_zones=n_zones,
         batch_size=batch_size,
         rate=rate,
         cells=cells,
-        duration=int(result.duration),
+        duration=int(duration),
         takt_time=tt,
-        handoff_lag=max(1, int(handoff_lag)),
+        handoff_lag=lag if lag > 0 else 1,
     )
 
 

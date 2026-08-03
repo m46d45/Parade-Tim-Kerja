@@ -60,7 +60,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-04-takt-ui-v70"
+_APP_BUILD = "2026-08-04-wagon-fix-v71"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1346,7 +1346,10 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
             cfg = _build_config_from_pairs(pairs, int(z_base), seed, batch_size=1)
             res = ParadeOfTrades(cfg).run()
             st.session_state["takt_base_result"] = res
-            st.session_state["takt_base_plan"] = takt_plan_from_lob_result(res)
+            # Ideal wagon (period 0) from rate — educational takt train
+            st.session_state["takt_base_plan"] = build_takt_plan(
+                n_trades, int(z_base), batch_size=1, rate=float(rate), handoff_lag=1,
+            )
         except RuntimeError as exc:
             st.error(str(exc))
 
@@ -1423,12 +1426,14 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
                 cfg = _build_config_from_pairs(pairs, int(z), seed, batch_size=1)
                 r = ParadeOfTrades(cfg).run()
                 results[label] = r
-                plans[label] = takt_plan_from_lob_result(r)
+                plans[label] = build_takt_plan(
+                    n_trades, int(z), batch_size=1, rate=float(rate), handoff_lag=1,
+                )
                 meta[label] = {
                     "zona": int(z),
                     "var_label": VAR_LABELS.get(var_mode, var_mode),
                     "pace": f"{rate:g}/p",
-                    "plan_duration": build_takt_plan(n_trades, int(z), 1, rate).duration,
+                    "plan_duration": plans[label].duration,
                 }
             st.session_state["takt_zone_results"] = results
             st.session_state["takt_zone_plans"] = plans

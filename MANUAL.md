@@ -242,7 +242,7 @@ Tidak ada pengaturan buffer takt di aplikasi. Buffer/WIP di tab Simulasi adalah 
 2. **Tabel ringkasan** — durasi aktual vs rencana, TH, WIP, CT, reliability, idle.  
 3. **LOB tim terakhir** — overlay A/B/C.  
 4. **LOB semua tim** — panel per skenario.  
-5. **Rencana vs aktual + wagon** — baseline.  
+5. **Takt plan (wagon)** — train T1→T5, zona di sumbu Y, periode mulai **0**.  
 6. **Unduh** CSV/Excel perbandingan + paket takt baseline.
 
 ### 6.5 Pesan pembelajaran

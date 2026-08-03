@@ -1356,36 +1356,72 @@ def plot_takt_wagon_chart(
     max_zones: int = 12,
 ) -> Axes:
     """
-    Compact wagon / train view: rows = zones (subset), color bars = trades in time.
+    Takt train / wagon chart (period 0-based).
+
+    - Y = zona (wagon location): 1, 2, 3, …
+    - X = periode mulai 0
+    - Warna = tim T1…T5 bergerak diagonal (train)
+    - Normal rate=1: tiap sel lebar 1 periode
     """
     if ax is None:
         _, ax = plt.subplots(figsize=(10, 4.8))
     colors = [_trade_color(i) for i in range(plan.n_trades)]
-    n_show = min(plan.n_zones, max_zones)
-    for z in range(1, n_show + 1):
-        for c in plan.cells:
-            if c.zone != z:
-                continue
-            ax.barh(
-                y=z,
-                width=c.period_end - c.period_start + 1,
-                left=c.period_start,
-                height=0.7,
-                color=colors[c.trade_index],
-                edgecolor="white",
-                linewidth=0.5,
-                label=f"T{c.trade_index + 1}" if z == 1 else None,
+    n_show = min(int(plan.n_zones), int(max_zones))
+    max_end = 0
+    labeled = set()
+    for c in plan.cells:
+        if c.zone < 1 or c.zone > n_show:
+            continue
+        w = max(1, int(c.period_end) - int(c.period_start) + 1)
+        left = float(c.period_start)
+        max_end = max(max_end, int(c.period_end) + 1)
+        lab = f"T{c.trade_index + 1}"
+        ax.barh(
+            y=c.zone,
+            width=w,
+            left=left,
+            height=0.72,
+            color=colors[c.trade_index % len(colors)],
+            edgecolor="white",
+            linewidth=0.6,
+            align="center",
+            label=lab if lab not in labeled else None,
+            zorder=2,
+        )
+        labeled.add(lab)
+        # label short inside cell if wide enough
+        if w >= 1 and n_show <= 16:
+            ax.text(
+                left + w / 2.0,
+                c.zone,
+                lab,
+                ha="center",
+                va="center",
+                fontsize=7,
+                color="white",
+                fontweight="bold",
+                zorder=3,
             )
-    ax.set_xlabel("Periode")
-    ax.set_ylabel("Zona")
-    ax.set_ylim(0.3, n_show + 0.7)
-    ax.invert_yaxis()
-    ax.set_xlim(left=0)
-    ax.set_title(title or f"Takt wagons (zona 1–{n_show}) · batch={plan.batch_size}")
-    # unique legend
+
+    # period gridlines
+    if max_end <= 0:
+        max_end = int(plan.duration) if getattr(plan, "duration", None) else 1
+    ax.set_xlim(0, max(max_end, 1))
+    ax.set_xticks(list(range(0, max_end + 1, max(1, max_end // 12))))
+    ax.set_xlabel("Periode (mulai 0)")
+    ax.set_ylabel("Zona (wagon)")
+    ax.set_yticks(list(range(1, n_show + 1)))
+    ax.set_ylim(n_show + 0.6, 0.4)  # zona 1 di atas
+    ax.set_title(title or f"Takt plan (wagon) · zona 1–{n_show} · rate={plan.rate:g}")
     handles, labels = ax.get_legend_handles_labels()
-    uniq = dict(zip(labels, handles))
-    ax.legend(uniq.values(), uniq.keys(), loc="lower right", fontsize=8, framealpha=0.92, ncol=plan.n_trades)
+    if handles:
+        uniq = dict(zip(labels, handles))
+        ax.legend(
+            uniq.values(), uniq.keys(),
+            loc="lower right", fontsize=8, framealpha=0.92,
+            ncol=min(plan.n_trades, 5),
+        )
+    ax.grid(True, axis="x", alpha=0.25, zorder=0)
     _apply_axes_style(ax)
     return ax
 
