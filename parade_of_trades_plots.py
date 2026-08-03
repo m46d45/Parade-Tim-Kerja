@@ -534,12 +534,13 @@ def plot_comparison_buffers(
     if ax is None:
         _, ax = plt.subplots(figsize=(8, 5))
 
-    for name, result in results.items():
+    fallback = ["#2563eb", "#ea580c", "#16a34a", "#dc2626", "#7c3aed", "#0891b2"]
+    for idx, (name, result) in enumerate(results.items()):
         if result.config.n_interfaces == 0:
             continue
         buf = result.buffer_series()
         total_wip = [sum(buf[j][t] for j in range(len(buf))) for t in range(len(buf[0]))]
-        color = PRESET_COLORS.get(name, None)
+        color = PRESET_COLORS.get(name, fallback[idx % len(fallback)])
         display = PRESET_DISPLAY.get(name, name)
         peak = max(total_wip) if total_wip else 0
         ax.plot(
@@ -547,15 +548,66 @@ def plot_comparison_buffers(
             total_wip,
             color=color,
             linewidth=1.9,
-            label=f"{display} (peak={peak})",
+            label=f"{display} (puncak={peak})",
         )
 
     ax.set_xlim(left=0)
     ax.set_ylim(bottom=0)
     ax.set_xlabel("Periode")
-    ax.set_ylabel("Total WIP (all interfaces)")
-    ax.set_title(title or "Total Buffer / WIP – Scenario Comparison")
+    ax.set_ylabel("Total WIP (semua buffer)")
+    ax.set_title(title or "Buffer / WIP — perbandingan skenario")
     ax.legend(loc="upper right", fontsize=8, framealpha=0.92)
+    _apply_axes_style(ax)
+    return ax
+
+
+def plot_comparison_utilization(
+    results: Dict[str, ParadeResult],
+    ax: Optional[Axes] = None,
+    title: Optional[str] = None,
+) -> Axes:
+    """
+    Grouped bar chart: utilization (%) per trade, one group per scenario.
+    """
+    if ax is None:
+        _, ax = plt.subplots(figsize=(10, 4.5))
+
+    names = list(results.keys())
+    if not names:
+        return ax
+    n_scen = len(names)
+    n_trades = results[names[0]].config.n_trades
+    fallback = ["#2563eb", "#ea580c", "#16a34a", "#dc2626", "#7c3aed", "#0891b2"]
+
+    # x positions for trade groups
+    import numpy as np
+    x = np.arange(n_trades)
+    width = min(0.8 / max(n_scen, 1), 0.18)
+    offsets = (np.arange(n_scen) - (n_scen - 1) / 2.0) * width
+
+    for i, name in enumerate(names):
+        r = results[name]
+        utils = [100.0 * m.utilization for m in r.trade_metrics]
+        color = PRESET_COLORS.get(name, fallback[i % len(fallback)])
+        display = PRESET_DISPLAY.get(name, name)
+        ax.bar(
+            x + offsets[i],
+            utils,
+            width=width * 0.92,
+            color=color,
+            edgecolor="white",
+            linewidth=0.5,
+            label=display,
+        )
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([f"T{i + 1}" for i in range(n_trades)])
+    ax.set_ylim(0, 105)
+    ax.set_ylabel("Utilisasi (%)")
+    ax.set_xlabel("Tim")
+    ax.set_title(title or "Utilisasi per tim — perbandingan skenario")
+    ax.axhline(100, color="0.6", linestyle="--", linewidth=0.9)
+    ax.legend(loc="lower right", fontsize=8, framealpha=0.92, ncol=min(n_scen, 3))
     _apply_axes_style(ax)
     return ax
 

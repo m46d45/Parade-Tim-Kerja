@@ -31,13 +31,15 @@ from parade_of_trades_core import (
 )
 from parade_of_trades_plots import (
     plot_buffer_profile,
+    plot_comparison_buffers,
     plot_comparison_lob,
+    plot_comparison_utilization,
     plot_line_of_balance,
     plot_line_of_balance_detail,
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-cmp-clean-v35"
+_APP_BUILD = "2026-08-03-cmp-plots-v36"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -817,15 +819,35 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
     st.markdown("##### Ringkasan")
     st.dataframe(sorted(rows, key=lambda x: x["Durasi"]), use_container_width=True, hide_index=True)
 
-    fig, ax = plt.subplots(figsize=(10, 5.5))
-    plot_comparison_lob(
-        results,
-        ax=ax,
-        title="Line of Balance — perbandingan skenario",
-        last_trade_only=True,
-    )
-    fig.tight_layout()
-    _fig_to_st(fig)
+    tab_lob, tab_buf, tab_util = st.tabs(["Line of Balance", "Buffer / WIP", "Utilisasi"])
+    with tab_lob:
+        fig, ax = plt.subplots(figsize=(10, 5.5))
+        plot_comparison_lob(
+            results,
+            ax=ax,
+            title="Line of Balance — perbandingan skenario",
+            last_trade_only=True,
+        )
+        fig.tight_layout()
+        _fig_to_st(fig)
+    with tab_buf:
+        fig, ax = plt.subplots(figsize=(10, 5.0))
+        plot_comparison_buffers(
+            results,
+            ax=ax,
+            title="Buffer / WIP — perbandingan skenario",
+        )
+        fig.tight_layout()
+        _fig_to_st(fig)
+    with tab_util:
+        fig, ax = plt.subplots(figsize=(10, 4.8))
+        plot_comparison_utilization(
+            results,
+            ax=ax,
+            title="Utilisasi per tim — perbandingan skenario",
+        )
+        fig.tight_layout()
+        _fig_to_st(fig)
 
     with st.expander("Detail tim satu skenario"):
         pick = st.selectbox("Skenario", list(results.keys()), key="cmp_detail_pick")
