@@ -115,9 +115,10 @@ Jumlah tim **tetap 5** (floor cycle).
 
 ### 3.2 Tiga tab utama
 
-1. **Simulasi** — satu skenario, atur tim, lihat LOB / Buffer / Utilisasi  
+1. **Simulasi** — satu skenario, atur tim, lihat LOB / Buffer / Utilisasi / Little / Kingman / FR  
 2. **Perbandingan** — 2–5 skenario berdampingan  
-3. **Manual** — dokumen ini (+ unduh `.md`)
+3. **Takt plan** — rencana irama zona + reliability + Tommelein 2020  
+4. **Manual** — dokumen ini (+ unduh `.md`)
 
 ---
 
@@ -382,6 +383,40 @@ Kurva klasik **service–inventory tradeoff** (Factory Physics / inventory theor
 - **Fill rate** analog ≈ `produksi / (produksi + idle)` pada tim hilir (idle = kelaparan buffer).
 - **Inventory** = rata-rata isi buffer B1…B4.
 - Tab **Inventory / FR**: kurva teoritis base-stock + titik operasi run / skenario.
+
+
+
+
+---
+
+## 14. Takt plan
+
+**Takt** (bahasa Jerman: *Takt* = irama/ketukan) = tempo produksi yang disepakati agar tim mengalir **ritmis** melalui zona.
+
+### Istilah
+
+| Istilah | Arti di app |
+|---------|-------------|
+| **Takt time** | Waktu rencana untuk menyelesaikan **satu zona** di satu stasiun (= 1 / kapasitas) |
+| **Zona takt** | Lokasi kerja (zona 1…N) |
+| **Batch handoff** | Berapa zona dikumpulkan sebelum dilepas ke tim hilir |
+| **Takt train / wagon** | Urutan tim (T1→T5) yang “berjalan” melewati zona pada irama yang sama |
+| **Reliability** | % (tim, zona) selesai **pada atau sebelum** waktu rencana |
+
+### Apa yang ditampilkan di tab **Takt plan**
+
+1. **Rencana ideal** (tanpa variability) — LOB putus-putus + wagon chart  
+2. **Simulasi aktual** (bisa dengan variability) — LOB solid menumpuk di rencana  
+3. **Reliability** vs durasi rencana  
+4. **Tommelein (2020)** — S1 classic 4/6, S2 takt 5 + standby 1, S3 classic 5/7 (buffer kapasitas)
+
+### Intuisi kelas
+
+- Rencana takt = janji irama. Variability membuat aktual **melenceng** (reliability turun, durasi naik).  
+- **Capacity buffer / standby** (Tommelein 2020) = cadangan kapasitas untuk menepati takt saat undian rendah.  
+- Batch besar memperpanjang rencana (W0 handoff); one-piece memendekkan train.
+
+Referensi: Tommelein (2020) *Takting the Parade of Trades*; LCI Takt Time / Takt Planning.
 
 
 ## 10. Pemecahan masalah singkat

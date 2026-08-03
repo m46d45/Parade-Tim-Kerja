@@ -1273,3 +1273,93 @@ def plot_inventory_fill_rate(
     _apply_axes_style(ax)
     return ax
 
+def plot_takt_plan(
+    plan,
+    ax: Optional[Axes] = None,
+    title: Optional[str] = None,
+    result: Optional[ParadeResult] = None,
+) -> Axes:
+    """
+    Takt plan as LOB-style diagonals (planned) + optional actual cumulative.
+
+    X = periode, Y = zona kumulatif (0..N). Each trade = one planned staircase.
+    """
+    if ax is None:
+        _, ax = plt.subplots(figsize=(10, 5.2))
+    colors = [_trade_color(i) for i in range(plan.n_trades)]
+    # Build planned cumulative: at end of each period how many zones done
+    for i in range(plan.n_trades):
+        cells = [c for c in plan.cells if c.trade_index == i]
+        cells = sorted(cells, key=lambda c: c.zone)
+        xs = [0]
+        ys = [0]
+        for c in cells:
+            # finish of zone c.zone at period_end → cum = c.zone
+            xs.append(c.period_end)
+            ys.append(c.zone)
+        ax.plot(xs, ys, color=colors[i], linewidth=2.0, linestyle="--",
+                label=f"Rencana T{i + 1}", alpha=0.85)
+        ax.scatter(xs[1:], ys[1:], color=colors[i], s=18, zorder=3)
+
+    if result is not None and result.history:
+        for i in range(min(result.config.n_trades, plan.n_trades)):
+            xs = [0] + [rec.period for rec in result.history]
+            ys = [0] + [rec.cumulative[i] for rec in result.history]
+            ax.plot(xs, ys, color=colors[i], linewidth=2.2, label=f"Aktual T{i + 1}")
+
+    ax.set_xlabel("Periode")
+    ax.set_ylabel("Zona kumulatif")
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0, top=plan.n_zones * 1.05)
+    ax.set_title(
+        title
+        or (
+            f"Takt plan · batch={plan.batch_size} · rate={plan.rate:g} · "
+            f"T0/zona={plan.takt_time:g} · durasi rencana={plan.duration}"
+        )
+    )
+    ax.legend(loc="upper left", fontsize=7.5, framealpha=0.92, ncol=2)
+    _apply_axes_style(ax)
+    return ax
+
+
+def plot_takt_wagon_chart(
+    plan,
+    ax: Optional[Axes] = None,
+    title: Optional[str] = None,
+    max_zones: int = 12,
+) -> Axes:
+    """
+    Compact wagon / train view: rows = zones (subset), color bars = trades in time.
+    """
+    if ax is None:
+        _, ax = plt.subplots(figsize=(10, 4.8))
+    colors = [_trade_color(i) for i in range(plan.n_trades)]
+    n_show = min(plan.n_zones, max_zones)
+    for z in range(1, n_show + 1):
+        for c in plan.cells:
+            if c.zone != z:
+                continue
+            ax.barh(
+                y=z,
+                width=c.period_end - c.period_start + 1,
+                left=c.period_start,
+                height=0.7,
+                color=colors[c.trade_index],
+                edgecolor="white",
+                linewidth=0.5,
+                label=f"T{c.trade_index + 1}" if z == 1 else None,
+            )
+    ax.set_xlabel("Periode")
+    ax.set_ylabel("Zona")
+    ax.set_ylim(0.3, n_show + 0.7)
+    ax.invert_yaxis()
+    ax.set_xlim(left=0)
+    ax.set_title(title or f"Takt wagons (zona 1–{n_show}) · batch={plan.batch_size}")
+    # unique legend
+    handles, labels = ax.get_legend_handles_labels()
+    uniq = dict(zip(labels, handles))
+    ax.legend(uniq.values(), uniq.keys(), loc="lower right", fontsize=8, framealpha=0.92, ncol=plan.n_trades)
+    _apply_axes_style(ax)
+    return ax
+

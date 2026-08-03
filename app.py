@@ -25,6 +25,8 @@ from parade_of_trades_analysis import (
     kingman_combined,
     kingman_metrics,
     littles_law_metrics,
+    build_takt_plan,
+    takt_plan_reliability,
 )
 from parade_of_trades_core import (
     CAPACITY_PRESETS,
@@ -32,6 +34,7 @@ from parade_of_trades_core import (
     ParadeConfig,
     ParadeOfTrades,
     ParadeResult,
+    tommelein2020_scenarios,
 )
 from parade_of_trades_plots import (
     plot_buffer_profile,
@@ -44,11 +47,13 @@ from parade_of_trades_plots import (
     plot_line_of_balance,
     plot_line_of_balance_detail,
     plot_littles_law_wip,
+    plot_takt_plan,
+    plot_takt_wagon_chart,
     plot_wip_th_ct,
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-ops-bound-v45"
+_APP_BUILD = "2026-08-03-takt-plan-v46"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1078,6 +1083,133 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
 
 
 
+
+def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
+    """Takt plan: rencana irama zona + bandingkan dengan simulasi / Tommelein 2020."""
+    st.subheader("Takt plan")
+
+    c1, c2, c3, c4 = st.columns(4)
+    rate = c1.selectbox(
+        "Kapasitas rencana (zona/periode)",
+        options=[1.0, 0.5, 2.0],
+        index=0,
+        format_func=lambda x: (
+            "Normal — 1 zona/periode" if x == 1.0
+            else "Rendah — 0,5" if x == 0.5
+            else "Tinggi — 2"
+        ),
+        key="takt_rate_plan",
+    )
+    batch = c2.selectbox(
+        "Batch handoff",
+        options=[4, 1, 2, 3, 5],
+        index=0,
+        key="takt_batch_plan",
+    )
+    n_zones = c3.number_input("Jumlah zona (rencana)", 4, 100, int(total_units), 4, key="takt_zones")
+    show_actual = c4.checkbox("Bandingkan simulasi aktual", value=True, key="takt_show_actual")
+
+    plan = build_takt_plan(
+        n_trades=n_trades,
+        n_zones=int(n_zones),
+        batch_size=int(batch),
+        rate=float(rate),
+        handoff_lag=1,
+    )
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Takt time / zona", f"{plan.takt_time:g} periode")
+    m2.metric("Durasi rencana", f"{plan.duration}")
+    m3.metric("Batch", f"{plan.batch_size}")
+    m4.metric("Handoff lag", f"{plan.handoff_lag} periode")
+
+    result = None
+    rel = None
+    if show_actual:
+        # run matching zone-flow, no var, same rate & batch
+        det = abs(float(rate) - 1.0) < 1e-12 or True
+        pairs = [(float(rate), float(rate), 0.5, float(rate), True)] * n_trades
+        # allow variability option
+        var_mode = st.selectbox(
+            "Variability aktual (simulasi)",
+            ["no_variability", "low", "medium", "high", "very_high"],
+            format_func=lambda x: VAR_LABELS.get(x, x),
+            key="takt_var_actual",
+        )
+        if var_mode != "no_variability":
+            pairs = [_pair_from_base_and_var(float(rate), var_mode)] * n_trades
+        try:
+            result = ParadeOfTrades(
+                _build_config_from_pairs(pairs, int(n_zones), seed, batch_size=int(batch))
+            ).run()
+            rel = takt_plan_reliability(result, plan)
+        except RuntimeError as exc:
+            st.error(str(exc))
+            result = None
+
+    if rel is not None:
+        r1, r2, r3 = st.columns(3)
+        r1.metric("Reliability (tepat waktu)", f"{100 * rel['reliability']:.1f}%")
+        r2.metric("Durasi aktual", f"{rel['actual_duration']}")
+        r3.metric("Selisih vs rencana", f"{rel['actual_duration'] - rel['plan_duration']:+d}")
+
+    fig, ax = plt.subplots(figsize=(10, 5.2))
+    plot_takt_plan(plan, ax=ax, result=result)
+    fig.tight_layout()
+    _fig_to_st(fig)
+
+    fig, ax = plt.subplots(figsize=(10, 4.6))
+    plot_takt_wagon_chart(plan, ax=ax, max_zones=min(12, int(n_zones)))
+    fig.tight_layout()
+    _fig_to_st(fig)
+
+    with st.expander("Tabel rencana (cuplikan)"):
+        rows = plan.as_rows()
+        st.dataframe(rows[: min(40, len(rows))], use_container_width=True, hide_index=True)
+
+    if rel is not None:
+        with st.expander("Detail reliability per zona"):
+            st.dataframe(rel["detail"][:80], use_container_width=True, hide_index=True)
+
+    st.divider()
+    st.markdown("##### Tommelein (2020) — capacity buffer / standby")
+    st.caption(
+        "Skenario klasik dadu (bukan zone-flow): S1 4/6 · S2 takt 5 + standby 1 · S3 5/7. "
+        "Menunjukkan buffer kapasitas untuk menepati takt."
+    )
+    if st.button("Jalankan 3 skenario Tommelein 2020", key="takt_tommelein"):
+        sc = tommelein2020_scenarios(total_units=min(int(n_zones), 50), seed=seed)
+        rows = []
+        results = {}
+        for name, cfg in sc.items():
+            try:
+                results[name] = ParadeOfTrades(cfg).run()
+                r = results[name]
+                rows.append({
+                    "Skenario": name,
+                    "Durasi": r.duration,
+                    "Idle": r.total_idle_capacity,
+                    "TH": round(r.system_throughput, 3),
+                    "Standby dipakai": r.total_standby_used,
+                })
+            except RuntimeError as exc:
+                rows.append({"Skenario": name, "Durasi": str(exc), "Idle": "—", "TH": "—", "Standby dipakai": "—"})
+        st.session_state["takt_tom_rows"] = rows
+        st.session_state["takt_tom_res"] = results
+    if "takt_tom_rows" in st.session_state:
+        st.dataframe(st.session_state["takt_tom_rows"], use_container_width=True, hide_index=True)
+        if st.session_state.get("takt_tom_res"):
+            fig, ax = plt.subplots(figsize=(10, 4.8))
+            plot_comparison_lob(
+                st.session_state["takt_tom_res"],
+                ax=ax,
+                title="Tommelein 2020 — LOB (tim terakhir)",
+                last_trade_only=True,
+            )
+            fig.tight_layout()
+            _fig_to_st(fig)
+
+
 def tab_manual() -> None:
     st.subheader("📖 Manual")
     if _MANUAL_PATH.exists():
@@ -1099,12 +1231,14 @@ def tab_manual() -> None:
 def main() -> None:
     total_units, seed, n_trades = render_sidebar()
     _render_header()
-    tabs = st.tabs(["Simulasi", "Perbandingan", "Manual"])
+    tabs = st.tabs(["Simulasi", "Perbandingan", "Takt plan", "Manual"])
     with tabs[0]:
         tab_single_run(total_units, seed, n_trades)
     with tabs[1]:
         tab_compare(total_units, seed, n_trades)
     with tabs[2]:
+        tab_takt(total_units, seed, n_trades)
+    with tabs[3]:
         tab_manual()
 
 

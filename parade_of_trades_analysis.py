@@ -603,6 +603,172 @@ def inventory_fill_rate_curve(
     }
 
 
+
+@dataclass
+class TaktPlanCell:
+    trade_index: int
+    zone: int  # 1-based zone index
+    period_start: int
+    period_end: int  # inclusive
+    planned_rate: float
+
+
+@dataclass
+class TaktPlan:
+    """Ideal takt plan for zone-flow floor cycle (no variability)."""
+
+    n_trades: int
+    n_zones: int
+    batch_size: int
+    rate: float  # zones per period per trade (capacity)
+    cells: List[TaktPlanCell]
+    duration: int
+    takt_time: float
+    """Periods to complete one zone at one station (= 1/rate)."""
+    handoff_lag: int = 1  # next-period release
+
+    def as_rows(self) -> List[dict]:
+        rows = []
+        for c in self.cells:
+            rows.append({
+                "Tim": c.trade_index + 1,
+                "Zona": c.zone,
+                "Mulai": c.period_start,
+                "Selesai": c.period_end,
+                "Durasi": c.period_end - c.period_start + 1,
+            })
+        return rows
+
+
+def build_takt_plan(
+    n_trades: int = 5,
+    n_zones: int = 20,
+    batch_size: int = 4,
+    rate: float = 1.0,
+    handoff_lag: int = 1,
+) -> TaktPlan:
+    """
+    Build an ideal takt plan (zone-flow, no variability).
+
+    - Capacity ``rate`` zona/periode per tim (konstan).
+    - Waktu satu zona di satu stasiun: takt_time = 1/rate.
+    - Batch handoff: zona dalam batch dilepas bersama setelah hulu
+      menyelesaikan zona terakhir batch; + handoff_lag periode.
+    - Outer loop = trade (hulu selesai semua zona dulu di struktur data).
+    """
+    rate = max(float(rate), 1e-9)
+    tt = 1.0 / rate
+    batch_size = max(1, int(batch_size))
+    dur = max(1, int(math.ceil(tt - 1e-12)))
+    finish: List[List[int]] = [[0] * n_zones for _ in range(n_trades)]
+    start: List[List[int]] = [[0] * n_zones for _ in range(n_trades)]
+    cells: List[TaktPlanCell] = []
+
+    for i in range(n_trades):
+        for z in range(n_zones):
+            if i == 0:
+                p0 = 1 if z == 0 else finish[0][z - 1] + 1
+            else:
+                group_end = min(((z // batch_size) + 1) * batch_size - 1, n_zones - 1)
+                release = finish[i - 1][group_end] + handoff_lag
+                if z == 0:
+                    p0 = release
+                else:
+                    p0 = max(release, finish[i][z - 1] + 1)
+            p1 = p0 + dur - 1
+            start[i][z] = p0
+            finish[i][z] = p1
+            cells.append(
+                TaktPlanCell(
+                    trade_index=i,
+                    zone=z + 1,
+                    period_start=p0,
+                    period_end=p1,
+                    planned_rate=rate,
+                )
+            )
+
+    duration = max(finish[i][z] for i in range(n_trades) for z in range(n_zones))
+    return TaktPlan(
+        n_trades=n_trades,
+        n_zones=n_zones,
+        batch_size=batch_size,
+        rate=rate,
+        cells=cells,
+        duration=duration,
+        takt_time=tt,
+        handoff_lag=handoff_lag,
+    )
+
+
+def takt_plan_reliability(
+    result: ParadeResult,
+    plan: TaktPlan,
+) -> dict:
+    """
+    Compare simulated zone completions to takt plan.
+
+    For each trade, approximate zone completion periods from cumulative
+    history (first period cumulative >= z). Reliability = share of
+    (trade, zone) finished on or before plan.period_end.
+    """
+    n = result.config.n_trades
+    n_zones = min(plan.n_zones, result.config.total_units)
+    # actual finish period for trade i zone z (1-based z)
+    actual: List[List[Optional[int]]] = [
+        [None] * n_zones for _ in range(n)
+    ]
+    for rec in result.history:
+        for i in range(n):
+            cum = int(rec.cumulative[i])
+            for z in range(min(cum, n_zones)):
+                if actual[i][z] is None:
+                    actual[i][z] = rec.period
+
+    on_time = 0
+    total = 0
+    late = 0
+    early = 0
+    detail = []
+    plan_by = {(c.trade_index, c.zone): c for c in plan.cells}
+    for i in range(n):
+        for z in range(n_zones):
+            cell = plan_by.get((i, z + 1))
+            if cell is None:
+                continue
+            act = actual[i][z]
+            total += 1
+            if act is None:
+                late += 1
+                status = "belum"
+            elif act <= cell.period_end:
+                on_time += 1
+                status = "tepat/awal"
+                if act < cell.period_start:
+                    early += 1
+            else:
+                late += 1
+                status = "telat"
+            detail.append({
+                "Tim": i + 1,
+                "Zona": z + 1,
+                "Rencana selesai": cell.period_end,
+                "Aktual selesai": act if act is not None else "—",
+                "Status": status,
+            })
+    rel = on_time / total if total else 0.0
+    return {
+        "reliability": rel,
+        "on_time": on_time,
+        "late": late,
+        "early": early,
+        "total": total,
+        "plan_duration": plan.duration,
+        "actual_duration": result.duration,
+        "detail": detail,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Statistics helpers
 # ---------------------------------------------------------------------------
