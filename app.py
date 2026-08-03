@@ -33,17 +33,14 @@ from parade_of_trades_analysis import (
     required_rate_for_duration,
     takt_design_table,
     takt_plan_reliability,
-    tommelein_run_metrics,
-    takt_plan_from_lob_result,
-)
+        )
 from parade_of_trades_core import (
     CAPACITY_PRESETS,
     DEFAULT_TRADE_NAMES,
     ParadeConfig,
     ParadeOfTrades,
     ParadeResult,
-    tommelein2020_scenarios,
-)
+    )
 from parade_of_trades_plots import (
     plot_buffer_profile,
     plot_comparison_buffers,
@@ -57,14 +54,11 @@ from parade_of_trades_plots import (
     plot_littles_law_wip,
     plot_takt_plan,
     plot_takt_wagon_chart,
-    plot_tommelein_scenario_lobs,
-    plot_single_scenario_lob,
-    plot_tommelein_last_trade_lob,
-    plot_wip_th_ct,
+                plot_wip_th_ct,
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-04-takt-buffers-tpi-v63"
+_APP_BUILD = "2026-08-04-no-tommelein-v64"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1414,135 +1408,6 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
             })
         st.dataframe(rows, use_container_width=True, hide_index=True)
 
-    # ------------------------------------------------------------------
-    # Tommelein (2020)
-    # ------------------------------------------------------------------
-    st.divider()
-    st.markdown("##### Tommelein (2020) — *Takting the Parade of Trades*")
-
-    st.dataframe(
-        [
-            {
-                "Skenario": "S1 Classic 4/6",
-                "Dadu": "4–6",
-                "Takt": "—",
-                "Standby": "—",
-                "Inti": "Parade klasik; kapasitas acak tiap periode, tanpa buffer.",
-            },
-            {
-                "Skenario": "S2 Takt 5 + standby 1",
-                "Dadu": "4–6",
-                "Takt": "5",
-                "Standby": "1",
-                "Inti": "Komitmen takt 5 unit/periode; bila dadu < 5, standby menutup selisih (buffer kapasitas).",
-            },
-            {
-                "Skenario": "S3 Classic 5/7",
-                "Dadu": "5–7",
-                "Takt": "—",
-                "Standby": "—",
-                "Inti": "Kapasitas dinaikkan (mean lebih tinggi) tanpa takt; variability lebih lebar.",
-            },
-        ],
-        use_container_width=True,
-        hide_index=True,
-    )
-
-    tcol1, tcol2 = st.columns(2)
-    tom_units = int(tcol1.number_input(
-        "Unit (zona) Tommelein",
-        min_value=20, max_value=200, value=min(max(int(n_zones), 50), 100), step=10,
-        key="takt_tom_units",
-    ))
-    tom_seed = tcol2.number_input(
-        "Seed Tommelein",
-        min_value=0, max_value=999999, value=int(seed or 42), step=1,
-        key="takt_tom_seed",
-    )
-
-    if st.button("Jalankan 3 skenario Tommelein 2020", type="primary", key="takt_tommelein"):
-        raw = tommelein2020_scenarios(total_units=tom_units, seed=int(tom_seed))
-        # Friendly names
-        name_map = {
-            "S1_classic_4/6": "S1 Classic 4/6",
-            "S2_takt_4/6+stby1": "S2 Takt 5 + standby 1",
-            "S3_classic_5/7": "S3 Classic 5/7",
-        }
-        results = {}
-        rows = []
-        for key, cfg in raw.items():
-            label = name_map.get(key, key)
-            try:
-                r = ParadeOfTrades(cfg).run()
-                results[label] = r
-                m = tommelein_run_metrics(r)
-                rows.append({"Skenario": label, **m})
-            except RuntimeError as exc:
-                rows.append({"Skenario": label, "Durasi": str(exc)})
-        st.session_state["takt_tom_rows"] = rows
-        st.session_state["takt_tom_res"] = results
-
-    if st.session_state.get("takt_tom_res"):
-        res_map = st.session_state["takt_tom_res"]
-
-        st.markdown("###### 1. LOB tiap skenario")
-        for name, r in res_map.items():
-            fig, ax = plt.subplots(figsize=(9.5, 4.5))
-            plot_single_scenario_lob(r, ax=ax, title=f"LOB — {name}")
-            fig.tight_layout()
-            _fig_to_st(fig)
-
-        st.markdown("###### 2. LOB tim terakhir (semua skenario)")
-        fig, ax = plt.subplots(figsize=(10, 4.8))
-        plot_tommelein_last_trade_lob(
-            res_map, ax=ax,
-            title="LOB tim terakhir — S1 · S2 · S3 (mulai 0,0)",
-        )
-        fig.tight_layout()
-        _fig_to_st(fig)
-
-        st.markdown("###### 3. Takt plan dari LOB (per skenario)")
-        for name, r in res_map.items():
-            plan = takt_plan_from_lob_result(r)
-            st.markdown(
-                f"**{name}** · durasi {plan.duration} p · "
-                f"rate acuan {plan.rate:g} · unit {plan.n_zones}"
-            )
-            # LOB-style plan (actual as solid = translated schedule)
-            fig, ax = plt.subplots(figsize=(9.5, 4.5))
-            plot_takt_plan(
-                plan, ax=ax, result=r,
-                title=f"Takt plan dari LOB — {name}",
-            )
-            fig.tight_layout()
-            _fig_to_st(fig)
-            # wagon from translated plan
-            fig, ax = plt.subplots(figsize=(9.5, 4.0))
-            plot_takt_wagon_chart(
-                plan, ax=ax,
-                max_zones=min(12, plan.n_zones),
-                title=f"Wagon takt — {name} (unit 1–{min(12, plan.n_zones)})",
-            )
-            fig.tight_layout()
-            _fig_to_st(fig)
-
-        st.markdown("###### Hasil perhitungan")
-        st.dataframe(st.session_state["takt_tom_rows"], use_container_width=True, hide_index=True)
-
-        with st.expander("Rincian periode (produksi, standby) — cuplikan"):
-            for name, r in res_map.items():
-                st.markdown(f"**{name}** · durasi {r.duration} · standby total {r.total_standby_used}")
-                detail = []
-                for rec in r.history[:12]:
-                    detail.append({
-                        "Periode": rec.period,
-                        "Cap T1": rec.capacity[0],
-                        "Eff T1": rec.effective_capacity[0],
-                        "Prod T1": rec.production[0],
-                        "Standby T1": rec.standby_used[0],
-                        "Cum T5": rec.cumulative[-1],
-                    })
-                st.dataframe(detail, use_container_width=True, hide_index=True)
 
 
 

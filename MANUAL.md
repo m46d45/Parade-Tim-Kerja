@@ -248,7 +248,6 @@ Tanpa buffer + tanpa variability → rencana kerja = aktual. Buffer menambah **d
 2. Atur **3 buffer**.  
 3. Tekan **Jalankan simulasi** (tombol di **atas** grafik).  
 4. Baca reliability & overlay rencana vs aktual.  
-5. Opsional: **Tommelein (2020)** — S1 classic 4/6, S2 takt 5 + standby 1, S3 classic 5/7.
 
 ### 6.5 Grafik takt
 
@@ -539,7 +538,6 @@ Semakin tinggi target fill rate (mendekati 100%), inventory yang dibutuhkan **na
 | 5 | Perbandingan 5× var | Durasi, CT, W_opt vs level var |
 | 6 | Little's Law + slider CONWIP | Prediksi TH/CT berubah di bawah slider |
 | 7 | Takt plan OPF + buffer | Reliability; target periode vs rate efektif |
-| 8 | Tommelein S1/S2/S3 | Standby (capacity buffer) menekan idle |
 
 Diskusi kunci: *idle = menunggu zona, bukan malas*; *batch = kebijakan serah terima*; *takt = janji irama*; *CONWIP ≈ W_opt menahan inventory*.
 
