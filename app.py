@@ -8,6 +8,7 @@ from typing import List, Optional, Sequence, Tuple
 
 import matplotlib.pyplot as plt
 import streamlit as st
+import streamlit.components.v1 as components
 
 import parade_of_trades_analysis as _a
 import parade_of_trades_core as _c
@@ -36,7 +37,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-sim-zones-v17"
+_APP_BUILD = "2026-08-03-sim-timeline-v18"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -125,202 +126,309 @@ def _base_speed_input(key: str, label: str = "Kecepatan dasar", default: float =
 
 
 def _render_parade_sim_banner() -> None:
-    """One-piece handoff: teams sit in zone columns Z1→Z5, staggered by 1 zone."""
-    st.markdown(
-        """
+    """Accurate one-piece parade: 5 zones × 5 teams, step timeline, then loop."""
+    # Full HTML+JS so positions snap to CSS grid cells (not free-floating %).
+    html = r"""
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"/>
 <style>
-.pot-sim-banner{
-  --bg0:#0f2744; --bg1:#1a365d;
-  --t1:#3b82f6; --t2:#f59e0b; --t3:#10b981; --t4:#ef4444; --t5:#8b5cf6;
-  --zone-w: 20%;
-  --dwell: 10s; /* full cycle; each zone = 20% = 2s */
-  background: linear-gradient(135deg, var(--bg0) 0%, var(--bg1) 55%, #234e76 100%);
-  border-radius: 14px;
-  padding: 1rem 1.1rem 1.05rem;
-  margin: 0 0 0.75rem 0;
-  color: #e8eef7;
-  box-shadow: 0 8px 28px rgba(15,39,68,.28);
-  overflow: hidden;
-  position: relative;
-}
-.pot-sim-banner::after{
-  content:""; position:absolute; inset:0; pointer-events:none;
-  background: radial-gradient(ellipse 55% 70% at 88% 15%, rgba(255,255,255,.07), transparent 55%);
-}
-.pot-sim-head{ position:relative; z-index:2; margin-bottom:.6rem; }
-.pot-sim-title{ font-weight:700; font-size:1.05rem; }
-.pot-sim-sub{ font-size:.8rem; opacity:.9; margin-top:.12rem; line-height:1.35; }
-.pot-sim-stage{ position:relative; z-index:2; }
-
-/* 5 equal zone columns — teams snap to these */
-.pot-zones-wrap{
-  position: relative;
-  border-radius: 12px;
-  background: rgba(0,0,0,.16);
-  padding: 8px 6px 10px;
-}
-.pot-zone-row{
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 6px;
-  margin-bottom: 4px;
-}
-.pot-zone-head{
-  text-align: center;
-  font-size: .72rem;
-  font-weight: 700;
-  letter-spacing: .02em;
-  color: rgba(255,255,255,.82);
-  padding: 2px 0 4px;
-}
-.pot-zone-body{
-  position: relative;
-  height: 88px;
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 6px;
-}
-.pot-zone-cell{
-  border: 1px dashed rgba(255,255,255,.30);
-  border-radius: 10px;
-  background: rgba(255,255,255,.06);
-  position: relative;
-}
-/* subtle column index for alignment check */
-.pot-zone-cell::after{
-  content: attr(data-z);
-  position: absolute; bottom: 4px; left: 0; right: 0;
-  text-align: center; font-size: .62rem;
-  color: rgba(255,255,255,.35); font-weight: 600;
-}
-
-/* Teams absolutely positioned over the 5-column body */
-.pot-actors{
-  position: absolute;
-  left: 6px; right: 6px;
-  top: 0; bottom: 0;
-  pointer-events: none;
-}
-.pot-team{
-  position: absolute;
-  top: 50%;
-  width: calc(20% - 8px);
-  transform: translate(-50%, -50%);
-  padding: 8px 6px;
-  border-radius: 10px;
-  font-weight: 800;
-  font-size: .8rem;
-  line-height: 1.15;
-  text-align: center;
-  box-shadow: 0 4px 14px rgba(0,0,0,.35);
-  animation: pot-zone-walk var(--dwell) linear infinite;
-  animation-delay: calc(var(--i) * 2s); /* 1 zone = 2s @ 10s cycle */
-  will-change: left, opacity;
-}
-.pot-team small{
-  display: block;
-  font-weight: 600;
-  font-size: .62rem;
-  opacity: .92;
-  margin-top: 2px;
-}
-.pot-team.t1{ background: var(--t1); color:#fff; }
-.pot-team.t2{ background: var(--t2); color:#1a1200; }
-.pot-team.t3{ background: var(--t3); color:#fff; }
-.pot-team.t4{ background: var(--t4); color:#fff; }
-.pot-team.t5{ background: var(--t5); color:#fff; }
-
-/*
-  left % is center of each zone column (of .pot-actors width):
-  Z1=10%, Z2=30%, Z3=50%, Z4=70%, Z5=90%
-  Hold ~14% of timeline per zone, transit ~6%.
-  T2 delay = 2s = 20% so T2 enters Z1 exactly when T1 leaves for Z2.
-*/
-@keyframes pot-zone-walk{
-  0%   { left: -8%;  opacity: 0; }
-  2%   { left: 10%;  opacity: 1; }   /* enter Z1 */
-  16%  { left: 10%;  opacity: 1; }   /* hold Z1 */
-  20%  { left: 30%;  opacity: 1; }   /* Z2 */
-  36%  { left: 30%; }
-  40%  { left: 50%; }                /* Z3 */
-  56%  { left: 50%; }
-  60%  { left: 70%; }                /* Z4 */
-  76%  { left: 70%; }
-  80%  { left: 90%; }                /* Z5 */
-  94%  { left: 90%;  opacity: 1; }
-  100% { left: 108%; opacity: 0; }   /* exit */
-}
-
-.pot-sim-legend{
-  display: flex; flex-wrap: wrap; gap: 6px 14px;
-  margin-top: 10px; font-size: .72rem; opacity: .93;
-  line-height: 1.35;
-}
-.pot-sim-legend .chip{
-  display: inline-flex; align-items: center; gap: 5px;
-  background: rgba(255,255,255,.08);
-  border-radius: 999px; padding: 3px 10px 3px 6px;
-}
-.pot-sim-legend i{
-  width: 10px; height: 10px; border-radius: 50%; display: inline-block;
-}
-.pot-sim-legend i.t1{ background: var(--t1); }
-.pot-sim-legend i.t2{ background: var(--t2); }
-.pot-sim-legend i.t3{ background: var(--t3); }
-.pot-sim-legend i.t4{ background: var(--t4); }
-.pot-sim-legend i.t5{ background: var(--t5); }
-
-@media (max-width: 640px){
-  .pot-zone-body{ height: 72px; }
-  .pot-team{ font-size: .68rem; padding: 6px 3px; width: calc(20% - 4px); }
-  .pot-team small{ display: none; }
-  .pot-sim-title{ font-size: .95rem; }
-  .pot-zone-head{ font-size: .62rem; }
-}
+  :root {
+    --t1:#3b82f6; --t2:#f59e0b; --t3:#10b981; --t4:#ef4444; --t5:#8b5cf6;
+    --done:#94a3b8; --bg0:#0f2744; --bg1:#1a365d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+    background: transparent; color: #e8eef7;
+  }
+  .wrap {
+    background: linear-gradient(135deg, var(--bg0) 0%, var(--bg1) 55%, #234e76 100%);
+    border-radius: 14px; padding: 14px 14px 12px;
+    box-shadow: 0 8px 28px rgba(15,39,68,.28);
+  }
+  .head { margin-bottom: 10px; }
+  .title { font-weight: 700; font-size: 16px; }
+  .sub { font-size: 12.5px; opacity: .9; margin-top: 3px; line-height: 1.4; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+  }
+  .zone {
+    background: rgba(255,255,255,.07);
+    border: 1px dashed rgba(255,255,255,.32);
+    border-radius: 10px;
+    min-height: 96px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 6px 4px 8px;
+    transition: background .25s, border-color .25s;
+  }
+  .zone.done {
+    background: rgba(148,163,184,.18);
+    border-style: solid;
+    border-color: rgba(148,163,184,.55);
+  }
+  .zone-label {
+    font-size: 11px; font-weight: 700; letter-spacing: .03em;
+    color: rgba(255,255,255,.8); margin-bottom: 6px;
+  }
+  .slot {
+    flex: 1; width: 100%;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 56px;
+  }
+  .chip {
+    display: none;
+    width: 92%;
+    max-width: 112px;
+    padding: 8px 6px;
+    border-radius: 10px;
+    text-align: center;
+    font-weight: 800;
+    font-size: 13px;
+    line-height: 1.15;
+    box-shadow: 0 4px 12px rgba(0,0,0,.3);
+  }
+  .chip small { display:block; font-weight:600; font-size:10px; opacity:.92; margin-top:2px; }
+  .chip.show { display: block; animation: pop .28s ease; }
+  .chip.t1 { background: var(--t1); color:#fff; }
+  .chip.t2 { background: var(--t2); color:#1a1200; }
+  .chip.t3 { background: var(--t3); color:#fff; }
+  .chip.t4 { background: var(--t4); color:#fff; }
+  .chip.t5 { background: var(--t5); color:#fff; }
+  .chip.done-block {
+    background: linear-gradient(180deg, #e2e8f0, #cbd5e1);
+    color: #0f172a;
+    border: 1px solid rgba(15,23,42,.12);
+  }
+  @keyframes pop {
+    from { transform: scale(.85); opacity: 0; }
+    to   { transform: scale(1); opacity: 1; }
+  }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 8px 14px;
+    margin-top: 10px; font-size: 11.5px; opacity: .92;
+    align-items: center;
+  }
+  .period {
+    background: rgba(255,255,255,.1);
+    border-radius: 999px; padding: 3px 10px; font-weight: 700;
+  }
+  .hint { opacity: .85; }
+  @media (max-width: 560px) {
+    .chip small { display: none; }
+    .zone { min-height: 78px; }
+    .title { font-size: 14px; }
+  }
 </style>
-<div class="pot-sim-banner">
-  <div class="pot-sim-head">
-    <div class="pot-sim-title">Simulasi pendek — handoff zona (one-piece)</div>
-    <div class="pot-sim-sub">
-      Tiap kotak = <b>satu zona</b>. Tim berdiri di zona yang dikerjakan.
-      T1 selesai Z1 → pindah Z2; bersamaan itu T2 masuk Z1 — dst. sampai T5.
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div class="title">Simulasi pendek — handoff zona (one-piece)</div>
+    <div class="sub">
+      Awal kosong → tim muncul satu per satu. Setelah T5 selesai di suatu zona,
+      muncul blok <b>hasil kerja</b>. T1 hilang setelah selesai Zona 5.
+      Ulangi hanya setelah T5 selesai Zona 5.
     </div>
   </div>
-  <div class="pot-sim-stage">
-    <div class="pot-zones-wrap">
-      <div class="pot-zone-row">
-        <div class="pot-zone-head">Zona 1</div>
-        <div class="pot-zone-head">Zona 2</div>
-        <div class="pot-zone-head">Zona 3</div>
-        <div class="pot-zone-head">Zona 4</div>
-        <div class="pot-zone-head">Zona 5</div>
-      </div>
-      <div class="pot-zone-body" style="position:relative">
-        <div class="pot-zone-cell" data-z="Z1"></div>
-        <div class="pot-zone-cell" data-z="Z2"></div>
-        <div class="pot-zone-cell" data-z="Z3"></div>
-        <div class="pot-zone-cell" data-z="Z4"></div>
-        <div class="pot-zone-cell" data-z="Z5"></div>
-        <div class="pot-actors">
-          <div class="pot-team t1" style="--i:0"><span>T1</span><small>Bekisting</small></div>
-          <div class="pot-team t2" style="--i:1"><span>T2</span><small>Tulangan</small></div>
-          <div class="pot-team t3" style="--i:2"><span>T3</span><small>Cor</small></div>
-          <div class="pot-team t4" style="--i:3"><span>T4</span><small>Bongkar</small></div>
-          <div class="pot-team t5" style="--i:4"><span>T5</span><small>Finishing</small></div>
-        </div>
-      </div>
-    </div>
-    <div class="pot-sim-legend">
-      <span class="chip"><i class="t1"></i>T1 di Z1 dulu</span>
-      <span class="chip"><i class="t2"></i>T2 isi Z1 setelah T1 pindah</span>
-      <span class="chip"><i class="t3"></i>T3…T5 menyusul</span>
-      <span class="chip">1 zona = 1 “periode” di animasi</span>
-    </div>
+  <div class="grid" id="grid">
+    <!-- zones filled by JS -->
+  </div>
+  <div class="meta">
+    <span class="period" id="period">Periode 0</span>
+    <span class="hint" id="hint">Menunggu mulai…</span>
   </div>
 </div>
-        """,
-        unsafe_allow_html=True,
-    )
+<script>
+(function () {
+  const TEAMS = [
+    { id: 1, name: "T1", job: "Bekisting", cls: "t1" },
+    { id: 2, name: "T2", job: "Tulangan", cls: "t2" },
+    { id: 3, name: "T3", job: "Cor", cls: "t3" },
+    { id: 4, name: "T4", job: "Bongkar", cls: "t4" },
+    { id: 5, name: "T5", job: "Finishing", cls: "t5" },
+  ];
+  const N = 5;
+  const STEP_MS = 900;
+  const HOLD_END_MS = 1600;
+  const grid = document.getElementById("grid");
+  const periodEl = document.getElementById("period");
+  const hintEl = document.getElementById("hint");
+
+  // Build 5 zone columns
+  for (let z = 1; z <= N; z++) {
+    const zone = document.createElement("div");
+    zone.className = "zone";
+    zone.id = "zone-" + z;
+    zone.innerHTML =
+      '<div class="zone-label">Zona ' + z + "</div>" +
+      '<div class="slot" id="slot-' + z + '"></div>';
+    grid.appendChild(zone);
+  }
+
+  function clearSlots() {
+    for (let z = 1; z <= N; z++) {
+      const slot = document.getElementById("slot-" + z);
+      slot.innerHTML = "";
+      document.getElementById("zone-" + z).classList.remove("done");
+    }
+  }
+
+  function putTeam(zone, team) {
+    const slot = document.getElementById("slot-" + zone);
+    const chip = document.createElement("div");
+    chip.className = "chip show " + team.cls;
+    chip.innerHTML = "<span>" + team.name + "</span><small>" + team.job + "</small>";
+    slot.appendChild(chip);
+  }
+
+  function putDone(zone) {
+    const slot = document.getElementById("slot-" + zone);
+    const chip = document.createElement("div");
+    chip.className = "chip show done-block";
+    chip.innerHTML = "<span>✓ Selesai</span><small>hasil kerja</small>";
+    slot.appendChild(chip);
+    document.getElementById("zone-" + zone).classList.add("done");
+  }
+
+  /*
+    Discrete one-piece state for period p (1-based):
+      Team t is in zone (p - t + 1) if that zone is in 1..5.
+      Zone z is fully done when period > z + 4  (T5 finished z at period z+4).
+    Period 0: empty
+    Period 1: T1@1
+    Period 5: T1@5,T2@4,T3@3,T4@2,T5@1
+    Period 6: T2@5,...,T5@2; Z1 done (T5 left Z1)
+    Period 9: T5@5; Z1..Z4 done
+    Period 10: all done
+  */
+  function renderPeriod(p) {
+    clearSlots();
+    periodEl.textContent = "Periode " + p;
+
+    if (p === 0) {
+      hintEl.textContent = "Kosong — belum ada tim di zona";
+      return;
+    }
+
+    // Occupancy: team t at zone z = p - t + 1
+    for (let t = 1; t <= N; t++) {
+      const z = p - t + 1;
+      if (z >= 1 && z <= N) {
+        putTeam(z, TEAMS[t - 1]);
+      }
+    }
+
+    // Done zones: T5 finished zone z at period p_done = z + 4
+    // After that period (p > z+4), show hasil kerja
+    let doneCount = 0;
+    for (let z = 1; z <= N; z++) {
+      if (p > z + 4) {
+        // only if no team currently there (should be none)
+        const zOcc = p - 1 + 1; // not needed
+        putDone(z);
+        doneCount++;
+      }
+    }
+
+    // hints
+    if (p <= 5) {
+      hintEl.textContent = "Tim muncul berurutan · T" + p + " baru masuk Zona 1";
+    } else if (p < 10) {
+      hintEl.textContent =
+        "T1 sudah selesai Z5 (hilang) · zona yang T5 tinggalkan → blok hasil kerja";
+    } else {
+      hintEl.textContent = "Semua zona selesai — siap mengulang";
+    }
+  }
+
+  // Fix done logic: when p > z+4, zone has no team:
+  // team t in z when z = p - t + 1 => t = p - z + 1
+  // for zone z, last team is T5 when p - 5 + 1 = z => p = z + 4
+  // at p = z+4, T5 is still IN zone z
+  // at p = z+5, T5 has moved (or finished if z=5), zone z is free → hasil kerja
+  // So done when p >= z + 5
+  function renderPeriodFixed(p) {
+    clearSlots();
+    periodEl.textContent = "Periode " + p;
+
+    if (p === 0) {
+      hintEl.textContent = "Kosong — belum ada tim";
+      return;
+    }
+
+    // First place done blocks for completed zones, then active teams (teams win if overlap - shouldn't)
+    for (let z = 1; z <= N; z++) {
+      if (p >= z + 5) {
+        putDone(z);
+      }
+    }
+
+    for (let t = 1; t <= N; t++) {
+      const z = p - t + 1;
+      if (z >= 1 && z <= N) {
+        // clear done if any (team occupies)
+        const slot = document.getElementById("slot-" + z);
+        slot.innerHTML = "";
+        document.getElementById("zone-" + z).classList.remove("done");
+        putTeam(z, TEAMS[t - 1]);
+      }
+    }
+
+    if (p === 0) {
+      hintEl.textContent = "Kosong";
+    } else if (p === 1) {
+      hintEl.textContent = "Hanya T1 di Zona 1";
+    } else if (p <= 5) {
+      hintEl.textContent = "T1…T" + p + " aktif · handoff one-piece";
+    } else if (p === 6) {
+      hintEl.textContent = "T1 hilang (selesai Z5) · Zona 1 = hasil kerja (T5 sudah lewat)";
+    } else if (p < 10) {
+      hintEl.textContent = "Parade berlanjut · zona selesai menampilkan hasil kerja";
+    } else {
+      hintEl.textContent = "T5 selesai Zona 5 · semua hasil kerja — ulang dari kosong";
+    }
+  }
+
+  let p = 0;
+  const MAX_P = 10; // 0 empty … 10 all done
+
+  function tick() {
+    renderPeriodFixed(p);
+    if (p >= MAX_P) {
+      // hold full complete, then reset to empty and restart
+      setTimeout(function () {
+        p = 0;
+        renderPeriodFixed(0);
+        setTimeout(function () {
+          p = 1;
+          schedule();
+        }, 700);
+      }, HOLD_END_MS);
+      return;
+    }
+    p += 1;
+    schedule();
+  }
+
+  function schedule() {
+    setTimeout(tick, STEP_MS);
+  }
+
+  // start: brief empty, then period 1
+  renderPeriodFixed(0);
+  setTimeout(function () {
+    p = 1;
+    tick();
+  }, 600);
+})();
+</script>
+</body></html>
+"""
+    components.html(html, height=250, scrolling=False)
 
 
 def _render_header() -> None:
