@@ -1597,6 +1597,71 @@ def compare_scenarios(
     return cmp
 
 
+
+def takt_plan_from_lob_result(result: ParadeResult) -> "TaktPlan":
+    """
+    Translate a classic Parade LOB run into a TaktPlan-like schedule.
+
+    For each trade and each completed unit (1..N), estimate the period when
+    that unit was finished from the cumulative series (first period cum >= z).
+    Start period ≈ previous unit finish + 1 (or first production period).
+    """
+    n = result.config.n_trades
+    n_units = int(result.config.total_units)
+    cum = result.cumulative_series()  # series[i][p] with p=0 → 0
+
+    # actual finish period for trade i, unit z (0-based unit index)
+    finish: List[List[Optional[int]]] = [[None] * n_units for _ in range(n)]
+    start: List[List[Optional[int]]] = [[None] * n_units for _ in range(n)]
+
+    for i in range(n):
+        series = cum[i]
+        # series index = period
+        for p in range(1, len(series)):
+            prev = int(series[p - 1])
+            cur = int(series[p])
+            if cur > prev:
+                for z in range(prev, min(cur, n_units)):
+                    if finish[i][z] is None:
+                        finish[i][z] = p
+                        if z == 0:
+                            start[i][z] = p  # first unit of this trade that period
+                        else:
+                            prev_f = finish[i][z - 1]
+                            start[i][z] = (prev_f + 1) if prev_f is not None and prev_f < p else p
+
+    cells: List[TaktPlanCell] = []
+    for i in range(n):
+        for z in range(n_units):
+            pe = finish[i][z] if finish[i][z] is not None else result.duration
+            ps = start[i][z] if start[i][z] is not None else pe
+            if ps > pe:
+                ps = pe
+            cells.append(
+                TaktPlanCell(
+                    trade_index=i,
+                    zone=z + 1,
+                    period_start=int(ps),
+                    period_end=int(pe),
+                    planned_rate=float(result.config.takt_rate or (result.config.trades[i].mean or 1.0)),
+                )
+            )
+
+    rate = float(result.config.takt_rate) if result.config.takt_enabled else float(
+        result.config.trades[0].mean or 1.0
+    )
+    return TaktPlan(
+        n_trades=n,
+        n_zones=n_units,
+        batch_size=1,
+        rate=rate,
+        cells=cells,
+        duration=int(result.duration),
+        takt_time=(1.0 / rate) if rate > 0 else 1.0,
+        handoff_lag=0 if result.config.same_period_handoff else 1,
+    )
+
+
 def tommelein_run_metrics(result: ParadeResult) -> dict:
     """Summary row for one Tommelein (2020) scenario run."""
     cfg = result.config

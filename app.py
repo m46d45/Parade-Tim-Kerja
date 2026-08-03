@@ -32,6 +32,7 @@ from parade_of_trades_analysis import (
     takt_design_table,
     takt_plan_reliability,
     tommelein_run_metrics,
+    takt_plan_from_lob_result,
 )
 from parade_of_trades_core import (
     CAPACITY_PRESETS,
@@ -55,12 +56,13 @@ from parade_of_trades_plots import (
     plot_takt_plan,
     plot_takt_wagon_chart,
     plot_tommelein_scenario_lobs,
+    plot_single_scenario_lob,
     plot_tommelein_last_trade_lob,
     plot_wip_th_ct,
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-04-takt-tommelein-v61"
+_APP_BUILD = "2026-08-04-tommelein-order-v62"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1436,24 +1438,52 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
         st.session_state["takt_tom_res"] = results
 
     if st.session_state.get("takt_tom_res"):
-        st.markdown("###### Hasil perhitungan")
-        st.dataframe(st.session_state["takt_tom_rows"], use_container_width=True, hide_index=True)
-
         res_map = st.session_state["takt_tom_res"]
-        # Side-by-side last trade
+
+        st.markdown("###### 1. LOB tiap skenario")
+        for name, r in res_map.items():
+            fig, ax = plt.subplots(figsize=(9.5, 4.5))
+            plot_single_scenario_lob(r, ax=ax, title=f"LOB — {name}")
+            fig.tight_layout()
+            _fig_to_st(fig)
+
+        st.markdown("###### 2. LOB tim terakhir (semua skenario)")
         fig, ax = plt.subplots(figsize=(10, 4.8))
         plot_tommelein_last_trade_lob(
             res_map, ax=ax,
-            title="LOB tim terakhir — tiga skenario (mulai 0,0)",
+            title="LOB tim terakhir — S1 · S2 · S3 (mulai 0,0)",
         )
         fig.tight_layout()
         _fig_to_st(fig)
 
-        st.markdown("###### Takt plan / LOB per skenario (semua tim)")
-        fig = plot_tommelein_scenario_lobs(res_map)
-        _fig_to_st(fig)
+        st.markdown("###### 3. Takt plan dari LOB (per skenario)")
+        for name, r in res_map.items():
+            plan = takt_plan_from_lob_result(r)
+            st.markdown(
+                f"**{name}** · durasi {plan.duration} p · "
+                f"rate acuan {plan.rate:g} · unit {plan.n_zones}"
+            )
+            # LOB-style plan (actual as solid = translated schedule)
+            fig, ax = plt.subplots(figsize=(9.5, 4.5))
+            plot_takt_plan(
+                plan, ax=ax, result=r,
+                title=f"Takt plan dari LOB — {name}",
+            )
+            fig.tight_layout()
+            _fig_to_st(fig)
+            # wagon from translated plan
+            fig, ax = plt.subplots(figsize=(9.5, 4.0))
+            plot_takt_wagon_chart(
+                plan, ax=ax,
+                max_zones=min(12, plan.n_zones),
+                title=f"Wagon takt — {name} (unit 1–{min(12, plan.n_zones)})",
+            )
+            fig.tight_layout()
+            _fig_to_st(fig)
 
-        # Per-scenario calculation expander
+        st.markdown("###### Hasil perhitungan")
+        st.dataframe(st.session_state["takt_tom_rows"], use_container_width=True, hide_index=True)
+
         with st.expander("Rincian periode (produksi, standby) — cuplikan"):
             for name, r in res_map.items():
                 st.markdown(f"**{name}** · durasi {r.duration} · standby total {r.total_standby_used}")

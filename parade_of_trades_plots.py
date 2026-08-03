@@ -1478,3 +1478,43 @@ def plot_tommelein_last_trade_lob(
     _apply_axes_style(ax)
     return ax
 
+
+def plot_single_scenario_lob(
+    result: ParadeResult,
+    ax: Optional[Axes] = None,
+    title: Optional[str] = None,
+) -> Axes:
+    """Full LOB (all trades) for one scenario, origin (0,0)."""
+    if ax is None:
+        _, ax = plt.subplots(figsize=(8.5, 4.6))
+    cum = result.cumulative_series()
+    total = result.config.total_units
+    colors = [_trade_color(i) for i in range(result.config.n_trades)]
+    for i, series in enumerate(cum):
+        series = list(series)
+        periods = list(range(len(series)))
+        ax.plot(periods, series, color=colors[i], linewidth=2.0, label=f"T{i + 1}")
+    # planned rate line for last trade
+    tr = result.config.trades[0]
+    if result.config.takt_enabled and result.config.takt_rate:
+        rate = float(result.config.takt_rate)
+        plan_label = f"Rencana takt={result.config.takt_rate}"
+    else:
+        rate = float(tr.mean) if tr.mean else (float(tr.low) + float(tr.high)) / 2.0
+        plan_label = f"Rencana mean={rate:g}"
+    n_tr = result.config.n_trades
+    lag = 0 if result.config.same_period_handoff else (n_tr - 1)
+    if rate > 0:
+        t_end = lag + total / rate
+        ax.plot([lag, t_end], [0, total], color="0.35", linestyle="--",
+                linewidth=1.4, label=plan_label)
+    ax.axhline(total, color="0.75", linestyle=":", linewidth=0.9)
+    ax.set_xlim(left=0)
+    ax.set_ylim(0, total * 1.08)
+    ax.set_xlabel("Periode")
+    ax.set_ylabel("Zona kumulatif")
+    ax.set_title(title or "Line of Balance")
+    ax.legend(loc="lower right", fontsize=8, framealpha=0.92, ncol=2)
+    _apply_axes_style(ax)
+    return ax
+
