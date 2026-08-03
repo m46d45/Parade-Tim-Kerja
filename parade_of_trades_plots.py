@@ -1187,7 +1187,7 @@ def plot_wip_th_ct(
     ax.axvline(conwip, color="#7c3aed", linestyle="-", linewidth=2.0, alpha=0.85)
     # soft band: W_min .. CONWIP = recommended CONWIP operating region
     x_right = max(bc_w[-1] if bc_w else w_opt * 3, d["op_wip"] * 1.2, conwip * 1.5, w_opt * 2)
-    ax.axvspan(w_min, conwip, color="#7c3aed", alpha=0.06, zorder=0)
+    ax.axvspan(min(w_min, conwip), max(w_min, conwip), color="#7c3aed", alpha=0.06, zorder=0)
 
     ax.text(w_min, ymax_th * 0.92, f" W_min={w_min:.1f}", color="#15803d", fontsize=8, va="top")
     ax.text(w_opt, ymax_th * 0.80, f" W_opt={w_opt:.1f}", color="#c2410c", fontsize=8, va="top")

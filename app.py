@@ -56,7 +56,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-conwip-v52"
+_APP_BUILD = "2026-08-03-conwip-slider-fix-v53"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -663,15 +663,32 @@ def _plot_single_result(result: ParadeResult) -> None:
         e3.metric("WIP operasi", f"{_d['op_wip']:.2f}")
         e4.metric("TH_max / T0", f"{_d['th_max']:.2f} / {_d['t0']:.2f}")
 
+        # Slider CONWIP: fixed bounds + session state only (no value=) agar tidak error
+        # saat digeser / saat metrik run berubah.
         conwip_default = float(_d["conwip"])
+        _ck = "ll_conwip_level"
+        _cmin = 0.5
+        _cmax = float(max(float(result.config.total_units), w_opt * 4.0, w_min * 4.0, 20.0))
+        # snap to 0.5 steps
+        def _snap05(x: float) -> float:
+            return round(float(x) * 2.0) / 2.0
+
+        if _ck not in st.session_state:
+            st.session_state[_ck] = _snap05(max(conwip_default, w_min))
+        # clamp if out of range (e.g. after new run with different scale)
+        try:
+            cur = float(st.session_state[_ck])
+        except (TypeError, ValueError):
+            cur = conwip_default
+        st.session_state[_ck] = _snap05(min(_cmax, max(_cmin, cur)))
+
         conwip_lvl = st.slider(
             "CONWIP — batas WIP konstan",
-            min_value=0.5,
-            max_value=max(float(_d["op_wip"]) * 2.5, w_opt * 3.0, w_min * 4.0, 8.0),
-            value=min(max(conwip_default, w_min), max(float(_d["op_wip"]) * 2.5, w_opt * 3.0, 8.0)),
+            min_value=_cmin,
+            max_value=_cmax,
             step=0.5,
-            key="ll_conwip_level",
-            help="Constant Work-In-Process: rilis kerja baru hanya jika WIP di bawah batas ini.",
+            key=_ck,
+            help="Constant Work-In-Process: geser untuk memindahkan garis ungu di grafik.",
         )
 
         fig, ax = plt.subplots(figsize=(9.5, 5.2))
