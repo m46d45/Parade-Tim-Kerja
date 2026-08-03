@@ -37,7 +37,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-sim-timeline-v18"
+_APP_BUILD = "2026-08-03-sim-silent-v19"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -143,7 +143,7 @@ def _render_parade_sim_banner() -> None:
   }
   .wrap {
     background: linear-gradient(135deg, var(--bg0) 0%, var(--bg1) 55%, #234e76 100%);
-    border-radius: 14px; padding: 14px 14px 12px;
+    border-radius: 14px; padding: 12px 12px 10px;
     box-shadow: 0 8px 28px rgba(15,39,68,.28);
   }
   .head { margin-bottom: 10px; }
@@ -158,7 +158,7 @@ def _render_parade_sim_banner() -> None:
     background: rgba(255,255,255,.07);
     border: 1px dashed rgba(255,255,255,.32);
     border-radius: 10px;
-    min-height: 96px;
+    min-height: 88px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -226,20 +226,8 @@ def _render_parade_sim_banner() -> None:
 </head>
 <body>
 <div class="wrap">
-  <div class="head">
-    <div class="title">Simulasi pendek — handoff zona (one-piece)</div>
-    <div class="sub">
-      Awal kosong → tim muncul satu per satu. Setelah T5 selesai di suatu zona,
-      muncul blok <b>hasil kerja</b>. T1 hilang setelah selesai Zona 5.
-      Ulangi hanya setelah T5 selesai Zona 5.
-    </div>
-  </div>
   <div class="grid" id="grid">
     <!-- zones filled by JS -->
-  </div>
-  <div class="meta">
-    <span class="period" id="period">Periode 0</span>
-    <span class="hint" id="hint">Menunggu mulai…</span>
   </div>
 </div>
 <script>
@@ -255,17 +243,13 @@ def _render_parade_sim_banner() -> None:
   const STEP_MS = 900;
   const HOLD_END_MS = 1600;
   const grid = document.getElementById("grid");
-  const periodEl = document.getElementById("period");
-  const hintEl = document.getElementById("hint");
 
   // Build 5 zone columns
   for (let z = 1; z <= N; z++) {
     const zone = document.createElement("div");
     zone.className = "zone";
     zone.id = "zone-" + z;
-    zone.innerHTML =
-      '<div class="zone-label">Zona ' + z + "</div>" +
-      '<div class="slot" id="slot-' + z + '"></div>';
+    zone.innerHTML = '<div class="slot" id="slot-' + z + '"></div>';
     grid.appendChild(zone);
   }
 
@@ -281,7 +265,7 @@ def _render_parade_sim_banner() -> None:
     const slot = document.getElementById("slot-" + zone);
     const chip = document.createElement("div");
     chip.className = "chip show " + team.cls;
-    chip.innerHTML = "<span>" + team.name + "</span><small>" + team.job + "</small>";
+    chip.innerHTML = "<span>" + team.name + "</span>";
     slot.appendChild(chip);
   }
 
@@ -289,7 +273,7 @@ def _render_parade_sim_banner() -> None:
     const slot = document.getElementById("slot-" + zone);
     const chip = document.createElement("div");
     chip.className = "chip show done-block";
-    chip.innerHTML = "<span>✓ Selesai</span><small>hasil kerja</small>";
+    chip.innerHTML = "<span>✓</span>";
     slot.appendChild(chip);
     document.getElementById("zone-" + zone).classList.add("done");
   }
@@ -305,62 +289,10 @@ def _render_parade_sim_banner() -> None:
     Period 9: T5@5; Z1..Z4 done
     Period 10: all done
   */
-  function renderPeriod(p) {
-    clearSlots();
-    periodEl.textContent = "Periode " + p;
-
-    if (p === 0) {
-      hintEl.textContent = "Kosong — belum ada tim di zona";
-      return;
-    }
-
-    // Occupancy: team t at zone z = p - t + 1
-    for (let t = 1; t <= N; t++) {
-      const z = p - t + 1;
-      if (z >= 1 && z <= N) {
-        putTeam(z, TEAMS[t - 1]);
-      }
-    }
-
-    // Done zones: T5 finished zone z at period p_done = z + 4
-    // After that period (p > z+4), show hasil kerja
-    let doneCount = 0;
-    for (let z = 1; z <= N; z++) {
-      if (p > z + 4) {
-        // only if no team currently there (should be none)
-        const zOcc = p - 1 + 1; // not needed
-        putDone(z);
-        doneCount++;
-      }
-    }
-
-    // hints
-    if (p <= 5) {
-      hintEl.textContent = "Tim muncul berurutan · T" + p + " baru masuk Zona 1";
-    } else if (p < 10) {
-      hintEl.textContent =
-        "T1 sudah selesai Z5 (hilang) · zona yang T5 tinggalkan → blok hasil kerja";
-    } else {
-      hintEl.textContent = "Semua zona selesai — siap mengulang";
-    }
-  }
-
-  // Fix done logic: when p > z+4, zone has no team:
-  // team t in z when z = p - t + 1 => t = p - z + 1
-  // for zone z, last team is T5 when p - 5 + 1 = z => p = z + 4
-  // at p = z+4, T5 is still IN zone z
-  // at p = z+5, T5 has moved (or finished if z=5), zone z is free → hasil kerja
-  // So done when p >= z + 5
   function renderPeriodFixed(p) {
     clearSlots();
-    periodEl.textContent = "Periode " + p;
+    if (p === 0) return;
 
-    if (p === 0) {
-      hintEl.textContent = "Kosong — belum ada tim";
-      return;
-    }
-
-    // First place done blocks for completed zones, then active teams (teams win if overlap - shouldn't)
     for (let z = 1; z <= N; z++) {
       if (p >= z + 5) {
         putDone(z);
@@ -370,26 +302,11 @@ def _render_parade_sim_banner() -> None:
     for (let t = 1; t <= N; t++) {
       const z = p - t + 1;
       if (z >= 1 && z <= N) {
-        // clear done if any (team occupies)
         const slot = document.getElementById("slot-" + z);
         slot.innerHTML = "";
         document.getElementById("zone-" + z).classList.remove("done");
         putTeam(z, TEAMS[t - 1]);
       }
-    }
-
-    if (p === 0) {
-      hintEl.textContent = "Kosong";
-    } else if (p === 1) {
-      hintEl.textContent = "Hanya T1 di Zona 1";
-    } else if (p <= 5) {
-      hintEl.textContent = "T1…T" + p + " aktif · handoff one-piece";
-    } else if (p === 6) {
-      hintEl.textContent = "T1 hilang (selesai Z5) · Zona 1 = hasil kerja (T5 sudah lewat)";
-    } else if (p < 10) {
-      hintEl.textContent = "Parade berlanjut · zona selesai menampilkan hasil kerja";
-    } else {
-      hintEl.textContent = "T5 selesai Zona 5 · semua hasil kerja — ulang dari kosong";
     }
   }
 
@@ -428,7 +345,7 @@ def _render_parade_sim_banner() -> None:
 </script>
 </body></html>
 """
-    components.html(html, height=250, scrolling=False)
+    components.html(html, height=140, scrolling=False)
 
 
 def _render_header() -> None:
