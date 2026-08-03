@@ -19,8 +19,7 @@ Simulasi Lean Construction interaktif: **kecepatan per zona**, **variability per
 2. Membedakan **tanpa variability** (rate sama tiap zona) vs **dengan variability** (rate diundi **per zona**).
 3. Memahami **batch handoff** vs **one-piece flow** dan dampaknya ke LOB.
 4. Membaca Line of Balance yang **mulai dari 0** dan **bergeser** antar trade.
-5. Membandingkan skenario (Compare 2, Sweep) dan memahami replikasi.
-6. (Opsional) Mengenal **Takt 2020** (model klasik dadu + standby) sebagai referensi literatur.
+5. Membandingkan skenario dengan **Compare 2** (mis. No var vs Medium).
 
 ---
 
@@ -79,31 +78,18 @@ Bekisting → Tulangan → Cor → Bongkar bekisting → Finishing
 
 ## 4. Cara memakai setiap tab
 
+App sengaja **hanya tiga tab** agar fokus di kelas:
+
 ### Single run
 Atur kecepatan & variability → cek batch di sidebar → **Run**.  
-Lihat LOB detail + full, buffer, utilization, tabel start/finish.
+Lihat LOB (mulai dari 0), buffer, utilization, start/finish trade.
 
 ### Compare 2
 Dua skenario A vs B (mis. No var vs Medium), batch sama dari sidebar.  
-Bandingkan duration, start trade, LOB side-by-side.
-
-### Sweep
-Satu kecepatan dasar; jalankan semua level variability.  
-Lihat tabel duration/idle/peak WIP + LOB gabungan.
-
-### Takt 2020
-**Model klasik literatur** (dadu capacity + takt/standby Tommelein 2020) — **bukan** zone-flow.  
-Untuk membandingkan dengan paper, bukan mengganti model kelas.
-
-### Replications
-Banyak run acak (seed berbeda) pada setup zone-flow yang sama.  
-Lihat sebaran duration / idle — satu run tidak cukup jika ada variability.
+Bandingkan duration, idle, peak WIP, start trade, dan LOB.
 
 ### Manual
-File ini.
-
-### About
-Ringkasan build & model.
+File ini + ringkasan model / build.
 
 ---
 
@@ -113,8 +99,7 @@ Ringkasan build & model.
 2. **Batch 1 (one-piece)** → T2 start periode 2; jarak antar trade = 1 zona.
 3. **T1 Medium, lain No var** → T1 lonjak/landai per zona; T2+ tetap menunggu handoff batch.
 4. **Compare 2**: A No var vs B Medium → duration & idle naik di B.
-5. **Sweep** → urutkan duration by variability.
-6. **Replications** (n≥50) medium → histogram/sebaran duration.
+5. Ulangi Compare dengan batch 1 (one-piece) vs batch 4 — lihat start T2.
 
 ---
 
@@ -126,8 +111,8 @@ A: Handoff ke periode berikutnya setelah batch penuh (default 4 zona).
 **Q: Kenapa medium tidak lompat +3 zona?**  
 A: Rate ×0.5/×1.5 pada **satu zona**, bukan undi 0/3 zona massal.
 
-**Q: Apa bedanya Takt 2020 tab?**  
-A: Model klasik paper (dadu + standby). Tab lain = zone-flow kelas.
+**Q: Kenapa hanya 3 tab?**  
+A: Fokus kelas: eksperimen (Single), bandingkan (Compare), baca panduan (Manual).
 
 ---
 

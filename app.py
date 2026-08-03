@@ -18,10 +18,8 @@ _p = importlib.reload(_p)
 _a = importlib.reload(_a)
 
 from parade_of_trades_analysis import (
-    compare_tommelein2020,
     export_result_csv,
     export_result_excel,
-    run_replications,
 )
 from parade_of_trades_core import (
     CAPACITY_PRESETS,
@@ -33,14 +31,12 @@ from parade_of_trades_core import (
 from parade_of_trades_plots import (
     plot_buffer_profile,
     plot_comparison_lob,
-    plot_duration_histogram,
     plot_line_of_balance,
     plot_line_of_balance_detail,
-    plot_replication_summary,
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-tabs-zoneflow-v9"
+_APP_BUILD = "2026-08-03-tabs-slim-v10"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -374,8 +370,7 @@ def render_sidebar():
              "1 = one-piece flow.",
     )
     st.sidebar.caption(
-        "Batch dipakai di **Single / Compare / Sweep / Replications** (zone-flow). "
-        "Tab Takt 2020 = model klasik paper (terpisah)."
+        "Batch dipakai di **Single run** dan **Compare 2**."
     )
     return int(total_units), seed, 5
 
@@ -510,178 +505,13 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
         _trade_table(results["B"])
 
 
-def tab_sweep(total_units: int, seed: Optional[int], n_trades: int) -> None:
-    st.subheader("Variability sweep (zone-flow)")
-    st.markdown(
-        '<div class="pot-callout">'
-        "Satu <strong>kecepatan dasar</strong> untuk semua trade; jalankan beberapa level "
-        "<strong>variability per zona</strong>. Batch dari sidebar. "
-        "Bandingkan duration & idle — variability biasanya menambah delay & waste."
-        "</div>",
-        unsafe_allow_html=True,
-    )
-    base = _base_speed_input("sweep_base", "Kecepatan dasar semua trade", 1.0)
-    selected = st.multiselect(
-        "Level variability",
-        PRESET_OPTIONS,
-        default=PRESET_OPTIONS,
-        format_func=lambda x: VAR_LABELS.get(x, x),
-        key="sweep_vars",
-    )
-    st.caption(f"Batch handoff = **{_batch_size()}** · Total zona = **{total_units}** · Seed = **{seed}**")
-
-    if st.button("Run sweep", type="primary", key="run_sweep") and selected:
-        results = {}
-        for p in selected:
-            pairs = [_pair_from_base_and_var(base, p)] * n_trades
-            results[p] = ParadeOfTrades(_build_config_from_pairs(pairs, total_units, seed)).run()
-        st.session_state.sweep = results
-
-    if "sweep" not in st.session_state:
-        st.info("Pilih level variability → **Run sweep**.")
-        return
-
-    results = st.session_state.sweep
-    rows = []
-    for name, r in results.items():
-        rows.append({
-            "Variability": VAR_LABELS.get(name, name),
-            "Duration": r.duration,
-            "vs Ideal": round(r.duration - r.ideal_duration, 1),
-            "Idle": r.total_idle_capacity,
-            "Peak WIP": _peak_wip(r),
-            "Throughput": round(r.system_throughput, 3),
-            "T1 start": r.trade_metrics[0].start_period,
-            "T5 start": r.trade_metrics[-1].start_period,
-            "T5 finish": r.trade_metrics[-1].periods_to_finish,
-        })
-    rows_sorted = sorted(rows, key=lambda x: x["Duration"])
-    st.markdown("##### Hasil (diurutkan duration naik)")
-    st.dataframe(rows_sorted, use_container_width=True, hide_index=True)
-
-    fig, ax = plt.subplots(figsize=(9, 5))
-    # short labels for legend
-    short = {k: k.replace("_", " ") for k in results}
-    plot_comparison_lob(
-        {short[k]: v for k, v in results.items()},
-        ax=ax,
-        title=f"Sweep LOB — base speed · batch {_batch_size()}",
-    )
-    fig.tight_layout()
-    _fig_to_st(fig)
-
-
-def tab_takt(total_units: int, seed: Optional[int]) -> None:
-    st.subheader("Takt 2020 — model klasik (literatur)")
-    st.markdown(
-        '<div class="pot-warn">'
-        "<strong>Tab ini berbeda dari zone-flow.</strong> "
-        "Ini replikasi skenario <em>Tommelein (2020)</em>: dadu capacity klasik + "
-        "takt rate + standby (capacity buffer). "
-        "Batch sidebar <em>tidak</em> dipakai di sini. "
-        "Gunakan untuk diskusi paper / takt planning — bukan pengganti Single run kelas."
-        "</div>",
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        """
-**Apa yang dijalankan**
-- Beberapa skenario paper (die + takt + standby)
-- Banyak replikasi → ringkasan duration / standby usage
-- Handoff model klasik paper (`same_period_handoff` sesuai fungsi analisis)
-"""
-    )
-    c1, c2, c3 = st.columns(3)
-    n_reps = int(c1.number_input("Replications", 10, 500, 50, 10, key="takt_n"))
-    sb = int(c2.number_input("Seed base", 0, value=seed or 0, key="takt_s"))
-    units = int(c3.number_input("Total units (paper)", 1, 1000, min(total_units, 100), 5, key="takt_u"))
-
-    if st.button("Run Tommelein 2020", type="primary", key="run_takt"):
-        with st.spinner("Menjalankan skenario paper…"):
-            st.session_state.takt = compare_tommelein2020(
-                n_reps=n_reps,
-                seed_base=sb,
-                total_units=units,
-                staggered=False,
-                same_period_handoff=False,
-                verbose=False,
-            )
-
-    if "takt" not in st.session_state:
-        st.info("Atur replikasi → **Run Tommelein 2020**.")
-        return
-
-    cmp = st.session_state.takt
-    st.markdown("##### Ringkasan skenario")
-    st.dataframe(cmp.summary_rows(), use_container_width=True, hide_index=True)
-
-    try:
-        fig, ax = plt.subplots(figsize=(9, 4.5))
-        plot_duration_histogram(cmp.batches, ax=ax)
-        fig.tight_layout()
-        _fig_to_st(fig)
-    except Exception as exc:
-        st.warning(f"Histogram tidak tersedia: {exc}")
-
-    st.caption(
-        "Interpretasi: takt + standby menstabilkan workflow vs dadu murni — "
-        "lihat paper Tommelein (2020) / materi P2SL."
-    )
-
-
-def tab_reps(total_units: int, seed: Optional[int], n_trades: int) -> None:
-    st.subheader("Replications (zone-flow)")
-    st.markdown(
-        '<div class="pot-callout">'
-        "Banyak run acak pada setup zone-flow yang sama (seed berbeda). "
-        "Penting bila ada variability: satu run bisa beruntung/sial. "
-        f"Batch = <strong>{_batch_size()}</strong> dari sidebar."
-        "</div>",
-        unsafe_allow_html=True,
-    )
-    pairs = _capacity_setup("rep", n_trades, "medium", 1.0)
-    c1, c2 = st.columns(2)
-    n = int(c1.number_input("Jumlah replikasi", 5, 1000, 100, 10, key="rep_n"))
-    sb = int(c2.number_input("Seed base", 0, value=seed or 0, key="rep_s"))
-
-    if st.button("Run replications", type="primary", key="run_reps"):
-        cfg = _build_config_from_pairs(pairs, total_units, None)
-        with st.spinner(f"Menjalankan {n} replikasi zone-flow…"):
-            batch = run_replications(cfg, n_reps=n, seed_base=sb, verbose=False)
-        st.session_state.reps = {"main": batch}
-        st.session_state.reps_cfg_note = (
-            f"batch={cfg.batch_size}, zone_flow={cfg.zone_flow}, n={n}, seed_base={sb}"
-        )
-
-    if "reps" not in st.session_state:
-        st.info("Atur setup → **Run replications**.")
-        return
-
-    main = st.session_state.reps["main"]
-    st.caption(st.session_state.get("reps_cfg_note", ""))
-    st.markdown("##### Ringkasan statistik")
-    st.dataframe(main.summary_table(), use_container_width=True, hide_index=True)
-
-    try:
-        fig = plot_replication_summary(st.session_state.reps, show=False)
-        _fig_to_st(fig)
-    except Exception as exc:
-        st.warning(f"Plot ringkasan: {exc}")
-        try:
-            fig, ax = plt.subplots(figsize=(8, 4))
-            plot_duration_histogram({"main": main}, ax=ax)
-            fig.tight_layout()
-            _fig_to_st(fig)
-        except Exception as exc2:
-            st.caption(f"Histogram fallback gagal: {exc2}")
-
-
 def tab_manual() -> None:
-    st.subheader("📖 Manual belajar")
+    st.subheader("📖 Manual & tentang model")
     st.markdown(
         '<div class="pot-field">'
-        "Panduan zone-flow untuk kelas: kecepatan & variability per zona, "
-        "batch/one-piece, cara baca LOB, latihan terarah."
+        "Panduan zone-flow untuk kelas. Ringkas: tiga tab saja — "
+        "<strong>Single run</strong> (eksperimen), <strong>Compare 2</strong> (A vs B), "
+        "<strong>Manual</strong> (panduan)."
         "</div>",
         unsafe_allow_html=True,
     )
@@ -697,80 +527,35 @@ def tab_manual() -> None:
     else:
         st.warning("MANUAL.md tidak ditemukan di repo.")
 
-
-def tab_about() -> None:
-    st.subheader("Tentang aplikasi")
-    st.markdown(
-        f"""
-**Parade of Trades** — simulasi Lean Construction untuk floor cycle Indonesia.
-
+    st.divider()
+    st.markdown(f"""
+### Tentang build
 | | |
 |---|---|
 | Build | `{_APP_BUILD}` |
-| Model utama | **Zone-flow** (kelas) |
-| Batch default | **4 zona** (sidebar) |
-| Trade | 5 (Bekisting → … → Finishing) |
-| Deploy | Streamlit Cloud + repo GitHub |
+| Model | **Zone-flow** (kecepatan & var **per zona**) |
+| Batch default | **4** (sidebar) |
+| Trade | 5 (floor cycle Indonesia) |
 
-### Prinsip zone-flow
-1. **Kecepatan** = progress pada **satu zona** (bukan bulk multi-zona per undian).
-2. **Tanpa variability** → rate sama untuk setiap zona trade itu.
-3. **Dengan variability** → rate diundi **sekali per zona** (faktor × dasar).
-4. **Batch N** → kumpulkan N zona, lepas ke trade hilir di periode berikutnya.
-5. **One-piece (N=1)** → lepas tiap zona.
-6. LOB **mulai dari 0**; garis trade **bergeser** (tidak menumpuk).
+**Tab yang dipakai**
+1. **Single run** — satu skenario, LOB / buffer / utilization  
+2. **Compare 2** — dua skenario berdampingan (mis. No var vs Medium)  
+3. **Manual** — panduan belajar + tentang  
 
-### Variability (× dasar)
-| Level | Faktor |
-|-------|--------|
-| No | ×1.0 tetap |
-| Low | ×0.75 / ×1.25 |
-| Medium | ×0.5 / ×1.5 |
-| High | ×0.25 / ×1.75 |
-| Very high | ×0.1 / ×1.9 |
-
-### Tab
-| Tab | Model |
-|-----|--------|
-| Single run | Zone-flow |
-| Compare 2 | Zone-flow A vs B |
-| Sweep | Zone-flow × level var |
-| Takt 2020 | **Klasik paper** (dadu + takt/standby) |
-| Replications | Zone-flow Monte Carlo |
-| Manual / About | Dokumentasi |
-
-### Referensi
-Tommelein, Riley & Howell (1999); Choo & Tommelein (1999); Tommelein (2020) / P2SL UC Berkeley.
-"""
-    )
+Referensi: Tommelein, Riley & Howell (1999); Choo & Tommelein (1999); Tommelein (2020).
+""")
 
 
 def main() -> None:
     total_units, seed, n_trades = render_sidebar()
     _render_header()
-    tabs = st.tabs([
-        "Single run",
-        "Compare 2",
-        "Sweep",
-        "Takt 2020",
-        "Replications",
-        "Manual",
-        "About",
-    ])
+    tabs = st.tabs(["Single run", "Compare 2", "Manual"])
     with tabs[0]:
         tab_single_run(total_units, seed, n_trades)
     with tabs[1]:
         tab_compare(total_units, seed, n_trades)
     with tabs[2]:
-        tab_sweep(total_units, seed, n_trades)
-    with tabs[3]:
-        tab_takt(total_units, seed)
-    with tabs[4]:
-        tab_reps(total_units, seed, n_trades)
-    with tabs[5]:
         tab_manual()
-    with tabs[6]:
-        tab_about()
 
 
 if __name__ == "__main__":
