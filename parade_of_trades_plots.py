@@ -1,4 +1,3 @@
-from typing import Optional, Dict, List, Tuple, Any
 """
 Parade of Trades – Visualization
 ================================
