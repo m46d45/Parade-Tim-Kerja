@@ -131,55 +131,131 @@ def plot_line_of_balance(
     show_ideal: bool = True,
 ) -> Axes:
     """
-    Line of Balance: cumulative units completed by each trade vs period.
+    Line of Balance: cumulative zones vs period as **straight lines**.
 
-    Includes a reference ideal line (slope = bottleneck mean capacity) when
-    ``show_ideal`` is True.
+    Slope of each line = speed (zona/periode). Deterministic paces use
+    continuous progress so lambat (0.5) is a clean diagonal, not a staircase.
     """
     if ax is None:
-        _, ax = plt.subplots(figsize=(8, 5))
+        _, ax = plt.subplots(figsize=(9, 5.2))
 
-    cum = result.cumulative_series()  # [trade][period], period 0 = 0
+    # Prefer continuous progress (straight pace); else integer cumulative
+    if hasattr(result, "fractional_cumulative_series"):
+        cum = result.fractional_cumulative_series()
+    else:
+        cum = result.cumulative_series()
     n = result.config.n_trades
     total = result.config.total_units
     periods = list(range(len(cum[0])))
-
+    n_per = len(periods)
+    mark_every = 1 if n_per <= 40 else max(1, n_per // 20)
+    markers = ("o", "s", "^", "D", "v", "P", "X")
     for i in range(n):
         trade = result.config.trades[i]
+        speed = trade.mean
         label = f"T{i + 1}: {_short_name(trade.name)} ({trade.label()})"
+        if getattr(trade, "deterministic", False) and speed > 0:
+            label += f" · slope {speed:g}"
         ax.plot(
             periods,
             cum[i],
             color=_trade_color(i),
-            linewidth=2.0,
-            marker="o",
-            markersize=3.0,
-            markevery=max(1, len(periods) // 20),
+            linewidth=2.4,
+            linestyle="-",
+            marker=markers[i % len(markers)],
+            markersize=4.5 if n_per <= 40 else 3.5,
+            markevery=mark_every,
             label=label,
+            zorder=3 + i,
+            alpha=0.95,
         )
 
     if show_ideal:
         mean_cap = min(t.mean for t in result.config.trades)
         if mean_cap > 0:
-            ideal_t = [0, total / mean_cap]
-            ideal_y = [0, total]
             ax.plot(
-                ideal_t,
-                ideal_y,
-                color="0.45",
-                linestyle=":",
-                linewidth=1.6,
-                label=f"Ideal ({mean_cap:g}/period)",
+                [0, total / mean_cap], [0, total],
+                color="0.45", linestyle=":", linewidth=1.6,
+                label=f"Ideal (bottleneck {mean_cap:g} zona/periode)",
             )
 
     ax.axhline(total, color="0.7", linestyle="--", linewidth=1.0, alpha=0.8)
-    ax.set_xlim(left=0)
-    ax.set_ylim(0, total * 1.05)
-    ax.set_xlabel("Period")
-    ax.set_ylabel("Cumulative units completed")
-    ax.set_title(title or "Line of Balance")
-    ax.legend(loc="lower right", fontsize=8, framealpha=0.92)
-    _apply_axes_style(ax)
+    ax.set_xlim(0, max(periods) if periods else 1)
+    ax.set_ylim(0, total * 1.06)
+    ax.set_xlabel("Periode (1, 2, 3, …)")
+    ax.set_ylabel("Zona kumulatif (1, 2, 3, …)")
+    ax.set_title(title or "Line of Balance — kemiringan = kecepatan")
+
+    if n_per <= 50:
+        ax.xaxis.set_major_locator(mticker.MultipleLocator(1 if n_per <= 24 else 2))
+    else:
+        ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True, nbins=16))
+    if total <= 40:
+        ax.yaxis.set_major_locator(mticker.MultipleLocator(1))
+    else:
+        ax.yaxis.set_major_locator(mticker.MaxNLocator(integer=True, nbins=12))
+    ax.grid(True, which="major", linestyle="--", alpha=0.5)
+
+    # Speed legend callout
+    notes = []
+    for i, trade in enumerate(result.config.trades):
+        if getattr(trade, "deterministic", False):
+            notes.append(f"T{i+1}: {trade.mean:g} zona/periode")
+    if notes:
+        ax.text(
+            0.02, 0.98,
+            "Kecepatan (kemiringan garis):\n" + " · ".join(notes[:5]),
+            transform=ax.transAxes, va="top", ha="left", fontsize=8,
+            color="#1a365d",
+            bbox=dict(boxstyle="round,pad=0.35", facecolor="#ebf8ff",
+                      edgecolor="#90cdf4", alpha=0.92), zorder=10,
+        )
+
+    ax.legend(loc="lower right", fontsize=7.5, framealpha=0.92)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    return ax
+
+
+def plot_line_of_balance_detail(
+    result: ParadeResult,
+    ax: Optional[Axes] = None,
+    max_period: int = 12,
+    title: Optional[str] = None,
+) -> Axes:
+    """Early-period LOB with every period tick — straight pace lines."""
+    if ax is None:
+        _, ax = plt.subplots(figsize=(9, 4.2))
+    if hasattr(result, "fractional_cumulative_series"):
+        cum_full = result.fractional_cumulative_series()
+    else:
+        cum_full = result.cumulative_series()
+    n = result.config.n_trades
+    total = result.config.total_units
+    end = min(max_period, len(cum_full[0]) - 1)
+    periods = list(range(end + 1))
+    markers = ("o", "s", "^", "D", "v", "P", "X")
+    for i in range(n):
+        trade = result.config.trades[i]
+        ys = cum_full[i][: end + 1]
+        ax.plot(
+            periods, ys, color=_trade_color(i), linewidth=2.6,
+            marker=markers[i % len(markers)], markersize=6.5, markevery=1,
+            label=f"T{i + 1}: {_short_name(trade.name)} ({trade.label()})",
+            zorder=3 + i,
+        )
+    ax.set_xlim(0, end)
+    ymax = max(max(cum_full[i][end] for i in range(n)), 1)
+    ax.set_ylim(0, min(total, ymax + 2) * 1.1)
+    ax.set_xlabel("Periode")
+    ax.set_ylabel("Zona (kumulatif)")
+    ax.set_title(title or f"Detail LOB — periode 0–{end} (garis lurus = kecepatan konstan)")
+    ax.xaxis.set_major_locator(mticker.MultipleLocator(1))
+    ax.yaxis.set_major_locator(mticker.MultipleLocator(1))
+    ax.grid(True, which="major", linestyle="--", alpha=0.55)
+    ax.legend(loc="upper left", fontsize=8, framealpha=0.92)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
     return ax
 
 

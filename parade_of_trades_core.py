@@ -24,10 +24,15 @@ Default process (Indonesian concrete floor cycle, 5 trades):
     5. Finishing Lantai
 
 Mechanics (one period):
-    - Each active trade draws capacity from a 50/50 low/high pair.
+    - Each active trade draws capacity from a low/high pair (classic 50/50; weighted when mean is fractional e.g. ⅓× speed).
     - Actual production = min(capacity, available upstream buffer, remaining work).
-    - Buffers update *sequentially* within the period: upstream output is
-      immediately available to the next trade in the same step.
+    - Handoff modes:
+        * next-period / field sequence (recommended in UI): zones finished by
+          trade i in period t become available to trade i+1 in period t+1
+          (T1 moves on; T2 starts those zones next period). No-var LOB shows
+          staggered straight lines — the classic parade.
+        * same-period (classic computer game): upstream output may be taken
+          by downstream within the same period; no-var LOB lines collapse.
     - Simulation ends when the last trade has completed all work units.
 """
 
@@ -35,6 +40,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, asdict
 from typing import Dict, List, Optional, Sequence, Tuple, Union
+import math
 import random
 import json
 
@@ -69,11 +75,22 @@ DEFAULT_MEAN_CAPACITY = 5
 
 @dataclass
 class TradeConfig:
-    """Capacity distribution for a single trade (50/50 low / high)."""
+    """Capacity for a single trade.
+
+    Classic Tommelein dice: integer ``low``/``high`` with ``p_high`` (default 50/50).
+
+    Classroom base speeds without variability use ``deterministic=True`` and
+    ``base_speed`` (zones per period). Fractional rates accumulate until a
+    whole zone is completed, e.g. base_speed=0.5 → exactly 1 zone every 2
+    periods (LOB steps every other period).
+    """
 
     name: str
-    low: int
-    high: int
+    low: float
+    high: float
+    p_high: float = 0.5  # probability of rolling ``high`` (else ``low``)
+    base_speed: Optional[float] = None  # target zones/period; default = mean
+    deterministic: bool = False  # True: pace accumulator (no random die)
 
     def __post_init__(self) -> None:
         if self.low < 0 or self.high < 0:
@@ -82,17 +99,51 @@ class TradeConfig:
             raise ValueError(
                 f"low ({self.low}) must be <= high ({self.high}) for {self.name}"
             )
+        if not 0.0 <= float(self.p_high) <= 1.0:
+            raise ValueError(
+                f"p_high must be in [0, 1] for {self.name}, got {self.p_high}"
+            )
+        self.p_high = float(self.p_high)
+        if self.base_speed is None:
+            if self.low == self.high:
+                self.base_speed = float(self.low)
+            else:
+                self.base_speed = (
+                    (1.0 - self.p_high) * self.low + self.p_high * self.high
+                )
+        else:
+            self.base_speed = float(self.base_speed)
+        if self.base_speed < 0:
+            raise ValueError(f"base_speed must be non-negative: {self.name}")
 
     @property
     def mean(self) -> float:
-        return (self.low + self.high) / 2.0
+        return float(self.base_speed) if self.base_speed is not None else 0.0
 
     @property
-    def pair(self) -> Tuple[int, int]:
-        return (self.low, self.high)
+    def pair(self) -> Tuple[float, float]:
+        return (float(self.low), float(self.high))
 
     def label(self) -> str:
-        return f"{self.low}/{self.high}"
+        b = self.mean
+        if self.deterministic:
+            # Classroom labels for fixed paces
+            if abs(b - 1.0 / 3.0) < 1e-9:
+                return "1 zona/3 per"
+            if abs(b - 0.5) < 1e-9:
+                return "1 zona/2 per"
+            if abs(b - 1.0) < 1e-9:
+                return "1 zona/per"
+            if abs(b - 2.0) < 1e-9:
+                return "2 zona/per"
+            if abs(b - 3.0) < 1e-9:
+                return "3 zona/per"
+            return f"{b:g} zona/per"
+        if self.low == self.high:
+            return f"{self.low}/{self.high}"
+        if abs(self.p_high - 0.5) < 1e-9:
+            return f"{self.low}/{self.high}"
+        return f"{self.low}/{self.high} (E≈{self.mean:g})"
 
 
 @dataclass
@@ -126,9 +177,11 @@ class ParadeConfig:
     #     may be taken by downstream in the same period (sequential update).
     same_period_handoff: bool = False
     # Optional extra gate: trade i may not work before period (i+1).
-    # Usually unnecessary when same_period_handoff is False (lag already
-    # creates the cascade). Kept for Tommelein (2020) style experiments.
     staggered_mobilization: bool = False
+    # Classroom zone-flow model (app default): work zone-by-zone (or batch),
+    # variability is per-zone speed, not bulk multi-zone dice.
+    zone_flow: bool = False
+    batch_size: int = 1  # 1 = one-piece flow; 3 = hand off every 3 zones
 
     def __post_init__(self) -> None:
         if not self.trades:
@@ -139,6 +192,8 @@ class ParadeConfig:
             raise ValueError("takt_rate must be positive when set")
         if self.standby_capacity < 0:
             raise ValueError("standby_capacity must be non-negative")
+        if self.batch_size < 1:
+            raise ValueError("batch_size must be >= 1")
 
     @property
     def n_trades(self) -> int:
@@ -238,15 +293,50 @@ class ParadeConfig:
         standby_capacity: int = 0,
         same_period_handoff: bool = False,
         staggered_mobilization: bool = False,
+        zone_flow: bool = False,
+        batch_size: int = 1,
     ) -> "ParadeConfig":
         """Build config from explicit (low, high) capacity pairs per trade."""
         if not pairs:
             raise ValueError("At least one capacity pair is required")
         names = _resolve_trade_names(len(pairs), trade_names)
-        trades = [
-            TradeConfig(name=names[i], low=pairs[i][0], high=pairs[i][1])
-            for i in range(len(pairs))
-        ]
+        trades = []
+        for i, p in enumerate(pairs):
+            if len(p) == 2:
+                lo, hi = float(p[0]), float(p[1])
+                trades.append(TradeConfig(name=names[i], low=lo, high=hi))
+            elif len(p) == 3:
+                lo, hi, ph = float(p[0]), float(p[1]), float(p[2])
+                trades.append(
+                    TradeConfig(name=names[i], low=lo, high=hi, p_high=ph)
+                )
+            elif len(p) >= 5:
+                lo, hi, ph = float(p[0]), float(p[1]), float(p[2])
+                bspd = float(p[3])
+                det = bool(p[4])
+                trades.append(
+                    TradeConfig(
+                        name=names[i],
+                        low=lo,
+                        high=hi,
+                        p_high=ph,
+                        base_speed=bspd,
+                        deterministic=det,
+                    )
+                )
+            elif len(p) == 4:
+                lo, hi, ph, bspd = float(p[0]), float(p[1]), float(p[2]), float(p[3])
+                trades.append(
+                    TradeConfig(
+                        name=names[i], low=lo, high=hi, p_high=ph, base_speed=bspd
+                    )
+                )
+            else:
+                raise ValueError(
+                    "Capacity pair must be (low, high), (low, high, p_high), "
+                    "or (low, high, p_high, base_speed, deterministic); "
+                    f"got {p!r}"
+                )
         return cls(
             trades=trades,
             total_units=total_units,
@@ -255,6 +345,8 @@ class ParadeConfig:
             standby_capacity=standby_capacity,
             same_period_handoff=same_period_handoff,
             staggered_mobilization=staggered_mobilization,
+            zone_flow=zone_flow,
+            batch_size=batch_size,
         )
 
 
@@ -297,6 +389,8 @@ class PeriodRecord:
     # Takt / standby (same length as trades; 0 when classic / inactive)
     effective_capacity: List[int] = field(default_factory=list)
     standby_used: List[int] = field(default_factory=list)
+    # Continuous progress for LOB (cum + partial zone). Shows straight pace lines.
+    fractional_cumulative: List[float] = field(default_factory=list)
 
 
 @dataclass
@@ -373,6 +467,23 @@ class ParadeResult:
                 series[i].append(rec.cumulative[i])
         return series
 
+    def fractional_cumulative_series(self) -> List[List[float]]:
+        """Continuous cumulative for LOB (straight pace lines).
+
+        Uses fractional_cumulative when present (deterministic paces); falls
+        back to integer cumulative otherwise. Index 0 = period 0 (zeros).
+        """
+        n = self.config.n_trades
+        series: List[List[float]] = [[0.0] for _ in range(n)]
+        for rec in self.history:
+            frac = rec.fractional_cumulative
+            for i in range(n):
+                if frac and i < len(frac):
+                    series[i].append(float(frac[i]))
+                else:
+                    series[i].append(float(rec.cumulative[i]))
+        return series
+
     def buffer_series(self) -> List[List[int]]:
         """Return list-of-series: series[interface][period] = buffer size.
 
@@ -435,6 +546,13 @@ class ParadeOfTrades:
         self.raw_remaining: int = self.config.total_units
         self.max_buffer: List[int] = [0] * n_if
         self.history: List[PeriodRecord] = []
+        # Fractional zone progress for deterministic (classroom) paces
+        self._progress: List[float] = [0.0] * n
+        # Zone-flow state (one-piece / batch)
+        self._zone_progress: List[float] = [0.0] * n  # 0..1 on current zone
+        self._zone_rate: List[Optional[float]] = [None] * n  # speed locked for current zone
+        self._batch_done: List[int] = [0] * n  # zones completed toward current batch
+        self._working: List[bool] = [False] * n
         # running sums for metrics
         self._total_capacity: List[int] = [0] * n
         self._total_effective: List[int] = [0] * n
@@ -466,11 +584,13 @@ class ParadeOfTrades:
     # -- core step ----------------------------------------------------------
 
     def _roll_capacity(self, trade_idx: int) -> int:
-        """50/50 draw between low and high capacity for the given trade."""
+        """Draw capacity between low and high (weighted by ``p_high``)."""
         t = self.config.trades[trade_idx]
         if t.low == t.high:
             return t.low
-        return self._rng.choice([t.low, t.high])
+        if self._rng.random() < t.p_high:
+            return t.high
+        return t.low
 
     def _apply_standby(self, base_capacity: int) -> Tuple[int, int]:
         """
@@ -513,6 +633,9 @@ class ParadeOfTrades:
         """
         if self.is_complete:
             raise RuntimeError("Simulation already complete; call reset()")
+
+        if self.config.zone_flow:
+            return self._step_zone_flow()
 
         self.period += 1
         n = self.config.n_trades
@@ -562,9 +685,22 @@ class ParadeOfTrades:
                 idles[i] = 0
                 continue
 
-            base = self._roll_capacity(i)
-            effective, standby_used = self._apply_standby(base)
-            actual = min(effective, available, remaining_for_trade)
+            trade_cfg = self.config.trades[i]
+            if trade_cfg.deterministic:
+                # Classroom pace: accumulate base_speed only when work is available
+                # so LOB fractional progress is a straight line at constant speed.
+                # Lambat (0.5): slope 0.5 zona/periode. Normal: slope 1. etc.
+                if available > 0 and remaining_for_trade > 0:
+                    self._progress[i] += float(trade_cfg.base_speed or 0.0)
+                potential = int(math.floor(self._progress[i] + 1e-12))
+                base = potential
+                effective, standby_used = self._apply_standby(base)
+                actual = min(effective, available, remaining_for_trade)
+                self._progress[i] -= actual
+            else:
+                base = self._roll_capacity(i)
+                effective, standby_used = self._apply_standby(base)
+                actual = min(effective, available, remaining_for_trade)
 
             # Consume from this period's working stock
             if i == 0:
@@ -609,6 +745,11 @@ class ParadeOfTrades:
             if self.buffers[j] > self.max_buffer[j]:
                 self.max_buffer[j] = self.buffers[j]
 
+        # Continuous LOB y = finished zones + partial progress (straight pace line)
+        fractional = [
+            min(float(total), float(self.cumulative[i]) + float(self._progress[i]))
+            for i in range(n)
+        ]
         rec = PeriodRecord(
             period=self.period,
             capacity=capacities,
@@ -619,6 +760,144 @@ class ParadeOfTrades:
             raw_remaining=self.raw_remaining,
             effective_capacity=effectives,
             standby_used=standbys,
+            fractional_cumulative=fractional,
+        )
+        self.history.append(rec)
+        return rec
+
+
+    # -- zone-flow step (classroom one-piece / batch) -----------------------
+
+
+    def _draw_zone_rate(self, trade_idx: int) -> float:
+        """Speed for one zone (progress per period), locked until that zone is done.
+
+        No variability → constant base_speed.
+        With variability → one low/high draw **per zone** (not bulk multi-zone dice).
+        """
+        t = self.config.trades[trade_idx]
+        if t.deterministic or t.low == t.high:
+            return max(1e-9, float(t.base_speed if t.base_speed is not None else t.mean))
+        rate = float(t.high if self._rng.random() < t.p_high else t.low)
+        return max(1e-9, rate)
+
+    def _step_zone_flow(self) -> "PeriodRecord":
+        """
+        Zone-centric parade (one-piece flow when batch_size=1).
+
+        - Each trade works **zone by zone** (speed = progress on current zone).
+        - Variability draws a speed **once per zone**.
+        - Finished zones accumulate into a batch; when ``batch_size`` is reached
+          they are released to the next trade for the **next period**.
+        - That lag keeps LOB lines staggered (T2≠T3≠T4≠T5 when speeds equal).
+        """
+        self.period += 1
+        n = self.config.n_trades
+        total = self.config.total_units
+        batch_size = max(1, int(self.config.batch_size))
+
+        capacities = [0] * n
+        effectives = [0] * n
+        standbys = [0] * n
+        productions = [0] * n
+        idles = [0] * n
+        released = [0] * n
+
+        # Inbound at start of period (handoff from previous period only)
+        available = [self.raw_remaining] + list(self.buffers)
+
+        for i in range(n):
+            if self.cumulative[i] >= total or not self._is_mobilized(i):
+                continue
+
+            rate_applied = 0.0
+
+            # Start a zone if idle and inbound exists
+            if not self._working[i]:
+                if available[i] <= 0:
+                    continue
+                available[i] -= 1
+                self._working[i] = True
+                self._zone_progress[i] = 0.0
+                self._zone_rate[i] = self._draw_zone_rate(i)
+                if self._start_period[i] is None:
+                    self._start_period[i] = self.period
+
+            rate = float(self._zone_rate[i] or 0.0)
+            rate_applied = rate
+            self._zone_progress[i] += rate
+
+            # Complete as many zones as progress allows (fast trades / high rate)
+            while self._zone_progress[i] + 1e-12 >= 1.0 and self.cumulative[i] < total:
+                self._zone_progress[i] -= 1.0
+                self.cumulative[i] += 1
+                productions[i] += 1
+                self._batch_done[i] += 1
+                self._working[i] = False
+
+                if self._batch_done[i] >= batch_size:
+                    released[i] += self._batch_done[i]
+                    self._batch_done[i] = 0
+
+                if self.cumulative[i] >= total:
+                    self._zone_progress[i] = 0.0
+                    if self._finish_period[i] is None:
+                        self._finish_period[i] = self.period
+                    break
+
+                # Only pull another zone same period if leftover progress remains
+                if self._zone_progress[i] > 1e-12:
+                    if available[i] > 0:
+                        available[i] -= 1
+                        self._working[i] = True
+                        self._zone_rate[i] = self._draw_zone_rate(i)
+                        # leftover progress carries onto the new zone
+                    else:
+                        self._zone_progress[i] = 0.0
+                        break
+                else:
+                    break
+
+            cap = int(round(rate_applied)) if rate_applied > 0 else 0
+            capacities[i] = cap
+            effectives[i] = max(cap, productions[i])
+            idles[i] = max(0, effectives[i] - productions[i])
+
+            if productions[i] > 0 or self._working[i]:
+                self._executions[i] += 1
+            self._total_capacity[i] += capacities[i]
+            self._total_effective[i] += effectives[i]
+            self._total_production[i] += productions[i]
+            self._total_idle[i] += idles[i]
+
+        # Next-period handoff: unconsumed inbound + newly released batches
+        self.raw_remaining = available[0]
+        new_buffers = [0] * self.config.n_interfaces
+        for j in range(self.config.n_interfaces):
+            new_buffers[j] = available[j + 1] + released[j]
+            if new_buffers[j] > self.max_buffer[j]:
+                self.max_buffer[j] = new_buffers[j]
+        self.buffers = new_buffers
+
+        fractional = [
+            min(
+                float(total),
+                float(self.cumulative[i])
+                + (float(self._zone_progress[i]) if self._working[i] else 0.0),
+            )
+            for i in range(n)
+        ]
+        rec = PeriodRecord(
+            period=self.period,
+            capacity=capacities,
+            production=productions,
+            idle_capacity=idles,
+            cumulative=list(self.cumulative),
+            buffers=list(self.buffers),
+            raw_remaining=self.raw_remaining,
+            effective_capacity=effectives,
+            standby_used=standbys,
+            fractional_cumulative=fractional,
         )
         self.history.append(rec)
         return rec
