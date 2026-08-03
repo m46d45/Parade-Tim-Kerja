@@ -875,6 +875,76 @@ def build_takt_plan(
 
 
 
+
+@dataclass
+class TaktBufferConfig:
+    """
+    Buffers in takt planning (Takt Production Institute taxonomy).
+
+    - **vertical**: non-working periods (calendar / holidays / rain) — pad timeline
+    - **diagonal_wagon**: breathing room *inside* each zone wagon (extra periods/zona)
+    - **diagonal_sequence**: extra lag between trades at handoff (train friction)
+    - **diagonal_buffer_wagon**: empty wagon count inserted in train (extra lag waves)
+    - **horizontal_end**: milestone buffer at project end (periods)
+    - **independent_capacity**: fraction extra capacity (standby / surge) on crews
+    """
+    vertical: int = 0
+    diagonal_wagon: int = 0
+    diagonal_sequence: int = 0
+    diagonal_buffer_wagon: int = 0
+    horizontal_end: int = 0
+    independent_capacity: float = 0.0  # 0..1
+
+
+def apply_takt_buffers(
+    n_trades: int,
+    n_zones: int,
+    base_rate: float,
+    buffers: TaktBufferConfig,
+) -> dict:
+    """
+    Compute effective rate, handoff lag, batch, and planned duration pads
+    from base capacity + TPI-style buffers.
+    """
+    base_rate = max(float(base_rate), 1e-9)
+    cap = max(0.0, float(buffers.independent_capacity))
+    rate_eff = base_rate * (1.0 + cap)
+    # Wagon buffer: extra process time per zone
+    t_proc = 1.0 / rate_eff
+    t_zone = t_proc + float(max(0, int(buffers.diagonal_wagon)))
+    rate_plan = 1.0 / max(t_zone, 1e-9)
+    # Sequence + buffer wagons → extra handoff lag (default engine lag = 1)
+    lag = 1 + max(0, int(buffers.diagonal_sequence)) + max(0, int(buffers.diagonal_buffer_wagon))
+    plan = build_takt_plan(
+        n_trades=n_trades,
+        n_zones=n_zones,
+        batch_size=1,  # one-piece train; buffers absorb variation
+        rate=rate_plan,
+        handoff_lag=1,  # engine lag fixed; extra diagonal lag via duration pad
+    )
+    # Approximate diagonal lag effect: each extra lag unit adds ~n_trades-1 periods
+    # (one between each consecutive pair) once per "wave" — use (n_trades-1)*extra
+    extra_lag = max(0, lag - 1)
+    diagonal_pad = extra_lag * max(0, n_trades - 1)
+    vertical = max(0, int(buffers.vertical))
+    horizontal = max(0, int(buffers.horizontal_end))
+    duration_with_buffers = int(plan.duration) + diagonal_pad + vertical + horizontal
+    return {
+        "rate_plan": rate_plan,
+        "rate_eff": rate_eff,
+        "takt_time": t_zone,
+        "batch": 1,
+        "handoff_lag": lag,
+        "plan": plan,
+        "duration_work": int(plan.duration),
+        "duration_plan": duration_with_buffers,
+        "pad_diagonal": diagonal_pad,
+        "pad_vertical": vertical,
+        "pad_horizontal": horizontal,
+        "buffers": buffers,
+    }
+
+
 def build_takt_plan_with_buffers(
     n_trades: int = 5,
     n_zones: int = 20,

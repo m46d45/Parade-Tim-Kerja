@@ -27,6 +27,8 @@ from parade_of_trades_analysis import (
     littles_law_metrics,
     evaluate_at_wip,
     build_takt_plan,
+    TaktBufferConfig,
+    apply_takt_buffers,
     build_takt_plan_with_buffers,
     required_rate_for_duration,
     takt_design_table,
@@ -62,7 +64,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-04-tommelein-order-v62"
+_APP_BUILD = "2026-08-04-takt-buffers-tpi-v63"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1230,23 +1232,53 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
         key="takt_design_mode",
     )
 
-    b1, b2, b3 = st.columns(3)
-    cap_buf_pct = int(b1.slider(
-        "Buffer kapasitas (%)",
-        min_value=0, max_value=100, value=0, step=5,
-        key="takt_cap_buf",
-    ))
-    cap_buf = cap_buf_pct / 100.0
-    time_buf = int(b2.number_input(
-        "Buffer waktu (periode/zona)",
-        min_value=0, max_value=10, value=0, step=1,
-        key="takt_time_buf",
-    ))
-    inv_buf = int(b3.number_input(
-        "Buffer inventory (zona)",
-        min_value=0, max_value=10, value=0, step=1,
-        key="takt_inv_buf",
-    ))
+    # --- Buffers (Takt Production Institute: vertical / diagonal / horizontal / independent) ---
+    st.markdown("##### Buffer")
+    col_v, col_d, col_h, col_i = st.columns(4)
+    with col_v:
+        st.caption("Vertikal")
+        buf_vertical = int(st.number_input(
+            "Non-working (periode)",
+            min_value=0, max_value=60, value=0, step=1,
+            key="takt_buf_vertical",
+            help="Buffer vertikal: libur, hujan, shutdown — slot waktu tanpa kerja.",
+        ))
+    with col_d:
+        st.caption("Diagonal (train)")
+        buf_wagon = int(st.number_input(
+            "Wagon buffer (p/zona)",
+            min_value=0, max_value=10, value=0, step=1,
+            key="takt_buf_wagon",
+            help="Breathing room di dalam wagon (zona) — takt time lebih longgar.",
+        ))
+        buf_seq = int(st.number_input(
+            "Sequence buffer (lag)",
+            min_value=0, max_value=10, value=0, step=1,
+            key="takt_buf_seq",
+            help="Buffer antar handoff trade berisiko (gesekan dalam train).",
+        ))
+        buf_bwagon = int(st.number_input(
+            "Buffer wagon (kosong)",
+            min_value=0, max_value=5, value=0, step=1,
+            key="takt_buf_bwagon",
+            help="Wagon kosong dalam train — proteksi aliran yang terlihat.",
+        ))
+    with col_h:
+        st.caption("Horizontal")
+        buf_end = int(st.number_input(
+            "End / milestone (periode)",
+            min_value=0, max_value=60, value=0, step=1,
+            key="takt_buf_end",
+            help="Buffer horizontal di akhir fase/proyek — proteksi milestone.",
+        ))
+    with col_i:
+        st.caption("Independen")
+        buf_cap_pct = int(st.slider(
+            "Kapasitas / standby (%)",
+            min_value=0, max_value=100, value=0, step=5,
+            key="takt_buf_cap",
+            help="Buffer independen: cadangan kapasitas kru (surge/standby).",
+        ))
 
     var_mode = st.selectbox(
         "Variability simulasi aktual",
@@ -1255,11 +1287,19 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
         key="takt_var_actual",
     )
 
-    rate_eff = rate * (1.0 + cap_buf)
-    t_proc = 1.0 / max(rate_eff, 1e-9)
-    t_plan = t_proc + float(time_buf)
-    rate_plan = 1.0 / max(t_plan, 1e-9)
-    batch = 1 if inv_buf <= 1 else inv_buf
+    buffers = TaktBufferConfig(
+        vertical=buf_vertical,
+        diagonal_wagon=buf_wagon,
+        diagonal_sequence=buf_seq,
+        diagonal_buffer_wagon=buf_bwagon,
+        horizontal_end=buf_end,
+        independent_capacity=buf_cap_pct / 100.0,
+    )
+    tb = apply_takt_buffers(n_trades, n_zones, rate, buffers)
+    rate_plan = float(tb["rate_plan"])
+    batch = int(tb["batch"])
+    plan = tb["plan"]
+    duration_plan = int(tb["duration_plan"])
 
     target_periods = None
     if mode.startswith("Target"):
@@ -1272,13 +1312,14 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
             key="takt_target_periods",
         ))
         req = required_rate_for_duration(
-            n_trades, n_zones, batch, target_periods, rate_max=10.0,
+            n_trades, n_zones, batch, max(1, target_periods - tb["pad_vertical"] - tb["pad_horizontal"] - tb["pad_diagonal"]),
+            rate_max=10.0,
         )
         if req["feasible"]:
             if rate_plan + 1e-9 >= req["rate"]:
                 st.success(
                     f"Rate efektif {rate_plan:.3f} ≥ kebutuhan {req['rate']:.3f} "
-                    f"untuk target {target_periods} p."
+                    f"(target {target_periods} p termasuk buffer)."
                 )
             else:
                 st.warning(
@@ -1291,22 +1332,18 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
     run = btn1.button("Jalankan simulasi", type="primary", use_container_width=True, key="takt_run")
     clear = btn2.button("Hapus hasil", use_container_width=True, key="takt_clear")
     if clear:
-        for k in ("takt_result", "takt_rel", "takt_plan_snap"):
+        for k in ("takt_result", "takt_rel", "takt_plan_snap", "takt_duration_plan"):
             st.session_state.pop(k, None)
 
-    plan = build_takt_plan(
-        n_trades=n_trades,
-        n_zones=n_zones,
-        batch_size=batch,
-        rate=rate_plan,
-        handoff_lag=1,
-    )
-
-    m1, m2, m3, m4 = st.columns(4)
+    m1, m2, m3, m4, m5 = st.columns(5)
     m1.metric("Zona", f"{n_zones}")
     m2.metric("Rate efektif", f"{rate_plan:.3g}")
-    m3.metric("Takt time", f"{plan.takt_time:.3g} p")
-    m4.metric("Durasi rencana", f"{plan.duration} p")
+    m3.metric("Takt time", f"{tb['takt_time']:.3g} p")
+    m4.metric("Durasi kerja", f"{tb['duration_work']} p")
+    m5.metric("Durasi + buffer", f"{duration_plan} p")
+
+    # replace ends before run - need to continue with existing run block but fix plan.duration references
+
 
     if run:
         pairs = [_pair_from_base_and_var(float(rate_plan), var_mode)] * n_trades
@@ -1317,6 +1354,13 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
             st.session_state["takt_result"] = res
             st.session_state["takt_rel"] = takt_plan_reliability(res, plan)
             st.session_state["takt_plan_snap"] = plan
+            st.session_state["takt_duration_plan"] = duration_plan
+            st.session_state["takt_buf_pads"] = {
+                "diagonal": tb["pad_diagonal"],
+                "vertical": tb["pad_vertical"],
+                "horizontal": tb["pad_horizontal"],
+                "work": tb["duration_work"],
+            }
         except RuntimeError as exc:
             st.error(str(exc))
 
@@ -1327,9 +1371,10 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
     if result is not None and rel is not None:
         st.divider()
         r1, r2, r3, r4 = st.columns(4)
+        d_plan = int(st.session_state.get("takt_duration_plan") or rel["plan_duration"])
         r1.metric("Reliability", f"{100 * rel['reliability']:.1f}%")
         r2.metric("Durasi aktual", f"{rel['actual_duration']} p")
-        r3.metric("vs rencana", f"{rel['actual_duration'] - rel['plan_duration']:+d} p")
+        r3.metric("vs rencana+buffer", f"{rel['actual_duration'] - d_plan:+d} p")
         if target_periods is not None:
             r4.metric("vs target", f"{rel['actual_duration'] - int(target_periods):+d} p")
         else:

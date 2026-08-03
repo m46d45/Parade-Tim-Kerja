@@ -222,16 +222,20 @@ Takt plan lean construction dalam app ini:
 | **Takt time** | Waktu rencana per zona di satu stasiun |
 | **Reliability** | % (tim, zona) selesai sesuai/sebelum rencana |
 
-### 6.2 Tiga jenis buffer
+### 6.2 Buffer dalam takt planning (Takt Production Institute)
 
-| Buffer | Teori | Di app |
-|--------|--------|--------|
-| **Kapasitas** | Cadangan produktivitas (standby, lembur, kru ekstra) — Tommelein 2020 | +% pada kapasitas dasar → rate efektif naik |
-| **Waktu** | Slack jadwal; takt time lebih longgar dari pure process time | +periode per zona pada takt time |
-| **Inventory** | Stok zona antar-tim (decoupling stock) | 0–1 = OPF murni; ≥2 = lepas tiap N zona |
+Buffer = proteksi **sengaja** (bukan float CPM). Di peta takt:
 
-Tanpa buffer + tanpa variability → rencana = aktual (reliability 100%).  
-Dengan variability, buffer menolong reliability dan/atau mendekati target periode.
+| Jenis | Alias | Proteksi | Di app |
+|-------|--------|----------|--------|
+| **Vertikal** | Non-working | Kalender: libur, hujan, shutdown | Non-working (periode) — pad durasi |
+| **Diagonal** | Train buffers | Gesekan dalam train | **Wagon buffer** (p/zona), **sequence buffer** (lag handoff), **buffer wagon** (wagon kosong) |
+| **Horizontal** | Milestone | Akhir fase / proyek | End / milestone (periode) |
+| **Independen** | One-off / capacity | Risiko tunggal atau surge kru | Kapasitas / standby (%) |
+
+Sumber: [Takt Production Institute — Complete Guide to Buffers](https://taktproductioninstitute.com/the-complete-guide-to-buffers-in-takt-planning-vertical-diagonal-horizontal-independent-buffers-explained/).
+
+Tanpa buffer + tanpa variability → rencana kerja = aktual. Buffer menambah **durasi rencana** (pad) dan/atau mengubah rate efektif.
 
 ### 6.3 Mode desain
 
