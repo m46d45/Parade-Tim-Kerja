@@ -60,7 +60,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-04-takt-ui-v69"
+_APP_BUILD = "2026-08-04-takt-ui-v70"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1406,7 +1406,7 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
     ]
 
     c1, c2, _ = st.columns([1, 1, 2])
-    run_cmp = c1.button("Jalankan perbandingan", type="primary", use_container_width=True, key="takt_run_cmp")
+    run_cmp = c1.button("Jalankan bandingan zona", type="primary", use_container_width=True, key="takt_run_cmp")
     clear_cmp = c2.button("Hapus perbandingan", use_container_width=True, key="takt_clear_cmp")
     if clear_cmp:
         st.session_state.pop("takt_zone_results", None)
@@ -1442,7 +1442,7 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
 
     if not results:
         st.info(
-            "Tekan **Jalankan perbandingan** untuk LOB + takt plan (wagon) "
+            "Tekan **Jalankan bandingan zona** untuk LOB + takt plan (wagon) "
             "pada tiga jumlah zona."
         )
         return
