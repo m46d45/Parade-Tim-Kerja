@@ -21,6 +21,10 @@ _a = importlib.reload(_a)
 from parade_of_trades_analysis import (
     export_result_csv,
     export_result_excel,
+export_comparison_excel,
+export_comparison_csv,
+export_takt_excel,
+export_takt_csv,
     inventory_fill_rate_metrics,
     kingman_combined,
     kingman_metrics,
@@ -58,7 +62,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-04-no-tommelein-v64"
+_APP_BUILD = "2026-08-04-export-all-v65"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -575,7 +579,8 @@ def _fig_to_st(fig) -> None:
     plt.close(fig)
 
 
-def _export_block(result: ParadeResult, key: str) -> None:
+def _export_block(result: ParadeResult, key: str, prefix: str = "parade_simulasi") -> None:
+    """Unduh CSV + Excel hasil satu run (untuk presentasi / arsip)."""
     st.markdown("##### Unduh data")
     with tempfile.TemporaryDirectory() as td:
         td_path = Path(td)
@@ -583,15 +588,112 @@ def _export_block(result: ParadeResult, key: str) -> None:
         xlsx = td_path / "run.xlsx"
         export_result_csv(result, hist, include_history=True)
         export_result_excel(result, xlsx)
+        summary = hist.with_name(hist.stem + "_summary.csv")
+        c1, c2, c3 = st.columns(3)
+        c1.download_button(
+            "⬇ CSV riwayat",
+            hist.read_bytes(),
+            f"{prefix}_riwayat.csv",
+            "text/csv",
+            key=f"{key}_csv",
+            use_container_width=True,
+        )
+        if summary.exists():
+            c2.download_button(
+                "⬇ CSV ringkasan",
+                summary.read_bytes(),
+                f"{prefix}_ringkasan.csv",
+                "text/csv",
+                key=f"{key}_csv_sum",
+                use_container_width=True,
+            )
+        c3.download_button(
+            "⬇ Excel lengkap",
+            xlsx.read_bytes(),
+            f"{prefix}.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key=f"{key}_xlsx",
+            use_container_width=True,
+        )
+
+
+def _export_comparison_block(
+    results: dict,
+    meta: Optional[dict],
+    key: str = "cmp",
+) -> None:
+    st.markdown("##### Unduh data perbandingan")
+    with tempfile.TemporaryDirectory() as td:
+        td_path = Path(td)
+        xlsx = td_path / "compare.xlsx"
+        csv_path = td_path / "compare.csv"
+        export_comparison_excel(results, xlsx, meta=meta)
+        export_comparison_csv(results, csv_path, meta=meta)
         c1, c2 = st.columns(2)
         c1.download_button(
-            "⬇ CSV riwayat", hist.read_bytes(), "parade_history.csv", "text/csv",
-            key=f"{key}_csv", use_container_width=True,
+            "⬇ CSV ringkasan",
+            csv_path.read_bytes(),
+            "parade_perbandingan.csv",
+            "text/csv",
+            key=f"{key}_csv",
+            use_container_width=True,
         )
         c2.download_button(
-            "⬇ Excel", xlsx.read_bytes(), "parade_run.xlsx",
+            "⬇ Excel lengkap",
+            xlsx.read_bytes(),
+            "parade_perbandingan.xlsx",
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key=f"{key}_xlsx", use_container_width=True,
+            key=f"{key}_xlsx",
+            use_container_width=True,
+        )
+
+
+def _export_takt_block(
+    result: ParadeResult,
+    plan,
+    rel: Optional[dict],
+    duration_plan: Optional[int],
+    buffers_info: Optional[dict],
+    key: str = "takt",
+) -> None:
+    st.markdown("##### Unduh data takt")
+    with tempfile.TemporaryDirectory() as td:
+        td_path = Path(td)
+        xlsx = td_path / "takt.xlsx"
+        csv_path = td_path / "takt_cells.csv"
+        export_takt_excel(
+            result, plan, xlsx,
+            reliability=rel,
+            duration_plan=duration_plan,
+            buffers_info=buffers_info,
+        )
+        export_takt_csv(result, plan, csv_path, reliability=rel)
+        hist = csv_path.with_name(csv_path.stem + "_history.csv")
+        c1, c2, c3 = st.columns(3)
+        c1.download_button(
+            "⬇ CSV sel takt",
+            csv_path.read_bytes(),
+            "parade_takt_sel.csv",
+            "text/csv",
+            key=f"{key}_csv",
+            use_container_width=True,
+        )
+        if hist.exists():
+            c2.download_button(
+                "⬇ CSV riwayat",
+                hist.read_bytes(),
+                "parade_takt_riwayat.csv",
+                "text/csv",
+                key=f"{key}_csv_hist",
+                use_container_width=True,
+            )
+        c3.download_button(
+            "⬇ Excel lengkap",
+            xlsx.read_bytes(),
+            "parade_takt.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key=f"{key}_xlsx",
+            use_container_width=True,
         )
 
 
@@ -869,7 +971,7 @@ def tab_single_run(total_units: int, seed: Optional[int], n_trades: int) -> None
     with right:
         st.markdown("##### Metrik per tim")
         _trade_table(result)
-        _export_block(result, "single")
+        _export_block(result, "single", prefix="parade_simulasi")
 
 
 def _batch_label(b: int) -> str:
@@ -1013,6 +1115,7 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
     st.divider()
     st.markdown("##### Ringkasan")
     st.dataframe(sorted(rows, key=lambda x: x["Durasi"]), use_container_width=True, hide_index=True)
+    _export_comparison_block(results, meta, key="cmp")
 
     tab_lob, tab_buf, tab_util, tab_ll, tab_kg, tab_fr = st.tabs(
         ["Line of Balance", "Buffer / WIP", "Utilisasi", "Little's Law", "Kingman", "Inventory / FR"]
@@ -1386,6 +1489,15 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
 
         with st.expander("Detail reliability per zona"):
             st.dataframe(rel["detail"][:100], use_container_width=True, hide_index=True)
+
+        _export_takt_block(
+            result,
+            plan_snap,
+            rel,
+            duration_plan=int(st.session_state.get("takt_duration_plan") or plan_snap.duration),
+            buffers_info=st.session_state.get("takt_buf_pads"),
+            key="takt",
+        )
     else:
         fig, ax = plt.subplots(figsize=(10, 5.0))
         plot_takt_plan(plan, ax=ax, result=None, title="Rencana")

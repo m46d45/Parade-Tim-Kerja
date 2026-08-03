@@ -21,6 +21,7 @@ Usage
 from __future__ import annotations
 
 import csv
+import re
 import math
 import statistics
 from dataclasses import dataclass, field
@@ -1921,7 +1922,266 @@ def export_result_excel(result: ParadeResult, path: PathLike) -> Path:
         down = result.config.trades[j + 1].name
         ws4.append([j + 1, up, down, mx])
 
+    # Analysis sheets for presentation
+    try:
+        ll = littles_law_metrics(result)
+        d = littles_operations_curve(result)
+        ws5 = wb.create_sheet("Littles_Law")
+        ws5.append(["metric", "value"])
+        for k, v in [
+            ("TH", ll.throughput),
+            ("WIP_pipeline_avg", ll.avg_pipeline_wip),
+            ("CT_pipeline", ll.cycle_time_pipeline),
+            ("WIP_buffer_avg", ll.avg_buffer_wip),
+            ("CT_buffer", ll.cycle_time_buffer),
+            ("TH_x_CT_check", ll.check_pipeline),
+            ("W_min", d.get("w_min")),
+            ("W_opt", d.get("w_opt")),
+            ("CONWIP_suggest", d.get("conwip")),
+            ("TH_max", d.get("th_max")),
+            ("T0", d.get("t0")),
+            ("V_factor", d.get("v_factor", d.get("v"))),
+        ]:
+            ws5.append([k, v])
+    except Exception:
+        pass
+
+    try:
+        kg = kingman_metrics(result)
+        comb = kingman_combined(result)
+        ws6 = wb.create_sheet("Kingman")
+        ws6.append(["metric", "value"])
+        ws6.append(["u_bar", comb.get("u_bar")])
+        ws6.append(["V", comb.get("v")])
+        ws6.append(["sum_ct_kingman", getattr(kg, "sum_ct_kingman", None)])
+        ws6.append(["sum_ct_observed", getattr(kg, "sum_ct_observed", None)])
+        ws6.append(["system_ct_little", getattr(kg, "system_ct_little", None)])
+        ws6.append([])
+        rows = kg.as_rows() if hasattr(kg, "as_rows") else []
+        if rows:
+            ws6.append(list(rows[0].keys()))
+            for row in rows:
+                ws6.append(list(row.values()))
+    except Exception:
+        pass
+
+    try:
+        fr = inventory_fill_rate_metrics(result)
+        ws7 = wb.create_sheet("Inventory_FR")
+        ws7.append(["metric", "value"])
+        for k, v in fr.items():
+            if not isinstance(v, (list, dict)):
+                ws7.append([k, v])
+        interfaces = fr.get("interfaces") or []
+        if interfaces:
+            ws7.append([])
+            ws7.append(list(interfaces[0].keys()))
+            for row in interfaces:
+                ws7.append(list(row.values()))
+    except Exception:
+        pass
+
+    # LOB cumulative table
+    try:
+        ws8 = wb.create_sheet("LOB_cumulative")
+        n = result.config.n_trades
+        header = ["period"] + [f"T{i+1}_cum" for i in range(n)] + [f"B{j+1}" for j in range(max(0, n - 1))]
+        ws8.append(header)
+        for rec in result.history:
+            row = [rec.period] + list(rec.cumulative)
+            row += list(rec.buffers)
+            ws8.append(row)
+    except Exception:
+        pass
+
     wb.save(path)
+    return path
+
+
+def export_comparison_excel(
+    results: Dict[str, ParadeResult],
+    path: PathLike,
+    meta: Optional[Dict[str, dict]] = None,
+) -> Path:
+    """Multi-scenario workbook for presentation."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    import openpyxl
+    from openpyxl.styles import Font
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Ringkasan"
+    ws.append(["Parade Tim Kerja — Perbandingan Skenario"])
+    ws["A1"].font = Font(bold=True, size=12)
+    ws.append([])
+    ws.append([
+        "Skenario", "Durasi", "Ideal", "TH", "Idle", "Puncak_WIP",
+        "WIP_avg", "CT", "W_min", "W_opt", "Batch", "Zona", "Seed",
+        "Variability", "Pace",
+    ])
+    for name, r in results.items():
+        ll = littles_law_metrics(r)
+        try:
+            d = littles_operations_curve(r)
+            wmin, wopt = d["w_min"], d["w_opt"]
+        except Exception:
+            wmin = wopt = ""
+        peak = max((sum(h.buffers) for h in r.history), default=0)
+        m = (meta or {}).get(name, {})
+        ws.append([
+            name, r.duration, r.ideal_duration, round(ll.throughput, 4),
+            r.total_idle_capacity, peak, round(ll.avg_pipeline_wip, 3),
+            round(ll.cycle_time_pipeline, 3), wmin, wopt,
+            r.config.batch_size, r.config.total_units, r.config.seed,
+            m.get("var_label", ""), m.get("pace", ""),
+        ])
+
+    wu = wb.create_sheet("Utilisasi")
+    wu.append(["Skenario", "Tim", "Produksi", "Idle", "Utilisasi"])
+    for name, r in results.items():
+        for tm in r.trade_metrics:
+            wu.append([name, tm.name, tm.total_production, tm.total_idle, round(tm.utilization, 4)])
+
+    wlob = wb.create_sheet("LOB_tim_terakhir")
+    max_len = max((len(r.history) for r in results.values()), default=0)
+    wlob.append(["period"] + list(results.keys()))
+    for p in range(max_len + 1):
+        row = [p]
+        for r in results.values():
+            cum = r.cumulative_series()[-1]
+            row.append(cum[p] if p < len(cum) else "")
+        wlob.append(row)
+
+    for idx, (name, r) in enumerate(results.items(), 1):
+        safe = re.sub(r"[^\w\-]+", "_", name)[:20]
+        title = f"S{idx}_{safe}"[:31]
+        wh = wb.create_sheet(title)
+        hist = _history_dicts(r)
+        if hist:
+            wh.append(list(hist[0].keys()))
+            for row in hist:
+                wh.append(list(row.values()))
+
+    wb.save(path)
+    return path
+
+
+def export_comparison_csv(
+    results: Dict[str, ParadeResult],
+    path: PathLike,
+    meta: Optional[Dict[str, dict]] = None,
+) -> Path:
+    """Summary CSV of multi-scenario comparison."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow([
+            "Skenario", "Durasi", "Ideal", "TH", "Idle", "Puncak_WIP",
+            "WIP_avg", "CT", "W_min", "W_opt", "Batch", "Zona", "Seed",
+            "Variability", "Pace",
+        ])
+        for name, r in results.items():
+            ll = littles_law_metrics(r)
+            try:
+                d = littles_operations_curve(r)
+                wmin, wopt = d["w_min"], d["w_opt"]
+            except Exception:
+                wmin = wopt = ""
+            peak = max((sum(h.buffers) for h in r.history), default=0)
+            m = (meta or {}).get(name, {})
+            w.writerow([
+                name, r.duration, r.ideal_duration, round(ll.throughput, 4),
+                r.total_idle_capacity, peak, round(ll.avg_pipeline_wip, 3),
+                round(ll.cycle_time_pipeline, 3), wmin, wopt,
+                r.config.batch_size, r.config.total_units, r.config.seed,
+                m.get("var_label", ""), m.get("pace", ""),
+            ])
+    return path
+
+
+def export_takt_excel(
+    result: ParadeResult,
+    plan: "TaktPlan",
+    path: PathLike,
+    *,
+    reliability: Optional[dict] = None,
+    duration_plan: Optional[int] = None,
+    buffers_info: Optional[dict] = None,
+) -> Path:
+    """Takt plan + actual run workbook."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # base single-run workbook
+    export_result_excel(result, path)
+    import openpyxl
+    from openpyxl.styles import Font
+    wb = openpyxl.load_workbook(path)
+
+    ws = wb.create_sheet("Takt_rencana", 0)
+    ws.append(["Parade Tim Kerja — Takt Plan"])
+    ws["A1"].font = Font(bold=True, size=12)
+    ws.append([])
+    ws.append(["zona", plan.n_zones])
+    ws.append(["rate", plan.rate])
+    ws.append(["takt_time", plan.takt_time])
+    ws.append(["batch", plan.batch_size])
+    ws.append(["durasi_kerja_rencana", plan.duration])
+    if duration_plan is not None:
+        ws.append(["durasi_rencana_plus_buffer", duration_plan])
+    if buffers_info:
+        for k, v in buffers_info.items():
+            ws.append([f"buffer_{k}", v])
+    if reliability:
+        ws.append([])
+        ws.append(["reliability", reliability.get("reliability")])
+        ws.append(["durasi_aktual", reliability.get("actual_duration")])
+        ws.append(["durasi_plan_cells", reliability.get("plan_duration")])
+
+    ws2 = wb.create_sheet("Takt_cells")
+    ws2.append(["trade", "zone", "period_start", "period_end", "planned_rate"])
+    for c in plan.cells:
+        ws2.append([c.trade_index + 1, c.zone, c.period_start, c.period_end, c.planned_rate])
+
+    if reliability and reliability.get("detail"):
+        ws3 = wb.create_sheet("Reliability_detail")
+        det = reliability["detail"]
+        if det:
+            ws3.append(list(det[0].keys()))
+            for row in det:
+                ws3.append(list(row.values()))
+
+    wb.save(path)
+    return path
+
+
+def export_takt_csv(
+    result: ParadeResult,
+    plan: "TaktPlan",
+    path: PathLike,
+    *,
+    reliability: Optional[dict] = None,
+) -> Path:
+    """CSV: takt cells + optional reliability summary header via sibling files."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["trade", "zone", "period_start", "period_end", "planned_rate"])
+        for c in plan.cells:
+            w.writerow([c.trade_index + 1, c.zone, c.period_start, c.period_end, c.planned_rate])
+    # also dump actual history
+    export_result_csv(result, path.with_name(path.stem + "_history.csv"), include_history=True)
+    if reliability:
+        with path.with_name(path.stem + "_summary.csv").open("w", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            w.writerow(["metric", "value"])
+            w.writerow(["reliability", reliability.get("reliability")])
+            w.writerow(["actual_duration", reliability.get("actual_duration")])
+            w.writerow(["plan_duration", reliability.get("plan_duration")])
+            w.writerow(["plan_rate", plan.rate])
+            w.writerow(["plan_zones", plan.n_zones])
     return path
 
 
