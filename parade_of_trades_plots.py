@@ -446,15 +446,15 @@ def plot_comparison_lob(
     Overlay Line of Balance curves for several scenarios.
 
     By default only the *last* trade (project completion) is shown per
-    scenario so the panel stays readable.
+    scenario so the panel stays readable. Every series is forced to start
+    at (period=0, zona=0).
     """
     if ax is None:
         _, ax = plt.subplots(figsize=(8, 5))
 
-    # Use first result for total / ideal reference
     first = next(iter(results.values()))
     total = first.config.total_units
-    mean_cap = min(t.mean for t in first.config.trades)
+    mean_cap = min(float(t.mean) for t in first.config.trades)
     if mean_cap > 0:
         ax.plot(
             [0, total / mean_cap],
@@ -462,26 +462,49 @@ def plot_comparison_lob(
             color="0.5",
             linestyle=":",
             linewidth=1.5,
-            label=f"Ideal ({mean_cap:g}/period)",
+            label=f"Ideal ({mean_cap:g}/periode) dari (0,0)",
         )
 
-    for name, result in results.items():
+    # Distinct cycle if names are Skenario N (not in PRESET_COLORS)
+    fallback_colors = ["#2563eb", "#ea580c", "#16a34a", "#dc2626", "#7c3aed", "#0891b2"]
+    max_period = 0
+
+    for idx, (name, result) in enumerate(results.items()):
         cum = result.cumulative_series()
-        color = PRESET_COLORS.get(name, None)
+        color = PRESET_COLORS.get(name, fallback_colors[idx % len(fallback_colors)])
         display = PRESET_DISPLAY.get(name, name)
+        batch = getattr(result.config, "batch_size", None)
+        batch_tag = f", batch={batch}" if batch is not None else ""
+
         if last_trade_only:
-            series = cum[-1]
+            series = list(cum[-1])
+            # Force origin (0, 0)
+            if not series or series[0] != 0:
+                series = [0] + series
             periods = list(range(len(series)))
+            max_period = max(max_period, periods[-1] if periods else 0)
+            # Start marker at origin + line
             ax.plot(
                 periods,
                 series,
                 color=color,
                 linewidth=2.2,
-                label=f"{display} (T={result.duration})",
+                solid_capstyle="round",
+                label=f"{display} (T={result.duration}{batch_tag})",
             )
+            ax.plot(0, 0, marker="o", color=color, markersize=5, zorder=5)
+            # Mark first production period (when curve leaves zero)
+            for p, y in enumerate(series):
+                if y > 0:
+                    ax.plot(p, y, marker="o", color=color, markersize=4, zorder=5)
+                    break
         else:
             for i, series in enumerate(cum):
+                series = list(series)
+                if not series or series[0] != 0:
+                    series = [0] + series
                 periods = list(range(len(series)))
+                max_period = max(max_period, periods[-1] if periods else 0)
                 ax.plot(
                     periods,
                     series,
@@ -491,12 +514,12 @@ def plot_comparison_lob(
                     label=f"{display} T{i + 1}" if i == len(cum) - 1 else None,
                 )
 
-    ax.axhline(total, color="0.7", linestyle="--", linewidth=1.0)
-    ax.set_xlim(left=0)
-    ax.set_ylim(0, total * 1.05)
-    ax.set_xlabel("Period")
-    ax.set_ylabel("Cumulative units (last trade)")
-    ax.set_title(title or "Line of Balance – Scenario Comparison")
+    ax.axhline(total, color="0.7", linestyle="--", linewidth=1.0, label=None)
+    ax.set_xlim(0, max(max_period, 1) * 1.02)
+    ax.set_ylim(0, total * 1.08)
+    ax.set_xlabel("Periode (mulai 0)")
+    ax.set_ylabel("Zona kumulatif trade terakhir (mulai 0)")
+    ax.set_title(title or "Line of Balance – perbandingan skenario (dari 0,0)")
     ax.legend(loc="lower right", fontsize=8, framealpha=0.92)
     _apply_axes_style(ax)
     return ax

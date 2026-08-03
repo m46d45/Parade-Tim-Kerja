@@ -36,7 +36,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-batch-flush-v14"
+_APP_BUILD = "2026-08-03-lob-from-zero-v15"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -611,14 +611,16 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
     plot_comparison_lob(
         results,
         ax=ax,
-        title="LOB skenario (trade terakhir) — batch bisa beda per skenario",
+        title="LOB skenario — mulai (0,0) · trade terakhir · batch bisa beda",
         last_trade_only=True,
     )
     fig.tight_layout()
     _fig_to_st(fig)
     st.caption(
-        "Setiap garis = satu skenario (kumulatif trade terakhir). "
-        "Kolom Batch di tabel menunjukkan handoff masing-masing."
+        "Semua kurva **mulai dari (periode 0, zona 0)**. "
+        "Garis = kumulatif **trade terakhir** (proyek selesai). "
+        "Batch=1 (one-piece): trade terakhir mulai paling awal. "
+        "Batch besar: trade terakhir mulai lebih lambat (tunggu handoff)."
     )
 
     with st.expander("Detail trade satu skenario"):
