@@ -37,7 +37,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-logo-lg-v25"
+_APP_BUILD = "2026-08-03-logo-bold-v26"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -438,7 +438,7 @@ def _render_header() -> None:
     if _LOGO_ICON.exists():
         c1, c2 = st.columns([1.6, 5], vertical_alignment="center")
         with c1:
-            st.image(str(_LOGO_ICON), width=160)
+            st.image(str(_LOGO_ICON), width=168)
         with c2:
             st.markdown("## Parade Tim Kerja")
             st.caption("Zone-flow · batch / one-piece · kecepatan & variability **per zona**")
