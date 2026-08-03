@@ -21,6 +21,7 @@ _a = importlib.reload(_a)
 from parade_of_trades_analysis import (
     export_result_csv,
     export_result_excel,
+    kingman_metrics,
     littles_law_metrics,
 )
 from parade_of_trades_core import (
@@ -35,6 +36,7 @@ from parade_of_trades_plots import (
     plot_comparison_buffers,
     plot_comparison_lob,
     plot_comparison_utilization,
+    plot_kingman_stations,
     plot_line_of_balance,
     plot_line_of_balance_detail,
     plot_littles_law_wip,
