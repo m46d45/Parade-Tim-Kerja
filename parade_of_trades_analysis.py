@@ -1597,7 +1597,43 @@ def compare_scenarios(
     return cmp
 
 
+def tommelein_run_metrics(result: ParadeResult) -> dict:
+    """Summary row for one Tommelein (2020) scenario run."""
+    cfg = result.config
+    t0 = cfg.trades[0]
+    mean_die = float(t0.mean) if t0.mean else (float(t0.low) + float(t0.high)) / 2.0
+    # periods meeting takt (when takt enabled): production >= takt when work available
+    periods_ok = 0
+    periods_work = 0
+    takt = cfg.takt_rate
+    if takt is not None:
+        for rec in result.history:
+            for i in range(cfg.n_trades):
+                # count only when trade had capacity roll (mobilized / working)
+                if rec.capacity[i] and rec.capacity[i] > 0:
+                    periods_work += 1
+                    if rec.production[i] + 1e-9 >= min(takt, rec.effective_capacity[i]):
+                        # met commitment if produced at least takt when possible
+                        if rec.effective_capacity[i] >= takt - 1e-9 and rec.production[i] + 1e-9 >= takt:
+                            periods_ok += 1
+                        elif rec.effective_capacity[i] < takt and rec.production[i] + 1e-9 >= rec.effective_capacity[i] - 1e-9:
+                            periods_ok += 1  # limited by work not capacity
+    rel = (periods_ok / periods_work) if periods_work else None
+    return {
+        "Dadu": f"{int(t0.low)}–{int(t0.high)}" if t0.low != t0.high else str(int(t0.low)),
+        "Mean dadu": round(mean_die, 2),
+        "Takt": cfg.takt_rate if cfg.takt_rate is not None else "—",
+        "Standby": cfg.standby_capacity if cfg.takt_enabled else "—",
+        "Durasi": result.duration,
+        "TH": round(result.system_throughput, 3),
+        "Idle": result.total_idle_capacity,
+        "Standby dipakai": result.total_standby_used,
+        "Reliability takt": f"{100 * rel:.0f}%" if rel is not None else "—",
+    }
+
+
 def compare_tommelein2020(
+
     n_reps: int = 100,
     seed_base: int = 0,
     total_units: int = 100,

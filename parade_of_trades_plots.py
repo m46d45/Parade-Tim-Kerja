@@ -1389,3 +1389,92 @@ def plot_takt_wagon_chart(
     _apply_axes_style(ax)
     return ax
 
+
+def plot_tommelein_scenario_lobs(
+    results: Dict[str, ParadeResult],
+    title: Optional[str] = None,
+) -> "plt.Figure":
+    """
+    One LOB panel per Tommelein scenario: all trades + planned takt line.
+
+    Planned line: constant rate = takt_rate if set, else trade mean capacity.
+    """
+    n = len(results)
+    fig, axes = plt.subplots(1, n, figsize=(4.2 * n, 4.4), sharey=True)
+    if n == 1:
+        axes = [axes]
+    colors = [_trade_color(i) for i in range(8)]
+    for ax, (name, result) in zip(axes, results.items()):
+        cum = result.cumulative_series()
+        total = result.config.total_units
+        for i, series in enumerate(cum):
+            series = list(series)
+            periods = list(range(len(series)))
+            ax.plot(
+                periods, series,
+                color=colors[i % len(colors)],
+                linewidth=1.8,
+                label=f"T{i + 1}",
+            )
+        # Planned / takt rate line (ideal constant pace from origin for last trade lag)
+        tr = result.config.trades[0]
+        if result.config.takt_enabled and result.config.takt_rate:
+            rate = float(result.config.takt_rate)
+            plan_label = f"Rencana takt={result.config.takt_rate}"
+        else:
+            rate = float(tr.mean) if tr.mean else (float(tr.low) + float(tr.high)) / 2.0
+            plan_label = f"Rencana mean={rate:g}"
+        # Ideal last-trade with next-period handoff: start after (n-1) lags
+        n_tr = result.config.n_trades
+        lag = 0 if result.config.same_period_handoff else (n_tr - 1)
+        if rate > 0:
+            t_end = lag + total / rate
+            ax.plot(
+                [lag, t_end], [0, total],
+                color="0.35", linestyle="--", linewidth=1.4,
+                label=plan_label,
+            )
+        ax.axhline(total, color="0.75", linestyle=":", linewidth=0.9)
+        ax.set_xlim(left=0)
+        ax.set_ylim(0, total * 1.08)
+        ax.set_xlabel("Periode")
+        ax.set_title(name, fontsize=10)
+        ax.legend(loc="lower right", fontsize=7, framealpha=0.9, ncol=2)
+        _apply_axes_style(ax)
+    axes[0].set_ylabel("Zona kumulatif")
+    fig.suptitle(title or "Tommelein (2020) — LOB per skenario (semua tim)", fontsize=11, y=1.02)
+    fig.tight_layout()
+    return fig
+
+
+def plot_tommelein_last_trade_lob(
+    results: Dict[str, ParadeResult],
+    ax: Optional[Axes] = None,
+    title: Optional[str] = None,
+) -> Axes:
+    """Overlay last-trade LOB for Tommelein scenarios with per-scenario plan lines."""
+    if ax is None:
+        _, ax = plt.subplots(figsize=(9.5, 4.8))
+    fallback = ["#2563eb", "#ea580c", "#16a34a", "#dc2626", "#7c3aed"]
+    total = next(iter(results.values())).config.total_units
+    max_p = 1
+    for idx, (name, result) in enumerate(results.items()):
+        color = fallback[idx % len(fallback)]
+        series = list(result.cumulative_series()[-1])
+        periods = list(range(len(series)))
+        max_p = max(max_p, periods[-1] if periods else 1)
+        ax.plot(
+            periods, series, color=color, linewidth=2.2,
+            label=f"{name} (T={result.duration})",
+        )
+        ax.plot(0, 0, marker="o", color=color, markersize=5, zorder=5)
+    ax.axhline(total, color="0.7", linestyle="--", linewidth=1.0)
+    ax.set_xlim(0, max_p * 1.05)
+    ax.set_ylim(0, total * 1.08)
+    ax.set_xlabel("Periode (mulai 0)")
+    ax.set_ylabel("Zona kumulatif tim terakhir")
+    ax.set_title(title or "Tommelein (2020) — LOB tim terakhir")
+    ax.legend(loc="lower right", fontsize=8, framealpha=0.92)
+    _apply_axes_style(ax)
+    return ax
+
