@@ -208,6 +208,165 @@ def littles_law_series(result: ParadeResult) -> Dict[str, List[float]]:
 
 
 
+
+# ---------------------------------------------------------------------------
+# Kingman's Equation (VUT approximation, Factory Physics)
+# ---------------------------------------------------------------------------
+# CT ≈ t_e + ((c_a² + c_e²)/2) × (u/(1-u)) × t_e
+#    = V × U × T  form: wait ≈ V×U×t_e, CT = wait + t_e
+# c_a = CV arrivals, c_e = CV process (effective) time, u = utilization, t_e = mean process time
+# Ref: Hopp & Spearman, Factory Physics; Kingman (1961) G/G/1 heavy-traffic approx.
+
+
+@dataclass
+class KingmanStationRow:
+    trade_index: int
+    name: str
+    utilization: float
+    t_e: float
+    """Mean process time per zona (periode)."""
+    c_e: float
+    """CV of process time (from capacity variability config)."""
+    c_a: float
+    """CV of arrivals (0 for T1; else ≈ c_e upstream)."""
+    wait_kingman: float
+    ct_kingman: float
+    ct_observed: float
+    """Empirical: time_on_site / production (periode per zona di stasiun)."""
+    v_factor: float
+    u_factor: float
+
+
+@dataclass
+class KingmanMetrics:
+    stations: List[KingmanStationRow]
+    sum_ct_kingman: float
+    sum_ct_observed: float
+    system_ct_little: float
+    """Little's Law pipeline CT for comparison."""
+    bottleneck_u: float
+    note: str = ""
+
+    def as_rows(self) -> List[dict]:
+        rows = []
+        for s in self.stations:
+            rows.append({
+                "Tim": f"T{s.trade_index + 1} {s.name}",
+                "u": round(s.utilization, 3),
+                "t_e": round(s.t_e, 3),
+                "c_e": round(s.c_e, 3),
+                "c_a": round(s.c_a, 3),
+                "V=(c_a²+c_e²)/2": round(s.v_factor, 3),
+                "U=u/(1-u)": round(s.u_factor, 3) if math.isfinite(s.u_factor) else "∞",
+                "Wait Kingman": round(s.wait_kingman, 3) if math.isfinite(s.wait_kingman) else "∞",
+                "CT Kingman": round(s.ct_kingman, 3) if math.isfinite(s.ct_kingman) else "∞",
+                "CT amati": round(s.ct_observed, 3),
+            })
+        return rows
+
+
+def _process_time_moments(trade) -> Tuple[float, float]:
+    """
+    Mean and CV of process time per zone from capacity model.
+
+    Capacity C = zona/periode → process time T = 1/C periode/zona.
+    """
+    lo = max(float(trade.low), 1e-12)
+    hi = max(float(trade.high), 1e-12)
+    p = float(trade.p_high)
+    if getattr(trade, "deterministic", False) or abs(lo - hi) < 1e-12:
+        base = float(trade.base_speed) if trade.base_speed is not None else float(trade.mean)
+        base = max(base, 1e-12)
+        return 1.0 / base, 0.0
+    t_lo, t_hi = 1.0 / lo, 1.0 / hi
+    t_e = (1.0 - p) * t_lo + p * t_hi
+    var = (1.0 - p) * (t_lo - t_e) ** 2 + p * (t_hi - t_e) ** 2
+    c_e = math.sqrt(max(var, 0.0)) / t_e if t_e > 0 else 0.0
+    return t_e, c_e
+
+
+def kingman_ct(u: float, t_e: float, c_a: float, c_e: float) -> Tuple[float, float, float, float]:
+    """
+    Returns (wait, ct, v_factor, u_factor).
+
+    Kingman / VUT: wait ≈ ((c_a² + c_e²)/2) * (u/(1-u)) * t_e
+                   CT  ≈ wait + t_e
+    """
+    u = float(u)
+    t_e = max(float(t_e), 1e-12)
+    c_a = max(float(c_a), 0.0)
+    c_e = max(float(c_e), 0.0)
+    v = 0.5 * (c_a ** 2 + c_e ** 2)
+    if u >= 1.0 - 1e-9:
+        return float("inf"), float("inf"), v, float("inf")
+    if u <= 0.0:
+        return 0.0, t_e, v, 0.0
+    u_factor = u / (1.0 - u)
+    wait = v * u_factor * t_e
+    return wait, wait + t_e, v, u_factor
+
+
+def kingman_metrics(result: ParadeResult) -> KingmanMetrics:
+    """
+    Per-trade Kingman (VUT) approximation vs observed station cycle time.
+
+    - **t_e, c_e** from trade capacity / variability configuration.
+    - **u** from simulated utilization (production / effective capacity).
+    - **c_a**: T1 ≈ 0 (pasokan zona mentah dianggap teratur); hilir ≈ **c_e**
+      stasiun hulu (pendekatan tandem teaching model).
+    - **CT amati** ≈ time_on_site / production (periode per zona di stasiun).
+
+    Bandingkan Σ CT Kingman dengan CT pipeline Little's Law (orde yang sama,
+    tidak harus sama — Kingman stasioner vs proyek berhingga).
+    """
+    stations: List[KingmanStationRow] = []
+    prev_c_e = 0.0
+    for i, m in enumerate(result.trade_metrics):
+        trade = result.config.trades[i]
+        t_e, c_e = _process_time_moments(trade)
+        u = float(m.utilization)
+        # Cap u slightly below 1 for display formula stability when util≈1
+        u_calc = min(u, 0.999)
+        c_a = 0.0 if i == 0 else prev_c_e
+        wait, ct_k, v_f, u_f = kingman_ct(u_calc, t_e, c_a, c_e)
+        prod = max(int(m.total_production), 1)
+        ct_obs = float(m.time_on_site) / float(prod)
+        stations.append(
+            KingmanStationRow(
+                trade_index=i,
+                name=m.name,
+                utilization=u,
+                t_e=t_e,
+                c_e=c_e,
+                c_a=c_a,
+                wait_kingman=wait,
+                ct_kingman=ct_k,
+                ct_observed=ct_obs,
+                v_factor=v_f,
+                u_factor=u_f,
+            )
+        )
+        prev_c_e = c_e
+
+    ll = littles_law_metrics(result)
+    sum_k = sum(s.ct_kingman for s in stations if math.isfinite(s.ct_kingman))
+    sum_o = sum(s.ct_observed for s in stations)
+    bott_u = max((s.utilization for s in stations), default=0.0)
+    note = (
+        "Kingman = pendekatan antrian stasioner (VUT). "
+        "Proyek parade berhingga + batch handoff bisa beda dari prediksi; "
+        "pakai untuk intuisi: V↑ atau U↑ → CT↑."
+    )
+    return KingmanMetrics(
+        stations=stations,
+        sum_ct_kingman=sum_k,
+        sum_ct_observed=sum_o,
+        system_ct_little=ll.cycle_time_pipeline,
+        bottleneck_u=bott_u,
+        note=note,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Statistics helpers
 # ---------------------------------------------------------------------------

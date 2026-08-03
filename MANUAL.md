@@ -294,6 +294,50 @@ Di app ini **tidak ada yield loss**, jadi bentuk klasik langsung dipakai. Cek nu
 > Intuisi Factory Physics: *untuk throughput yang sama, CT proporsional terhadap WIP* — kurangi WIP (aliran lebih ramping) untuk mempercepat cycle time.
 
 
+
+
+---
+
+## 12. Kingman's Equation (VUT)
+
+Pendekatan antrian **G/G/1** (Kingman / Factory Physics) untuk **cycle time di satu stasiun**:
+
+```text
+CT  ≈  t_e  +  ((c_a² + c_e²) / 2)  ×  (u / (1 − u))  ×  t_e
+         └ process ┘   └──────── V (variability) ──────┘   └ U ┘   └ T ┘
+```
+
+| Simbol | Nama | Di app |
+|--------|------|--------|
+| **t_e** | Mean process time | Waktu rata-rata selesaikan **1 zona** di tim itu (dari kapasitas: T = 1/C) |
+| **u** | Utilisasi | Dari simulasi (produksi ÷ kapasitas efektif) |
+| **c_e** | CV process time | Dari **variability** kapasitas (tanpa var → c_e = 0) |
+| **c_a** | CV kedatangan | T1 ≈ 0; tim hilir ≈ c_e tim hulu (pendekatan tandem) |
+| **V** | Faktor variability | (c_a² + c_e²) / 2 |
+| **U** | Faktor utilisasi | u / (1 − u) — meledak saat u → 1 |
+
+### Intuisi kelas (VUT)
+
+| Naikkan… | Efek pada CT Kingman |
+|----------|----------------------|
+| **V**ariability (c_a, c_e) | Wait ↑ |
+| **U**tilisasi u mendekati 100% | Wait ↑ tajam |
+| **T** process time t_e | CT ↑ proporsional |
+
+Tanpa variability (c_a = c_e = 0) → wait Kingman = 0 → **CT = t_e** (hanya proses murni).
+
+### Di mana di app?
+
+- **Simulasi** → sub-tab **Kingman**
+- **Perbandingan** → sub-tab **Kingman** (Σ CT per skenario)
+
+### Catatan
+
+Kingman mengasumsikan antrian **stasioner** jangka panjang. Parade proyek berhingga + **batch handoff** bisa membuat CT amati beda dari prediksi — tetap berguna untuk melihat arah: *var naik atau u naik → antrian mahal*.
+
+Bandingkan dengan **Little's Law** (sistem: WIP = TH × CT) di tab sebelahnya.
+
+
 ## 10. Pemecahan masalah singkat
 
 | Gejala | Coba |

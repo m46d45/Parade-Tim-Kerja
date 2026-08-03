@@ -41,7 +41,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-littles-law-v39"
+_APP_BUILD = "2026-08-03-kingman-v40"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -579,8 +579,8 @@ def _export_block(result: ParadeResult, key: str) -> None:
 
 
 def _plot_single_result(result: ParadeResult) -> None:
-    tab_lob, tab_buf, tab_util, tab_ll = st.tabs(
-        ["Line of Balance", "Buffer / WIP", "Utilisasi", "Little's Law"]
+    tab_lob, tab_buf, tab_util, tab_ll, tab_kg = st.tabs(
+        ["Line of Balance", "Buffer / WIP", "Utilisasi", "Little's Law", "Kingman"]
     )
     with tab_lob:
         fig, ax = plt.subplots(figsize=(10, 4.5))
@@ -643,6 +643,18 @@ def _plot_single_result(result: ParadeResult) -> None:
         fig.tight_layout()
         _fig_to_st(fig)
         st.dataframe(ll.as_rows(), use_container_width=True, hide_index=True)
+
+    with tab_kg:
+        kg = kingman_metrics(result)
+        a1, a2, a3 = st.columns(3)
+        a1.metric("Σ CT Kingman", f"{kg.sum_ct_kingman:.2f}", help="jumlah CT stasiun (periode/zona)")
+        a2.metric("Σ CT amati", f"{kg.sum_ct_observed:.2f}")
+        a3.metric("CT Little (pipeline)", f"{kg.system_ct_little:.2f}")
+        fig, ax = plt.subplots(figsize=(9, 4.2))
+        plot_kingman_stations(result, ax=ax)
+        fig.tight_layout()
+        _fig_to_st(fig)
+        st.dataframe(kg.as_rows(), use_container_width=True, hide_index=True)
 
 
 def render_sidebar():
@@ -849,8 +861,8 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
     st.markdown("##### Ringkasan")
     st.dataframe(sorted(rows, key=lambda x: x["Durasi"]), use_container_width=True, hide_index=True)
 
-    tab_lob, tab_buf, tab_util, tab_ll = st.tabs(
-        ["Line of Balance", "Buffer / WIP", "Utilisasi", "Little's Law"]
+    tab_lob, tab_buf, tab_util, tab_ll, tab_kg = st.tabs(
+        ["Line of Balance", "Buffer / WIP", "Utilisasi", "Little's Law", "Kingman"]
     )
     with tab_lob:
         fig, ax = plt.subplots(figsize=(10, 5.5))
@@ -913,6 +925,33 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
         axes[1].set_title("Cycle time (WIP÷TH)")
         for ax in axes:
             ax.set_ylim(bottom=0)
+        fig.tight_layout()
+        _fig_to_st(fig)
+
+    with tab_kg:
+        kg_rows = []
+        for name, r in results.items():
+            kg = kingman_metrics(r)
+            kg_rows.append({
+                "Skenario": name,
+                "Σ CT Kingman": round(kg.sum_ct_kingman, 3),
+                "Σ CT amati": round(kg.sum_ct_observed, 3),
+                "CT Little": round(kg.system_ct_little, 3),
+                "u bottleneck": round(kg.bottleneck_u, 3),
+                "c_e (T1)": round(kg.stations[0].c_e, 3),
+            })
+        st.dataframe(kg_rows, use_container_width=True, hide_index=True)
+        import numpy as np
+        names = list(results.keys())
+        sum_k = [kingman_metrics(results[n]).sum_ct_kingman for n in names]
+        fig, ax = plt.subplots(figsize=(9, 3.8))
+        x = np.arange(len(names))
+        ax.bar(x, sum_k, color="#553c9a", edgecolor="white")
+        ax.set_xticks(x)
+        ax.set_xticklabels(names, rotation=20, ha="right", fontsize=8)
+        ax.set_ylabel("Σ CT Kingman (periode/zona)")
+        ax.set_title("Kingman — jumlah CT stasiun per skenario")
+        ax.set_ylim(bottom=0)
         fig.tight_layout()
         _fig_to_st(fig)
 

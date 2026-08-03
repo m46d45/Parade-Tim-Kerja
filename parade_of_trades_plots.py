@@ -1011,3 +1011,32 @@ def plot_littles_law_wip(
     _apply_axes_style(ax)
     return ax
 
+def plot_kingman_stations(
+    result: ParadeResult,
+    ax: Optional[Axes] = None,
+    title: Optional[str] = None,
+) -> Axes:
+    """Grouped bars: CT Kingman vs CT observed per trade."""
+    if ax is None:
+        _, ax = plt.subplots(figsize=(9, 4.2))
+    from parade_of_trades_analysis import kingman_metrics
+    import numpy as np
+
+    k = kingman_metrics(result)
+    names = [f"T{s.trade_index + 1}" for s in k.stations]
+    ct_k = [s.ct_kingman if __import__("math").isfinite(s.ct_kingman) else 0 for s in k.stations]
+    ct_o = [s.ct_observed for s in k.stations]
+    x = np.arange(len(names))
+    w = 0.36
+    ax.bar(x - w / 2, ct_k, width=w, color="#2b6cb0", edgecolor="white", label="CT Kingman")
+    ax.bar(x + w / 2, ct_o, width=w, color="#dd6b20", edgecolor="white", label="CT amati")
+    ax.set_xticks(x)
+    ax.set_xticklabels(names)
+    ax.set_ylabel("Cycle time (periode / zona)")
+    ax.set_xlabel("Tim")
+    ax.set_title(title or "Kingman (VUT) vs CT teramati per stasiun")
+    ax.set_ylim(bottom=0)
+    ax.legend(loc="upper right", fontsize=8, framealpha=0.92)
+    _apply_axes_style(ax)
+    return ax
+
