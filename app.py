@@ -37,7 +37,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-kapasitas-v33"
+_APP_BUILD = "2026-08-03-var-labels-v34"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -60,11 +60,11 @@ VAR_FACTORS = {
     "very_high": (0.1, 1.9),
 }
 VAR_LABELS = {
-    "no_variability": "Tanpa variability",
-    "low": "Rendah",
-    "medium": "Sedang",
-    "high": "Tinggi",
-    "very_high": "Sangat tinggi",
+    "no_variability": "Tanpa variability — kapasitas tetap tiap zona",
+    "low": "Rendah — kapasitas zona ×0,75 atau ×1,25 (±25%)",
+    "medium": "Sedang — kapasitas zona ×0,5 atau ×1,5 (±50%)",
+    "high": "Tinggi — kapasitas zona ×0,25 atau ×1,75 (±75%)",
+    "very_high": "Sangat tinggi — kapasitas zona ×0,1 atau ×1,9 (±90%)",
 }
 _BATCH_OPTIONS = [4, 5, 3, 2, 1]
 
