@@ -37,7 +37,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-sim-clean-v32"
+_APP_BUILD = "2026-08-03-kapasitas-v33"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -69,11 +69,11 @@ VAR_LABELS = {
 _BATCH_OPTIONS = [4, 5, 3, 2, 1]
 
 _SPEED_CHOICES = [
-    ("Sangat lambat — 1 zona / 3 periode", 1.0 / 3.0),
-    ("Lambat — 1 zona / 2 periode", 0.5),
+    ("Sangat rendah — 1 zona / 3 periode", 1.0 / 3.0),
+    ("Rendah — 1 zona / 2 periode", 0.5),
     ("Normal — 1 zona / 1 periode", 1.0),
-    ("Cepat — 2 zona / 1 periode", 2.0),
-    ("Sangat cepat — 3 zona / 1 periode", 3.0),
+    ("Tinggi — 2 zona / 1 periode", 2.0),
+    ("Sangat tinggi — 3 zona / 1 periode", 3.0),
 ]
 
 
@@ -477,7 +477,7 @@ def _capacity_setup(
     default_base: float = 1.0,
     show_help: bool = False,
 ) -> List[Tuple]:
-    """UI pengaturan tim: seragam atau per tim (kecepatan + variability)."""
+    """UI pengaturan tim: seragam atau per tim (kapasitas + variability)."""
     mode = st.radio(
         "Pengaturan tim",
         ["Seragam (semua tim sama)", "Per tim (bisa berbeda)"],
@@ -489,9 +489,9 @@ def _capacity_setup(
         return PRESET_OPTIONS.index(name) if name in PRESET_OPTIONS else 0
 
     if mode.startswith("Seragam"):
-        base = _base_speed_input(f"{key_prefix}_base", "Kecepatan dasar", default_base)
+        base = _base_speed_input(f"{key_prefix}_base", "Kapasitas produksi (zona/periode)", default_base)
         var = st.selectbox(
-            "Variability",
+            "Variability (perubahan kapasitas per zona)",
             PRESET_OPTIONS,
             index=_vi(default_var),
             format_func=lambda x: VAR_LABELS.get(x, x),
@@ -502,9 +502,9 @@ def _capacity_setup(
     pairs: List[Tuple] = []
     for i in range(n_trades):
         with st.expander(f"Tim {i + 1}: {_trade_name(i)}", expanded=(i < 2)):
-            base_i = _base_speed_input(f"{key_prefix}_base_t{i}", "Kecepatan dasar", default_base)
+            base_i = _base_speed_input(f"{key_prefix}_base_t{i}", "Kapasitas produksi (zona/periode)", default_base)
             var_i = st.selectbox(
-                "Variability",
+                "Variability (perubahan kapasitas per zona)",
                 PRESET_OPTIONS,
                 index=_vi(default_var),
                 format_func=lambda x: VAR_LABELS.get(x, x),
@@ -778,9 +778,9 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
             label = f"Skenario {i + 1}"
             # keep label key in state for fills; no free-text name field
             st.session_state[f"cmp_s{i}_label"] = label
-            base = _base_speed_input(f"cmp_s{i}", "Kecepatan", 1.0)
+            base = _base_speed_input(f"cmp_s{i}", "Kapasitas produksi (zona/periode)", 1.0)
             var = st.selectbox(
-                "Variability",
+                "Variability (perubahan kapasitas per zona)",
                 PRESET_OPTIONS,
                 format_func=lambda x: VAR_LABELS.get(x, x),
                 key=f"cmp_s{i}_var",

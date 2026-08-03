@@ -35,14 +35,14 @@ Bekisting → Tulangan → Cor → Bongkar bekisting → Finishing
 
 | Konsep | Arti di simulasi |
 |--------|------------------|
-| **Kecepatan** | Progress pada **satu zona** per periode (mis. normal = 1 zona/periode) |
+| **Kapasitas produksi** | Progress pada **satu zona** per periode (mis. normal = 1 zona/periode) |
 | **Tanpa variability** | Setiap zona trade itu memakai rate yang **sama** |
 | **Dengan variability** | **Setiap zona** mengundi rate sendiri (mis. medium: ×0.5 atau ×1.5), dikunci sampai zona selesai |
 | **Batch handoff** | Zona dikumpulkan dulu; setelah N zona, dilepas ke trade hilir di **periode berikutnya** |
 | **One-piece (batch=1)** | Tiap zona langsung dilepas setelah selesai |
 | **Default batch** | **4 zona** (standar di sidebar) |
 
-### Kecepatan (profil tetap)
+### Kapasitas (profil tetap)
 
 | Profil | Definisi |
 |--------|----------|
