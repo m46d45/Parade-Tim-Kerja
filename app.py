@@ -37,7 +37,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-subtitle-v31"
+_APP_BUILD = "2026-08-03-sim-clean-v32"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -60,11 +60,11 @@ VAR_FACTORS = {
     "very_high": (0.1, 1.9),
 }
 VAR_LABELS = {
-    "no_variability": "Tanpa variability — kecepatan sama tiap zona",
-    "low": "Rendah — rate zona ×0.75 atau ×1.25",
-    "medium": "Sedang — rate zona ×0.5 atau ×1.5",
-    "high": "Tinggi — rate zona ×0.25 atau ×1.75",
-    "very_high": "Sangat tinggi — rate zona ×0.1 atau ×1.9",
+    "no_variability": "Tanpa variability",
+    "low": "Rendah",
+    "medium": "Sedang",
+    "high": "Tinggi",
+    "very_high": "Sangat tinggi",
 }
 _BATCH_OPTIONS = [4, 5, 3, 2, 1]
 
@@ -475,23 +475,12 @@ def _capacity_setup(
     n_trades: int = 5,
     default_var: str = "no_variability",
     default_base: float = 1.0,
-    show_help: bool = True,
+    show_help: bool = False,
 ) -> List[Tuple]:
-    st.markdown("**Kecepatan dasar** + **variability (per zona)**")
-    if show_help:
-        st.markdown(
-            '<div class="pot-field">'
-            "<strong>Kecepatan</strong> = progress pada <em>satu zona</em>. "
-            "Tanpa var: rate sama tiap zona. Dengan var: undi rate <em>per zona</em> "
-            "(mis. medium ×0.5 / ×1.5).<br/>"
-            f"<strong>Batch handoff</strong> (sidebar) = <strong>{_batch_size()}</strong> — "
-            "zona dilepas ke tim hilir setelah batch penuh (periode berikutnya)."
-            "</div>",
-            unsafe_allow_html=True,
-        )
+    """UI pengaturan tim: seragam atau per tim (kecepatan + variability)."""
     mode = st.radio(
-        "Pengaturan trade",
-        ["Seragam (semua tim sama)", "Per tim (dasar & variability bisa beda)"],
+        "Pengaturan tim",
+        ["Seragam (semua tim sama)", "Per tim (bisa berbeda)"],
         horizontal=True,
         key=f"{key_prefix}_speed_mode",
     )
@@ -500,32 +489,28 @@ def _capacity_setup(
         return PRESET_OPTIONS.index(name) if name in PRESET_OPTIONS else 0
 
     if mode.startswith("Seragam"):
-        base = _base_speed_input(f"{key_prefix}_base", "Kecepatan dasar semua tim", default_base)
+        base = _base_speed_input(f"{key_prefix}_base", "Kecepatan dasar", default_base)
         var = st.selectbox(
-            "Variability (semua tim)",
+            "Variability",
             PRESET_OPTIONS,
             index=_vi(default_var),
             format_func=lambda x: VAR_LABELS.get(x, x),
             key=f"{key_prefix}_var",
         )
-        spec = _pair_from_base_and_var(base, var)
-        st.info(f"Semua tim: **{_format_pair(spec)}** · {VAR_LABELS[var]}")
-        return [spec] * n_trades
+        return [_pair_from_base_and_var(base, var)] * n_trades
 
     pairs: List[Tuple] = []
     for i in range(n_trades):
         with st.expander(f"Tim {i + 1}: {_trade_name(i)}", expanded=(i < 2)):
-            base_i = _base_speed_input(f"{key_prefix}_base_t{i}", f"Kecepatan Tim {i + 1}", default_base)
+            base_i = _base_speed_input(f"{key_prefix}_base_t{i}", "Kecepatan dasar", default_base)
             var_i = st.selectbox(
-                "Variability tim ini",
+                "Variability",
                 PRESET_OPTIONS,
                 index=_vi(default_var),
                 format_func=lambda x: VAR_LABELS.get(x, x),
                 key=f"{key_prefix}_var_t{i}",
             )
-            spec = _pair_from_base_and_var(base_i, var_i)
-            pairs.append(spec)
-            st.caption(f"→ {_format_pair(spec)}")
+            pairs.append(_pair_from_base_and_var(base_i, var_i))
     return pairs
 
 
@@ -592,11 +577,7 @@ def _export_block(result: ParadeResult, key: str) -> None:
 def _plot_single_result(result: ParadeResult) -> None:
     tab_lob, tab_buf, tab_util = st.tabs(["Line of Balance", "Buffer / WIP", "Utilisasi"])
     with tab_lob:
-        st.caption(
-            "Sumbu X = periode (dari 0). Sumbu Y = zona kumulatif (dari 0). "
-            f"Batch={result.config.batch_size}: tim hilir mulai setelah handoff batch. "
-            "Garis **bergeser**, tidak menumpuk."
-        )
+        st.caption(f"Batch handoff = {result.config.batch_size}")
         fig, ax = plt.subplots(figsize=(10, 4.5))
         plot_line_of_balance_detail(result, ax=ax, max_period=min(16, result.duration + 1))
         fig.tight_layout()
@@ -667,49 +648,26 @@ def render_sidebar():
 # ----- Tabs -----------------------------------------------------------------
 
 def tab_single_run(total_units: int, seed: Optional[int], n_trades: int) -> None:
-    st.subheader("Simulasi (zone-flow)")
-    st.markdown(
-        '<div class="pot-callout">'
-        f"<strong>Default batch = {_batch_size()}</strong> (sidebar). "
-        "Semua Normal + tanpa variability → T2 mulai setelah T1 melepas batch; LOB dari 0 dan bergeser.<br/>"
-        "Ubah batch ke <strong>1</strong> untuk one-piece. "
-        "T1 variability sedang → rate diundi per zona (bukan lompat massal +3 zona)."
-        "</div>",
-        unsafe_allow_html=True,
-    )
-    col_cfg, col_ctrl = st.columns([1.1, 1.4])
-    with col_cfg:
-        pairs = _capacity_setup("single", n_trades, "no_variability", 1.0)
-        st.caption(
-            "Urutan: "
-            + " → ".join(f"{_trade_name(i)[:10]} [{_format_pair(pairs[i])}]" for i in range(n_trades))
-        )
-    with col_ctrl:
-        b1, b2 = st.columns(2)
-        run_c = b1.button("Jalankan", type="primary", use_container_width=True, key="single_run")
-        reset_c = b2.button("Atur ulang", use_container_width=True, key="single_reset")
-        if "single_result" not in st.session_state:
-            st.session_state.single_result = None
-        if reset_c:
-            st.session_state.single_result = None
-            st.success("Diatur ulang.")
-        if run_c:
-            cfg = _build_config_from_pairs(pairs, total_units, seed)
-            try:
-                res = ParadeOfTrades(cfg).run()
-                st.session_state.single_result = res
-                st.success(
-                    f"Selesai · Durasi **{res.duration}** · batch={cfg.batch_size} · "
-                    f"{_starts_caption(res)}"
-                )
-            except RuntimeError as exc:
-                st.error(f"Simulasi gagal: {exc}")
+    st.subheader("Simulasi")
+    pairs = _capacity_setup("single", n_trades, "no_variability", 1.0)
+    b1, b2, _ = st.columns([1, 1, 2])
+    run_c = b1.button("Jalankan", type="primary", use_container_width=True, key="single_run")
+    reset_c = b2.button("Atur ulang", use_container_width=True, key="single_reset")
+    if "single_result" not in st.session_state:
+        st.session_state.single_result = None
+    if reset_c:
+        st.session_state.single_result = None
+    if run_c:
+        cfg = _build_config_from_pairs(pairs, total_units, seed)
+        try:
+            st.session_state.single_result = ParadeOfTrades(cfg).run()
+        except RuntimeError as exc:
+            st.error(f"Simulasi gagal: {exc}")
 
-    st.divider()
     result = st.session_state.get("single_result")
     if not result or not result.history:
-        st.info("Atur kapasitas → **Jalankan**.")
         return
+    st.divider()
     _metrics_row(result)
     left, right = st.columns([1.25, 1])
     with left:
