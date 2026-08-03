@@ -453,7 +453,7 @@ def plot_comparison_lob(
         _, ax = plt.subplots(figsize=(8, 5))
 
     first = next(iter(results.values()))
-    total = first.config.total_units
+    total = max(r.config.total_units for r in results.values())
     mean_cap = min(float(t.mean) for t in first.config.trades)
     if mean_cap > 0:
         ax.plot(

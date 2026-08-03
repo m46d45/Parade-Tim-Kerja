@@ -44,7 +44,7 @@ Setelah memakai aplikasi ini, peserta diharapkan mampu:
 5. Menerapkan **Little's Law** (WIP = TH × CT) serta membaca **W_min**, **W_opt**, dan **CONWIP**.
 6. Memakai intuisi **Kingman / VUT**: variability dan utilisasi menaikkan cycle time.
 7. Memahami tradeoff **inventory vs fill rate**.
-8. Menyusun **takt plan** one-piece dengan **tiga buffer** (kapasitas, waktu, inventory) dan menilai reliability.
+8. Menyusun **takt plan** one-piece dan memahami dampak **jumlah zonasi** (kasar ↔ halus) pada parade.
 
 ---
 
@@ -137,7 +137,7 @@ Jumlah tim **tetap 5**.
 |-----|-----|
 | **Simulasi** | Satu skenario + suite analisis lengkap |
 | **Perbandingan** | 2–5 skenario berdampingan |
-| **Takt plan** | Rencana irama one-piece + buffer + reliability |
+| **Takt plan** | One-piece flow · bandingkan jumlah zona (kasar / baseline / halus) |
 | **Manual** | Dokumen ini (bisa diunduh) |
 
 ---
@@ -207,64 +207,59 @@ Teori tiap grafik: bab 7–12.
 
 ## 6. Tab Takt plan
 
-### 6.1 Prinsip
+### 6.1 Peran edukasi
 
-Takt plan lean construction dalam app ini:
+Tab ini adalah **kelanjutan parade tim kerja** dengan kebijakan tetap:
 
-1. **One-piece flow** — serah terima zona per zona (bukan batch besar).  
-2. **Jumlah zona** — variabel desain utama (menentukan panjang parade & durasi).  
-3. **Sistem buffer** — tiga jenis agar irama tetap andal.
+| Tetap | Fokus |
+|-------|--------|
+| **One-piece flow** (batch = 1) | Dampak **jumlah zonasi** |
+| 5 tim berurutan | Train lebih pendek (kasar) vs lebih panjang (halus) |
+| Kapasitas + variability | Durasi, LOB, TH, WIP, reliability |
 
-| Istilah | Arti |
-|---------|------|
-| **One-piece flow** | Batch handoff = 1 (tetap di tab ini) |
-| **Jumlah zona** | Skala zonasi; what-if menampilkan durasi vs zona |
-| **Takt time** | Waktu rencana per zona di satu stasiun |
-| **Reliability** | % (tim, zona) selesai sesuai/sebelum rencana |
+Tidak ada pengaturan buffer takt di aplikasi. Buffer/WIP di tab Simulasi adalah **antrian antar-tim** hasil aliran (bukan buffer desain takt).
 
-### 6.2 Buffer dalam takt planning (Takt Production Institute)
+### 6.2 Tiga skenario zona
 
-Buffer = proteksi **sengaja** (bukan float CPM). Di peta takt:
+| Skenario | Zona | Arti |
+|----------|------|------|
+| **A · Kasar** | Lebih sedikit (default ≈ baseline/2) | Unit lokasi lebih “besar”; train lebih pendek |
+| **B · Baseline** | Acuan (default = Total zona sidebar) | Titik banding |
+| **C · Halus** | Lebih banyak (default ≈ baseline×2) | Banyak unit kecil; train lebih panjang; handoff lebih sering |
 
-| Jenis | Alias | Proteksi | Di app |
-|-------|--------|----------|--------|
-| **Vertikal** | Non-working | Kalender: libur, hujan, shutdown | Non-working (periode) — pad durasi |
-| **Diagonal** | Train buffers | Gesekan dalam train | **Wagon buffer** (p/zona), **sequence buffer** (lag handoff), **buffer wagon** (wagon kosong) |
-| **Horizontal** | Milestone | Akhir fase / proyek | End / milestone (periode) |
-| **Independen** | One-off / capacity | Risiko tunggal atau surge kru | Kapasitas / standby (%) |
+### 6.3 Kontrol
 
-Sumber: [Takt Production Institute — Complete Guide to Buffers](https://taktproductioninstitute.com/the-complete-guide-to-buffers-in-takt-planning-vertical-diagonal-horizontal-independent-buffers-explained/).
+| Kontrol | Fungsi |
+|---------|--------|
+| Zona baseline / kasar / halus | Ukuran zonasi tiap skenario |
+| Kapasitas | Laju (zona/periode), seragam |
+| Variability | Sama untuk ketiga skenario |
+| **Jalankan** | Simulasi OPF ketiga skenario |
 
-Tanpa buffer + tanpa variability → rencana kerja = aktual. Buffer menambah **durasi rencana** (pad) dan/atau mengubah rate efektif.
+### 6.4 Output
 
-### 6.3 Mode desain
+1. **Kurva durasi rencana vs jumlah zona** (ideal OPF) — intuisi: zona ↑ → durasi ↑ (train memanjang).  
+2. **Tabel ringkasan** — durasi aktual vs rencana, TH, WIP, CT, reliability, idle.  
+3. **LOB tim terakhir** — overlay A/B/C.  
+4. **LOB semua tim** — panel per skenario.  
+5. **Rencana vs aktual + wagon** — baseline.  
+6. **Unduh** CSV/Excel perbandingan + paket takt baseline.
 
-1. **Hitung durasi** dari zona + kapasitas + buffer.  
-2. **Target periode** — cek apakah rate efektif (+ buffer) mencukupi.
+### 6.5 Pesan pembelajaran
 
-### 6.4 Alur di tab
+- **Zona sedikit (kasar):** lebih sedikit handoff; progres per “langkah” lebih besar di LOB.  
+- **Zona banyak (halus):** handoff sering; sensitif variability dan waiting di hilir.  
+- **One-piece** menjaga aliran unit-per-unit; bedanya murni dari **berapa unit lokasi** yang Anda potong.  
+- Bandingkan **durasi aktual vs rencana** saat variability naik — reliability menurun, terutama pada zonasi halus.
 
-1. Atur **jumlah zona** dan kapasitas dasar.  
-2. Atur **3 buffer**.  
-3. Tekan **Jalankan simulasi** (tombol di **atas** grafik).  
-4. Baca reliability & overlay rencana vs aktual.  
+### 6.6 Contoh kelas
 
-### 6.5 Grafik takt
+| # | Setup | Amati |
+|---|--------|--------|
+| 1 | Normal, tanpa var, 20 / 40 / 80 | Durasi naik seiring zona; LOB C lebih “panjang” |
+| 2 | Sama + var sedang | Reliability & idle memburuk, sering lebih terasa di C |
+| 3 | Baseline 40, kasar 10, halus 100 | Ekstrem: unit sangat besar vs sangat kecil |
 
-| Grafik | Isi |
-|--------|-----|
-| LOB rencana / aktual | Putus-putus vs tegas |
-| Wagon chart | Batang waktu per zona × tim |
-| What-if zona | Durasi OPF vs jumlah zona (tanpa buffer) |
-
-### 6.6 Contoh
-
-- 40 zona, OPF, Normal, tanpa buffer → rencana **44** periode.  
-- 40 zona, batch 4 (di Simulasi), Normal → **56** periode.  
-- Buffer kapasitas +20% → rate efektif naik → durasi rencana turun.  
-- Buffer waktu +1 p/zona → takt time lebih longgar → durasi naik (jadwal “aman”).  
-
----
 
 ## 7. Line of Balance (LOB)
 
@@ -537,7 +532,7 @@ Semakin tinggi target fill rate (mendekati 100%), inventory yang dibutuhkan **na
 | 4 | Variability sedang semua | LOB patah; **W_opt > W_min**; CT naik |
 | 5 | Perbandingan 5× var | Durasi, CT, W_opt vs level var |
 | 6 | Little's Law + slider CONWIP | Prediksi TH/CT berubah di bawah slider |
-| 7 | Takt plan OPF + buffer | Reliability; target periode vs rate efektif |
+| 7 | Takt plan zona 20/40/80 | Durasi & LOB vs jumlah zona |
 
 Diskusi kunci: *idle = menunggu zona, bukan malas*; *batch = kebijakan serah terima*; *takt = janji irama*; *CONWIP ≈ W_opt menahan inventory*.
 
@@ -581,7 +576,7 @@ Diskusi kunci: *idle = menunggu zona, bukan malas*; *batch = kebijakan serah ter
 | Topik app | Acuan utama |
 |-----------|-------------|
 | Variability & parade | Tommelein et al. (1999); Choo & Tommelein (1999) |
-| Takt + capacity buffer | Tommelein (2020); LCI Takt Time |
+| Takt & zonasi | LCI Takt Time; Tommelein (2020) (latar teoritis) |
 | WIP = TH × CT | Little (1961); Hopp & Spearman; PPI (konteks y=1) |
 | W_min, W_opt, CONWIP | Hopp & Spearman (Factory Physics) |
 | CT vs u, VUT | Kingman; Hopp & Spearman |
