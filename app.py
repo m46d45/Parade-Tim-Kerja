@@ -60,7 +60,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-04-wagon-fix-v71"
+_APP_BUILD = "2026-08-04-wagon-full-v72"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1369,11 +1369,12 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
         fig.tight_layout()
         _fig_to_st(fig)
 
-        fig, ax = plt.subplots(figsize=(10, 4.2))
+        n_z = int(base_plan.n_zones)
+        fig_h = max(4.5, min(14.0, 0.22 * n_z + 2.2))
+        fig, ax = plt.subplots(figsize=(10.5, fig_h))
         plot_takt_wagon_chart(
-            base_plan, ax=ax,
-            max_zones=min(16, z_base),
-            title=f"Takt plan (wagon) — baseline ({z_base} zona)",
+            base_plan, ax=ax, max_zones=None,
+            title=f"Takt plan (wagon) — baseline · {n_z} zona · durasi {base_plan.duration} p",
         )
         fig.tight_layout()
         _fig_to_st(fig)
@@ -1453,46 +1454,55 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
         return
 
     # Ringkasan singkat
-    from parade_of_trades_analysis import littles_law_metrics as _llm
     rows = []
     for label, r in results.items():
-        ll = _llm(r)
+        plan_i = plans[label]
+        z_n = int(meta.get(label, {}).get("zona", r.config.total_units))
         rows.append({
             "Skenario": label,
-            "Zona": meta.get(label, {}).get("zona", r.config.total_units),
-            "Durasi (p)": r.duration,
-            "TH (zona/p)": round(ll.throughput, 3),
-            "WIP⌀": round(ll.avg_pipeline_wip, 2),
-            "Idle": r.total_idle_capacity,
+            "Zona": z_n,
+            "Durasi takt (p)": plan_i.duration,
+            "Durasi sim (p)": r.duration,
         })
     st.dataframe(rows, use_container_width=True, hide_index=True)
 
-    # Side-by-side LOB (3 columns)
-    st.markdown("**Line of Balance**")
-    cols = st.columns(3)
-    for i, (label, r) in enumerate(results.items()):
-        z_n = meta.get(label, {}).get("zona", r.config.total_units)
-        with cols[i]:
-            fig, ax = plt.subplots(figsize=(4.0, 3.6))
-            plot_line_of_balance(r, ax=ax, title=f"{label}\n{z_n} zona · T={r.duration}p")
-            fig.tight_layout()
-            _fig_to_st(fig)
-
-    # Side-by-side Takt plan (wagon)
-    st.markdown("**Takt plan (wagon)**")
-    cols2 = st.columns(3)
-    for i, (label, r) in enumerate(results.items()):
+    # Gabungan: durasi vs jumlah zona (3 skenario)
+    st.markdown("**Durasi total vs jumlah zonasi**")
+    fig, ax = plt.subplots(figsize=(8.5, 4.2))
+    zs, d_plan, d_sim, labs = [], [], [], []
+    for label, r in results.items():
         z_n = int(meta.get(label, {}).get("zona", r.config.total_units))
         plan_i = plans[label]
-        with cols2[i]:
-            fig, ax = plt.subplots(figsize=(4.0, 3.8))
-            plot_takt_wagon_chart(
-                plan_i, ax=ax,
-                max_zones=min(12, z_n),
-                title=f"{label} · wagon",
-            )
-            fig.tight_layout()
-            _fig_to_st(fig)
+        zs.append(z_n)
+        d_plan.append(plan_i.duration)
+        d_sim.append(r.duration)
+        labs.append(label)
+    ax.plot(zs, d_plan, "o-", color="#2563eb", linewidth=2.2, markersize=9, label="Durasi takt plan (wagon)")
+    ax.plot(zs, d_sim, "s--", color="#ea580c", linewidth=1.8, markersize=8, label="Durasi simulasi aktual")
+    for x, y, lab in zip(zs, d_plan, labs):
+        ax.annotate(f"{lab}\n{y} p", (x, y), textcoords="offset points", xytext=(0, 10),
+                    ha="center", fontsize=8, color="#2563eb")
+    ax.set_xlabel("Jumlah zonasi")
+    ax.set_ylabel("Durasi total (periode)")
+    ax.set_title("Perbandingan: semakin banyak zona → train lebih panjang (durasi naik)")
+    ax.legend(loc="best", fontsize=8)
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+    _fig_to_st(fig)
+
+    # Takt plan wagon saja — full zones each
+    st.markdown("**Takt plan (wagon) per skenario**")
+    for label, r in results.items():
+        plan_i = plans[label]
+        z_n = int(plan_i.n_zones)
+        fig_h = max(4.0, min(12.0, 0.18 * z_n + 2.0))
+        fig, ax = plt.subplots(figsize=(10.5, fig_h))
+        plot_takt_wagon_chart(
+            plan_i, ax=ax, max_zones=None,
+            title=f"{label} · {z_n} zona · durasi {plan_i.duration} p",
+        )
+        fig.tight_layout()
+        _fig_to_st(fig)
 
     _export_comparison_block(results, meta, key="takt_zone")
 

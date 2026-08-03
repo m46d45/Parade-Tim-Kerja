@@ -1,3 +1,4 @@
+from typing import Optional, Dict, List, Tuple, Any
 """
 Parade of Trades – Visualization
 ================================
@@ -1353,22 +1354,27 @@ def plot_takt_wagon_chart(
     plan,
     ax: Optional[Axes] = None,
     title: Optional[str] = None,
-    max_zones: int = 12,
+    max_zones: Optional[int] = None,
 ) -> Axes:
     """
     Takt train / wagon chart (period 0-based).
 
-    - Y = zona (wagon location): 1, 2, 3, …
-    - X = periode mulai 0
-    - Warna = tim T1…T5 bergerak diagonal (train)
-    - Normal rate=1: tiap sel lebar 1 periode
+    Shows **all zones** by default (max_zones=None) so full duration is visible.
+    - Y = zona 1 … N
+    - X = periode mulai 0 … duration
     """
     if ax is None:
-        _, ax = plt.subplots(figsize=(10, 4.8))
+        n_z = int(plan.n_zones)
+        h = max(4.2, min(14.0, 0.22 * n_z + 2.0))
+        _, ax = plt.subplots(figsize=(10.5, h))
     colors = [_trade_color(i) for i in range(plan.n_trades)]
-    n_show = min(int(plan.n_zones), int(max_zones))
+    n_all = int(plan.n_zones)
+    n_show = n_all if max_zones is None else min(n_all, int(max_zones))
     max_end = 0
     labeled = set()
+    # thinner bars when many zones
+    bar_h = 0.85 if n_show <= 20 else (0.9 if n_show <= 60 else 0.95)
+    show_text = n_show <= 20
     for c in plan.cells:
         if c.zone < 1 or c.zone > n_show:
             continue
@@ -1380,39 +1386,49 @@ def plot_takt_wagon_chart(
             y=c.zone,
             width=w,
             left=left,
-            height=0.72,
+            height=bar_h,
             color=colors[c.trade_index % len(colors)],
             edgecolor="white",
-            linewidth=0.6,
+            linewidth=0.3 if n_show > 30 else 0.5,
             align="center",
             label=lab if lab not in labeled else None,
             zorder=2,
         )
         labeled.add(lab)
-        # label short inside cell if wide enough
-        if w >= 1 and n_show <= 16:
+        if show_text and w >= 1:
             ax.text(
                 left + w / 2.0,
                 c.zone,
                 lab,
                 ha="center",
                 va="center",
-                fontsize=7,
+                fontsize=6 if n_show > 12 else 7,
                 color="white",
                 fontweight="bold",
                 zorder=3,
             )
 
-    # period gridlines
     if max_end <= 0:
-        max_end = int(plan.duration) if getattr(plan, "duration", None) else 1
+        max_end = int(getattr(plan, "duration", 1) or 1)
+    # ensure axis shows full planned duration
+    dur = int(getattr(plan, "duration", max_end) or max_end)
+    max_end = max(max_end, dur)
     ax.set_xlim(0, max(max_end, 1))
-    ax.set_xticks(list(range(0, max_end + 1, max(1, max_end // 12))))
+    step = max(1, max_end // 15)
+    ax.set_xticks(list(range(0, max_end + 1, step)))
     ax.set_xlabel("Periode (mulai 0)")
-    ax.set_ylabel("Zona (wagon)")
-    ax.set_yticks(list(range(1, n_show + 1)))
-    ax.set_ylim(n_show + 0.6, 0.4)  # zona 1 di atas
-    ax.set_title(title or f"Takt plan (wagon) · zona 1–{n_show} · rate={plan.rate:g}")
+    ax.set_ylabel("Zona")
+    # y ticks: all if few, else every k
+    if n_show <= 40:
+        ax.set_yticks(list(range(1, n_show + 1)))
+    else:
+        step_y = max(1, n_show // 20)
+        ax.set_yticks(list(range(1, n_show + 1, step_y)) + ([n_show] if n_show % step_y else []))
+    ax.set_ylim(n_show + 0.6, 0.4)
+    ax.set_title(
+        title
+        or f"Takt plan (wagon) · {n_show} zona · rate={plan.rate:g} · durasi={dur} p"
+    )
     handles, labels = ax.get_legend_handles_labels()
     if handles:
         uniq = dict(zip(labels, handles))
@@ -1424,6 +1440,7 @@ def plot_takt_wagon_chart(
     ax.grid(True, axis="x", alpha=0.25, zorder=0)
     _apply_axes_style(ax)
     return ax
+
 
 
 def plot_tommelein_scenario_lobs(
