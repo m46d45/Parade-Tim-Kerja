@@ -1183,14 +1183,14 @@ def plot_wip_th_ct(
     # --- Landmarks: W_min, W_opt, CONWIP ---
     op_w, op_th, op_ct = float(d["op_wip"]), float(d["op_th"]), float(d["op_ct"])
 
-    # Axis spans full extended curves (past W_opt / operating WIP)
+    # Axis: curves end ~ max(W_opt, CONWIP, operasi) + 5
     x_right = max(
         bc_w[-1] if bc_w else 0.0,
         max(wip) if wip else 0.0,
-        w_opt * 1.15,
-        op_w * 1.15,
-        conwip * 1.15,
-        w_min * 4.0,
+        w_opt + 5.0,
+        float(conwip) + 5.0,
+        op_w + 5.0,
+        w_min + 5.0,
         8.0,
     )
     ymax_th = max(th_max * 1.15, op_th * 1.25, max(th) if th else 0.0, 0.5) * 1.05

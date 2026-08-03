@@ -435,14 +435,8 @@ def littles_operations_curve(
         w_opt_est = alpha_tmp * w0 * (1.0 + V_early * (alpha_tmp / (1.0 - alpha_tmp)))
         w_opt_est = max(w_opt_est, w0)
 
-    # Shared WIP axis: past W_opt, operating WIP, and high-WIP asymptote
-    w_hi = max(
-        w0 * 6.0,
-        w_opt_est * 2.8,
-        float(ll.avg_pipeline_wip) * 2.5,
-        float(result.config.total_units) * 0.75,
-        24.0,
-    )
+    # Shared WIP axis: only a little past W_opt / operating WIP (+5 WIP)
+    w_hi = max(w0, w_opt_est, float(ll.avg_pipeline_wip), 1.0) + 5.0
     w_grid = [max(w_hi * i / max(n_points - 1, 1), 1e-6) for i in range(n_points)]
 
     # Best-case envelope (extended full range)
