@@ -39,7 +39,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-buf-util-fix-v37"
+_APP_BUILD = "2026-08-03-manual-v38"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -863,15 +863,7 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
 
 
 def tab_manual() -> None:
-    st.subheader("📖 Manual & tentang model")
-    st.markdown(
-        '<div class="pot-field">'
-        "Panduan zone-flow untuk kelas. Tiga tab: "
-        "<strong>Simulasi</strong> (eksperimen), <strong>Perbandingan</strong> (2–5 skenario), "
-        "<strong>Manual</strong> (panduan)."
-        "</div>",
-        unsafe_allow_html=True,
-    )
+    st.subheader("📖 Manual")
     if _MANUAL_PATH.exists():
         st.download_button(
             "⬇ Unduh MANUAL.md",
@@ -885,22 +877,7 @@ def tab_manual() -> None:
         st.warning("MANUAL.md tidak ditemukan di repo.")
 
     st.divider()
-    st.markdown(f"""
-### Tentang build
-| | |
-|---|---|
-| Build | `{_APP_BUILD}` |
-| Model | **Zone-flow** (kapasitas & variability **per zona**) |
-| Batch default | **4** (sidebar) |
-| Trade | 5 (floor cycle Indonesia) |
-
-**Tab yang dipakai**
-1. **Simulasi** — satu skenario, LOB / buffer / utilisasi  
-2. **Perbandingan** — 2–5 skenario (variability & **batch** bisa beda)  
-3. **Manual** — panduan belajar + tentang  
-
-Referensi: Tommelein, Riley & Howell (1999); Choo & Tommelein (1999); Tommelein (2020).
-""")
+    st.caption(f"Build `{_APP_BUILD}` · zone-flow · 5 tim · batch default 4")
 
 
 def main() -> None:
