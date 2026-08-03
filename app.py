@@ -36,7 +36,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-cmp-batch-v12"
+_APP_BUILD = "2026-08-03-cmp-skenario-v13"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -453,22 +453,19 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
     )
 
     default_vars = list(PRESET_OPTIONS)
-    default_labels = {
-        "no_variability": "No var",
-        "low": "Low",
-        "medium": "Medium",
-        "high": "High",
-        "very_high": "Very high",
-    }
     sidebar_batch = _batch_size()
 
     # --- Quick-fill BEFORE widgets ---
     c1, c2, c3, c4 = st.columns(4)
-    fill_five = c1.button("5× variability", key="cmp_fill_five", use_container_width=True,
-                          help="5 skenario: No→Very high, batch sama (sidebar)")
+    fill_five = c1.button(
+        "5× variability", key="cmp_fill_five", use_container_width=True,
+        help="5 skenario: Skenario 1–5 = No→Very high, batch = sidebar",
+    )
     fill_two = c2.button("No vs Medium", key="cmp_fill_two", use_container_width=True)
-    fill_batch = c3.button("Batch 1 vs 4", key="cmp_fill_batch", use_container_width=True,
-                           help="2 skenario No var: one-piece vs batch 4")
+    fill_batch = c3.button(
+        "Batch 1 vs 4", key="cmp_fill_batch", use_container_width=True,
+        help="Skenario 1 = one-piece, Skenario 2 = batch 4 (No var)",
+    )
     clear_res = c4.button("Hapus hasil", key="cmp_clear", use_container_width=True)
 
     if clear_res:
@@ -477,29 +474,29 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
     if fill_five:
         st.session_state["cmp_n_scen"] = 5
         for i, v in enumerate(default_vars):
-            st.session_state[f"cmp_s{i}_label"] = default_labels[v]
+            st.session_state[f"cmp_s{i}_label"] = f"Skenario {i + 1}"
             st.session_state[f"cmp_s{i}_var"] = v
             st.session_state[f"cmp_s{i}_profile"] = "Normal — 1 zona / 1 periode"
             st.session_state[f"cmp_s{i}_batch"] = sidebar_batch
 
     if fill_two:
         st.session_state["cmp_n_scen"] = 2
-        st.session_state["cmp_s0_label"] = "No var"
+        st.session_state["cmp_s0_label"] = "Skenario 1"
         st.session_state["cmp_s0_var"] = "no_variability"
         st.session_state["cmp_s0_profile"] = "Normal — 1 zona / 1 periode"
         st.session_state["cmp_s0_batch"] = sidebar_batch
-        st.session_state["cmp_s1_label"] = "Medium"
+        st.session_state["cmp_s1_label"] = "Skenario 2"
         st.session_state["cmp_s1_var"] = "medium"
         st.session_state["cmp_s1_profile"] = "Normal — 1 zona / 1 periode"
         st.session_state["cmp_s1_batch"] = sidebar_batch
 
     if fill_batch:
         st.session_state["cmp_n_scen"] = 2
-        st.session_state["cmp_s0_label"] = "One-piece (b=1)"
+        st.session_state["cmp_s0_label"] = "Skenario 1"
         st.session_state["cmp_s0_var"] = "no_variability"
         st.session_state["cmp_s0_profile"] = "Normal — 1 zona / 1 periode"
         st.session_state["cmp_s0_batch"] = 1
-        st.session_state["cmp_s1_label"] = "Batch 4"
+        st.session_state["cmp_s1_label"] = "Skenario 2"
         st.session_state["cmp_s1_var"] = "no_variability"
         st.session_state["cmp_s1_profile"] = "Normal — 1 zona / 1 periode"
         st.session_state["cmp_s1_batch"] = 4
@@ -507,7 +504,7 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
     st.session_state.setdefault("cmp_n_scen", 5)
     for i in range(5):
         dv = default_vars[i] if i < len(default_vars) else "no_variability"
-        st.session_state.setdefault(f"cmp_s{i}_label", default_labels.get(dv, f"S{i+1}"))
+        st.session_state.setdefault(f"cmp_s{i}_label", f"Skenario {i + 1}")
         st.session_state.setdefault(f"cmp_s{i}_var", dv)
         st.session_state.setdefault(f"cmp_s{i}_batch", sidebar_batch)
 
@@ -531,8 +528,10 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
     cols = st.columns(n_scen)
     for i in range(n_scen):
         with cols[i]:
-            st.markdown(f"##### S{i + 1}")
-            label = st.text_input("Nama", key=f"cmp_s{i}_label")
+            st.markdown(f"##### Skenario {i + 1}")
+            label = f"Skenario {i + 1}"
+            # keep label key in state for fills; no free-text name field
+            st.session_state[f"cmp_s{i}_label"] = label
             base = _base_speed_input(f"cmp_s{i}", "Kecepatan", 1.0)
             var = st.selectbox(
                 "Variability",
@@ -555,22 +554,26 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
 
     if st.button("Run comparison", type="primary", key="run_cmp", use_container_width=True):
         results = {}
-        used = set()
-        for label, spec, var, batch_i in scenarios_cfg:
-            name = label
-            base_n, k = name, 2
-            while name in used:
-                name = f"{base_n} ({k})"
-                k += 1
-            used.add(name)
+        meta = {}
+        for idx, (label, spec, var, batch_i) in enumerate(scenarios_cfg):
+            # Stable short name for chart/table
+            name = f"Skenario {idx + 1}"
             pairs = [spec] * n_trades
             results[name] = ParadeOfTrades(
                 _build_config_from_pairs(pairs, total_units, seed, batch_size=batch_i)
             ).run()
+            meta[name] = {
+                "label": label,
+                "var": var,
+                "var_label": VAR_LABELS.get(var, var),
+                "batch": batch_i,
+                "pace": _format_pair(spec),
+            }
         st.session_state.cmp_multi = results
+        st.session_state.cmp_meta = meta
         batches = [scenarios_cfg[i][3] for i in range(len(scenarios_cfg))]
         st.success(
-            f"Selesai · **{len(results)}** skenario · batch per skenario = {batches}"
+            f"Selesai · **{len(results)}** skenario · batch = {batches}"
         )
 
     if "cmp_multi" not in st.session_state:
@@ -578,18 +581,20 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
         return
 
     results = st.session_state.cmp_multi
+    meta = st.session_state.get("cmp_meta") or {}
     rows = []
     for name, r in results.items():
+        m = meta.get(name, {})
         rows.append({
             "Skenario": name,
+            "Variability": m.get("var_label", "—"),
             "Batch": r.config.batch_size,
+            "Pace": m.get("pace", r.config.trades[0].label()),
             "Duration": r.duration,
             "vs Ideal": round(r.duration - r.ideal_duration, 1),
             "Idle": r.total_idle_capacity,
             "Peak WIP": _peak_wip(r),
             "Throughput": round(r.system_throughput, 3),
-            "T1 start": r.trade_metrics[0].start_period,
-            "T5 start": r.trade_metrics[-1].start_period,
             "T5 finish": r.trade_metrics[-1].periods_to_finish,
         })
     st.markdown("##### Ringkasan (duration naik)")
