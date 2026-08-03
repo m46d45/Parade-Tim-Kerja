@@ -36,7 +36,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-lob-from-zero-v15"
+_APP_BUILD = "2026-08-03-sim-banner-v16"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -124,6 +124,128 @@ def _base_speed_input(key: str, label: str = "Kecepatan dasar", default: float =
     return float(values[choice])
 
 
+def _render_parade_sim_banner() -> None:
+    """Short looping visual: 5 teams hand off through 5 zones (one-piece illustration)."""
+    st.markdown(
+        """
+<style>
+.pot-sim-banner{
+  --bg0:#0f2744; --bg1:#1a365d;
+  --t1:#3b82f6; --t2:#f59e0b; --t3:#10b981; --t4:#ef4444; --t5:#8b5cf6;
+  background: linear-gradient(135deg, var(--bg0) 0%, var(--bg1) 55%, #234e76 100%);
+  border-radius: 14px;
+  padding: 1rem 1.1rem 1.1rem;
+  margin: 0 0 0.75rem 0;
+  color: #e8eef7;
+  box-shadow: 0 8px 28px rgba(15,39,68,.28);
+  overflow: hidden;
+  position: relative;
+}
+.pot-sim-banner::after{
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background: radial-gradient(ellipse 60% 80% at 90% 20%, rgba(255,255,255,.08), transparent 55%);
+}
+.pot-sim-head{ position:relative; z-index:1; margin-bottom:.55rem; }
+.pot-sim-title{ font-weight:700; font-size:1.05rem; letter-spacing:.01em; }
+.pot-sim-sub{ font-size:.8rem; opacity:.88; margin-top:.12rem; }
+.pot-sim-stage{ position:relative; z-index:1; }
+.pot-sim-zones{
+  display:grid; grid-template-columns: repeat(5,1fr); gap:8px; margin-bottom:4px;
+}
+.pot-zone{
+  background: rgba(255,255,255,.08);
+  border: 1px dashed rgba(255,255,255,.28);
+  border-radius: 10px; min-height: 52px;
+  padding: 6px 4px; text-align: center;
+}
+.pot-zone-label{
+  display:block; font-size:.72rem; font-weight:600;
+  color: rgba(255,255,255,.78);
+}
+.pot-sim-track{
+  position: relative; height: 58px; margin: 6px 2px 8px;
+  border-radius: 10px; background: rgba(0,0,0,.18); overflow: hidden;
+}
+.pot-team{
+  position: absolute; top: 8px; left: 0;
+  width: calc(18% - 4px); max-width: 104px;
+  padding: 6px 6px; border-radius: 10px;
+  font-weight: 700; font-size: .78rem; line-height: 1.15;
+  box-shadow: 0 4px 12px rgba(0,0,0,.25);
+  animation: pot-march 7.5s linear infinite;
+  animation-delay: var(--delay);
+  display: flex; flex-direction: column; align-items: center;
+  will-change: transform;
+}
+.pot-team small{ font-weight:600; font-size:.62rem; opacity:.9; }
+.pot-team.t1{ background: var(--t1); color:#fff; }
+.pot-team.t2{ background: var(--t2); color:#1a1a1a; }
+.pot-team.t3{ background: var(--t3); color:#fff; }
+.pot-team.t4{ background: var(--t4); color:#fff; }
+.pot-team.t5{ background: var(--t5); color:#fff; }
+@keyframes pot-march{
+  0%   { transform: translateX(-130%); opacity: 0; }
+  5%   { opacity: 1; }
+  8%   { transform: translateX(6%); }     /* Zona 1 */
+  18%  { transform: translateX(6%); }
+  24%  { transform: translateX(112%); }   /* Zona 2 */
+  34%  { transform: translateX(112%); }
+  40%  { transform: translateX(218%); }   /* Zona 3 */
+  50%  { transform: translateX(218%); }
+  56%  { transform: translateX(324%); }   /* Zona 4 */
+  66%  { transform: translateX(324%); }
+  72%  { transform: translateX(430%); }   /* Zona 5 */
+  88%  { transform: translateX(430%); opacity: 1; }
+  100% { transform: translateX(560%); opacity: 0; }
+}
+.pot-sim-legend{
+  display:flex; flex-wrap:wrap; gap:8px 14px; font-size:.72rem; opacity:.92;
+}
+.pot-sim-legend b{ font-weight:700; }
+@media (max-width: 640px){
+  .pot-sim-zones{ gap:4px; }
+  .pot-zone{ min-height:44px; }
+  .pot-zone-label{ font-size:.62rem; }
+  .pot-team{ font-size:.68rem; }
+  .pot-team small{ display:none; }
+  .pot-sim-title{ font-size:.95rem; }
+}
+</style>
+<div class="pot-sim-banner">
+  <div class="pot-sim-head">
+    <div class="pot-sim-title">Simulasi pendek — dinamika tim & zona</div>
+    <div class="pot-sim-sub">
+      T1 kerja di Zona 1, lalu pindah ke Zona 2 · Zona 1 dikerjakan T2 · kemudian T3…T5
+      (one-piece flow, ilustrasi berulang)
+    </div>
+  </div>
+  <div class="pot-sim-stage">
+    <div class="pot-sim-zones">
+      <div class="pot-zone"><span class="pot-zone-label">Zona 1</span></div>
+      <div class="pot-zone"><span class="pot-zone-label">Zona 2</span></div>
+      <div class="pot-zone"><span class="pot-zone-label">Zona 3</span></div>
+      <div class="pot-zone"><span class="pot-zone-label">Zona 4</span></div>
+      <div class="pot-zone"><span class="pot-zone-label">Zona 5</span></div>
+    </div>
+    <div class="pot-sim-track">
+      <div class="pot-team t1" style="--delay:0s"><span>T1</span><small>Bekisting</small></div>
+      <div class="pot-team t2" style="--delay:1.15s"><span>T2</span><small>Tulangan</small></div>
+      <div class="pot-team t3" style="--delay:2.3s"><span>T3</span><small>Cor</small></div>
+      <div class="pot-team t4" style="--delay:3.45s"><span>T4</span><small>Bongkar</small></div>
+      <div class="pot-team t5" style="--delay:4.6s"><span>T5</span><small>Finishing</small></div>
+    </div>
+    <div class="pot-sim-legend">
+      <span><b>T1</b> selesai zona → pindah zona berikutnya</span>
+      <span><b>T2</b> masuk zona yang sudah dilepas T1</span>
+      <span>dst. sampai <b>T5</b> — parade handoff</span>
+    </div>
+  </div>
+</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def _render_header() -> None:
     st.markdown(
         """<style>
@@ -136,12 +258,12 @@ def _render_header() -> None:
         </style>""",
         unsafe_allow_html=True,
     )
-    if _HEADER_BANNER.exists():
-        st.image(str(_HEADER_BANNER), use_container_width=True)
+    # Animated parade sim replaces static photo banner
+    _render_parade_sim_banner()
     if _LOGO_ICON.exists():
         c1, c2 = st.columns([1, 8], vertical_alignment="center")
         with c1:
-            st.image(str(_LOGO_ICON), width=72)
+            st.image(str(_LOGO_ICON), width=64)
         with c2:
             st.markdown("## Parade of Trades")
             st.caption("Zone-flow · batch/one-piece · kecepatan & variability **per zona**")
