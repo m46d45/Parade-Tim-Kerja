@@ -21,6 +21,7 @@ _a = importlib.reload(_a)
 from parade_of_trades_analysis import (
     export_result_csv,
     export_result_excel,
+    kingman_combined,
     kingman_metrics,
     littles_law_metrics,
 )
@@ -37,13 +38,14 @@ from parade_of_trades_plots import (
     plot_comparison_lob,
     plot_comparison_utilization,
     plot_kingman_stations,
+    plot_kingman_vut_curve,
     plot_line_of_balance,
     plot_line_of_balance_detail,
     plot_littles_law_wip,
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-kingman-v40"
+_APP_BUILD = "2026-08-03-kingman-curve-v41"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -648,11 +650,19 @@ def _plot_single_result(result: ParadeResult) -> None:
 
     with tab_kg:
         kg = kingman_metrics(result)
-        a1, a2, a3 = st.columns(3)
-        a1.metric("Σ CT Kingman", f"{kg.sum_ct_kingman:.2f}", help="jumlah CT stasiun (periode/zona)")
-        a2.metric("Σ CT amati", f"{kg.sum_ct_observed:.2f}")
-        a3.metric("CT Little (pipeline)", f"{kg.system_ct_little:.2f}")
-        fig, ax = plt.subplots(figsize=(9, 4.2))
+        comb = kingman_combined(result)
+        a1, a2, a3, a4 = st.columns(4)
+        a1.metric("u̅ gabungan", f"{comb['u_bar']:.3f}", help="Rata-rata utilisasi semua tim")
+        a2.metric("V gabungan", f"{comb['v']:.3f}", help="(c_a²+c_e²)/2 rata-rata")
+        a3.metric("CT Kingman (u̅)", f"{comb['ct']:.2f}", help="CT pada utilisasi gabungan")
+        a4.metric("CT Little", f"{kg.system_ct_little:.2f}")
+        # Main teaching chart: CT vs u
+        fig, ax = plt.subplots(figsize=(9, 4.6))
+        plot_kingman_vut_curve(result, ax=ax)
+        fig.tight_layout()
+        _fig_to_st(fig)
+        # Per-station comparison
+        fig, ax = plt.subplots(figsize=(9, 3.8))
         plot_kingman_stations(result, ax=ax)
         fig.tight_layout()
         _fig_to_st(fig)
@@ -934,26 +944,45 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
         kg_rows = []
         for name, r in results.items():
             kg = kingman_metrics(r)
+            comb = kingman_combined(r)
             kg_rows.append({
                 "Skenario": name,
+                "u̅": round(comb["u_bar"], 3),
+                "V": round(comb["v"], 3),
+                "CT@u̅": round(comb["ct"], 3),
                 "Σ CT Kingman": round(kg.sum_ct_kingman, 3),
-                "Σ CT amati": round(kg.sum_ct_observed, 3),
                 "CT Little": round(kg.system_ct_little, 3),
-                "u bottleneck": round(kg.bottleneck_u, 3),
-                "c_e (T1)": round(kg.stations[0].c_e, 3),
             })
         st.dataframe(kg_rows, use_container_width=True, hide_index=True)
+        # Overlay operating points of each scenario on CT–u plane
         import numpy as np
-        names = list(results.keys())
-        sum_k = [kingman_metrics(results[n]).sum_ct_kingman for n in names]
-        fig, ax = plt.subplots(figsize=(9, 3.8))
-        x = np.arange(len(names))
-        ax.bar(x, sum_k, color="#553c9a", edgecolor="white")
-        ax.set_xticks(x)
-        ax.set_xticklabels(names, rotation=20, ha="right", fontsize=8)
-        ax.set_ylabel("Σ CT Kingman (periode/zona)")
-        ax.set_title("Kingman — jumlah CT stasiun per skenario")
+        fig, ax = plt.subplots(figsize=(9, 4.6))
+        t_e_ref = 1.0
+        u_grid = np.linspace(0.01, 0.97, 200)
+        for v, lab, color in [
+            (0.0, "V=0", "#94a3b8"),
+            (0.25, "V=0,25", "#f59e0b"),
+            (0.5, "V=0,5", "#ef4444"),
+            (1.0, "V=1,0", "#7c3aed"),
+        ]:
+            ct = [v * (u / (1 - u)) * t_e_ref + t_e_ref for u in u_grid]
+            ax.plot(u_grid, ct, color=color, linewidth=1.4, label=lab)
+        colors = ["#2563eb", "#ea580c", "#16a34a", "#dc2626", "#7c3aed"]
+        for i, (name, r) in enumerate(results.items()):
+            comb = kingman_combined(r)
+            # scale: chart uses t_e=1 reference; plot actual CT and u
+            ax.scatter(
+                [min(comb["u_bar"], 0.97)],
+                [comb["ct"]],
+                s=80, zorder=5, color=colors[i % len(colors)],
+                edgecolors="white", label=name,
+            )
+        ax.set_xlim(0, 1)
         ax.set_ylim(bottom=0)
+        ax.set_xlabel("Utilisasi gabungan u̅")
+        ax.set_ylabel("CT Kingman (periode/zona)")
+        ax.set_title("Kingman: titik operasi skenario (CT vs u̅)")
+        ax.legend(loc="upper left", fontsize=7.5, framealpha=0.92)
         fig.tight_layout()
         _fig_to_st(fig)
 

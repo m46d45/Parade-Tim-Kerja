@@ -1040,3 +1040,74 @@ def plot_kingman_stations(
     _apply_axes_style(ax)
     return ax
 
+def plot_kingman_vut_curve(
+    result: ParadeResult,
+    ax: Optional[Axes] = None,
+    title: Optional[str] = None,
+) -> Axes:
+    """
+    Classic Kingman chart: cycle time vs utilization (system / combined).
+
+    Curves for several variability factors V = (c_a²+c_e²)/2; process time
+    t_e is the mean station process time (average across trades).
+    Operating point = combined utilization (mean of trade utils) on the
+    curve that matches this run's average V.
+    """
+    if ax is None:
+        _, ax = plt.subplots(figsize=(9, 4.5))
+    import numpy as np
+    from parade_of_trades_analysis import kingman_metrics, kingman_ct
+
+    k = kingman_metrics(result)
+    # Combined utilization = average u across trades (gabungan)
+    us = [s.utilization for s in k.stations]
+    u_comb = float(sum(us) / len(us)) if us else 0.0
+    # Combined t_e and V: average station t_e; V from mean c_a,c_e
+    t_e = float(sum(s.t_e for s in k.stations) / len(k.stations))
+    c_a_m = float(sum(s.c_a for s in k.stations) / len(k.stations))
+    c_e_m = float(sum(s.c_e for s in k.stations) / len(k.stations))
+    v_run = 0.5 * (c_a_m ** 2 + c_e_m ** 2)
+
+    u_grid = np.linspace(0.01, 0.97, 200)
+    # Family of V curves for teaching
+    v_curves = [
+        (0.0, "V=0 (tanpa var)", "#94a3b8", "--"),
+        (0.125, "V=0,125 (var rendah)", "#38bdf8", "-"),
+        (0.25, "V=0,25 (var sedang)", "#f59e0b", "-"),
+        (0.5, "V=0,5 (var tinggi)", "#ef4444", "-"),
+        (1.0, "V=1,0 (sangat tinggi)", "#7c3aed", "-"),
+    ]
+    for v, lab, color, ls in v_curves:
+        ct = []
+        for u in u_grid:
+            # wait = V * u/(1-u) * t_e ; CT = wait + t_e
+            # equivalent kingman with ca^2+ce^2 = 2V
+            w = v * (u / (1.0 - u)) * t_e
+            ct.append(w + t_e)
+        ax.plot(u_grid, ct, color=color, linestyle=ls, linewidth=1.7, label=lab)
+
+    # Operating point on run's V
+    u_pt = min(max(u_comb, 0.0), 0.97)
+    w_pt = v_run * (u_pt / (1.0 - u_pt)) * t_e if u_pt < 1 else float("inf")
+    ct_pt = w_pt + t_e
+    ax.scatter(
+        [u_pt], [ct_pt],
+        s=90, zorder=5, color="#0f172a", edgecolors="white", linewidths=1.2,
+        label=f"Titik operasi (u̅={u_comb:.2f}, V≈{v_run:.2f})",
+    )
+    ax.axvline(u_pt, color="#0f172a", linestyle=":", linewidth=1.0, alpha=0.5)
+
+    ax.set_xlim(0, 1.0)
+    ax.set_ylim(bottom=0)
+    # sensible top
+    ymax = max(ct_pt * 1.4, t_e * 8, 2.0)
+    # avoid insane scale
+    sample_hi = v_curves[-1][0] * (0.9 / 0.1) * t_e + t_e
+    ax.set_ylim(0, min(max(ymax, t_e * 3), sample_hi * 0.35 + t_e * 2))
+    ax.set_xlabel("Utilisasi gabungan  u̅  (rata-rata semua tim)")
+    ax.set_ylabel("Cycle time Kingman  (periode / zona)")
+    ax.set_title(title or "Kingman: CT vs utilisasi (kurva VUT)")
+    ax.legend(loc="upper left", fontsize=7.5, framealpha=0.92)
+    _apply_axes_style(ax)
+    return ax
+

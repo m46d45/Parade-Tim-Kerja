@@ -367,6 +367,30 @@ def kingman_metrics(result: ParadeResult) -> KingmanMetrics:
     )
 
 
+def kingman_combined(result: ParadeResult) -> dict:
+    """Aggregate (gabungan) Kingman inputs/outputs for CT–u chart annotation."""
+    k = kingman_metrics(result)
+    n = max(len(k.stations), 1)
+    u_bar = sum(s.utilization for s in k.stations) / n
+    t_e = sum(s.t_e for s in k.stations) / n
+    c_a = sum(s.c_a for s in k.stations) / n
+    c_e = sum(s.c_e for s in k.stations) / n
+    v = 0.5 * (c_a ** 2 + c_e ** 2)
+    u_c = min(u_bar, 0.999)
+    wait, ct, _, u_f = kingman_ct(u_c, t_e, c_a, c_e)
+    return {
+        "u_bar": u_bar,
+        "t_e": t_e,
+        "c_a": c_a,
+        "c_e": c_e,
+        "v": v,
+        "u_factor": u_f,
+        "wait": wait,
+        "ct": ct,
+        "bottleneck_u": k.bottleneck_u,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Statistics helpers
 # ---------------------------------------------------------------------------
