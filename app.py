@@ -53,7 +53,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-takt-run-btn-v47"
+_APP_BUILD = "2026-08-03-takt-btn-top-v48"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1085,7 +1085,7 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
 
 
 def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
-    """Takt plan: rencana irama zona; simulasi hanya setelah tombol Jalankan."""
+    """Takt plan: kontrol + Jalankan di atas; grafik di bawah."""
     st.subheader("Takt plan")
 
     c1, c2, c3 = st.columns(3)
@@ -1117,31 +1117,6 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
         key="takt_var_actual",
     )
 
-    plan = build_takt_plan(
-        n_trades=n_trades,
-        n_zones=int(n_zones),
-        batch_size=int(batch),
-        rate=float(rate),
-        handoff_lag=1,
-    )
-
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Takt time / zona", f"{plan.takt_time:g} periode")
-    m2.metric("Durasi rencana", f"{plan.duration}")
-    m3.metric("Batch", f"{plan.batch_size}")
-    m4.metric("Handoff lag", f"{plan.handoff_lag} periode")
-
-    # Rencana only (always shown — cheap, no sim)
-    fig, ax = plt.subplots(figsize=(10, 5.0))
-    plot_takt_plan(plan, ax=ax, result=None)
-    fig.tight_layout()
-    _fig_to_st(fig)
-
-    fig, ax = plt.subplots(figsize=(10, 4.4))
-    plot_takt_wagon_chart(plan, ax=ax, max_zones=min(12, int(n_zones)))
-    fig.tight_layout()
-    _fig_to_st(fig)
-
     b1, b2, _ = st.columns([1, 1, 2])
     run = b1.button("Jalankan simulasi", type="primary", use_container_width=True, key="takt_run")
     clear = b2.button("Hapus hasil", use_container_width=True, key="takt_clear")
@@ -1149,6 +1124,14 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
         st.session_state.pop("takt_result", None)
         st.session_state.pop("takt_rel", None)
         st.session_state.pop("takt_plan_snap", None)
+
+    plan = build_takt_plan(
+        n_trades=n_trades,
+        n_zones=int(n_zones),
+        batch_size=int(batch),
+        rate=float(rate),
+        handoff_lag=1,
+    )
 
     if run:
         pairs = [_pair_from_base_and_var(float(rate), var_mode)] * n_trades
@@ -1162,12 +1145,17 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
         except RuntimeError as exc:
             st.error(str(exc))
 
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Takt time / zona", f"{plan.takt_time:g} periode")
+    m2.metric("Durasi rencana", f"{plan.duration}")
+    m3.metric("Batch", f"{plan.batch_size}")
+    m4.metric("Handoff lag", f"{plan.handoff_lag} periode")
+
     result = st.session_state.get("takt_result")
     rel = st.session_state.get("takt_rel")
     plan_snap = st.session_state.get("takt_plan_snap") or plan
 
     if result is not None and rel is not None:
-        st.divider()
         r1, r2, r3 = st.columns(3)
         r1.metric("Reliability (tepat waktu)", f"{100 * rel['reliability']:.1f}%")
         r2.metric("Durasi aktual", f"{rel['actual_duration']}")
@@ -1179,10 +1167,24 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
         fig.tight_layout()
         _fig_to_st(fig)
 
+        fig, ax = plt.subplots(figsize=(10, 4.4))
+        plot_takt_wagon_chart(plan_snap, ax=ax, max_zones=min(12, int(n_zones)))
+        fig.tight_layout()
+        _fig_to_st(fig)
+
         with st.expander("Detail reliability per zona"):
             st.dataframe(rel["detail"][:80], use_container_width=True, hide_index=True)
     else:
-        st.caption("Atur parameter → **Jalankan simulasi** untuk membandingkan aktual vs rencana.")
+        # Rencana only until user runs
+        fig, ax = plt.subplots(figsize=(10, 5.0))
+        plot_takt_plan(plan, ax=ax, result=None)
+        fig.tight_layout()
+        _fig_to_st(fig)
+
+        fig, ax = plt.subplots(figsize=(10, 4.4))
+        plot_takt_wagon_chart(plan, ax=ax, max_zones=min(12, int(n_zones)))
+        fig.tight_layout()
+        _fig_to_st(fig)
 
     with st.expander("Tabel rencana (cuplikan)"):
         rows = plan.as_rows()
