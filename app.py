@@ -37,7 +37,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-defaults-40-v30"
+_APP_BUILD = "2026-08-03-subtitle-v31"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -441,7 +441,7 @@ def _render_header() -> None:
             st.image(str(_LOGO_ICON), width=168)
         with c2:
             st.markdown("## Parade Tim Kerja")
-            st.caption("Zone-flow · batch / one-piece · kecepatan & variability **per zona**")
+            st.caption("Simulasi Parade Tim Kerja Pekerjaan Pengecoran Lantai Beton")
     else:
         st.title("Parade Tim Kerja")
 
