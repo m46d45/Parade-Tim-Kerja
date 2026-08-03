@@ -37,7 +37,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-var-labels-v34"
+_APP_BUILD = "2026-08-03-cmp-clean-v35"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -687,35 +687,21 @@ def _batch_label(b: int) -> str:
 
 
 def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
-    st.subheader("Perbandingan (2–5 skenario, zone-flow)")
-    st.markdown(
-        '<div class="pot-callout">'
-        "Bandingkan <strong>2 sampai 5</strong> skenario. "
-        "Tiap skenario punya <strong>kapasitas produksi</strong>, <strong>variability</strong>, "
-        "dan <strong>batch</strong> handoff sendiri — cocok membandingkan "
-        "tingkat variability <em>atau</em> one-piece vs batch besar."
-        "</div>",
-        unsafe_allow_html=True,
-    )
+    st.subheader("Perbandingan")
 
     default_vars = list(PRESET_OPTIONS)
     sidebar_batch = _batch_size()
 
-    # --- Quick-fill BEFORE widgets ---
+    # Quick-fill BEFORE widgets (mutate session_state first)
     c1, c2, c3, c4 = st.columns(4)
-    fill_five = c1.button(
-        "5× variability", key="cmp_fill_five", use_container_width=True,
-        help="5 skenario: Skenario 1–5 = tanpa var → sangat tinggi, batch = sidebar",
-    )
+    fill_five = c1.button("5× variability", key="cmp_fill_five", use_container_width=True)
     fill_two = c2.button("Tanpa var vs Sedang", key="cmp_fill_two", use_container_width=True)
-    fill_batch = c3.button(
-        "Batch 1 vs 4", key="cmp_fill_batch", use_container_width=True,
-        help="Skenario 1 = one-piece, Skenario 2 = batch 4 (tanpa variability)",
-    )
+    fill_batch = c3.button("Batch 1 vs 4", key="cmp_fill_batch", use_container_width=True)
     clear_res = c4.button("Hapus hasil", key="cmp_clear", use_container_width=True)
 
     if clear_res:
         st.session_state.pop("cmp_multi", None)
+        st.session_state.pop("cmp_meta", None)
 
     if fill_five:
         st.session_state["cmp_n_scen"] = 5
@@ -754,21 +740,7 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
         st.session_state.setdefault(f"cmp_s{i}_var", dv)
         st.session_state.setdefault(f"cmp_s{i}_batch", sidebar_batch)
 
-    n_scen = int(
-        st.slider(
-            "Jumlah skenario",
-            min_value=2,
-            max_value=5,
-            key="cmp_n_scen",
-            help="2–5 skenario.",
-        )
-    )
-
-    st.caption(
-        f"Zona = **{total_units}** · Seed = **{seed}** (sama). "
-        f"Batch di sidebar (**{sidebar_batch}**) hanya default; "
-        "setiap skenario bisa beda batch di kolom di bawah."
-    )
+    n_scen = int(st.slider("Jumlah skenario", min_value=2, max_value=5, key="cmp_n_scen"))
 
     scenarios_cfg = []
     cols = st.columns(n_scen)
@@ -776,7 +748,6 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
         with cols[i]:
             st.markdown(f"##### Skenario {i + 1}")
             label = f"Skenario {i + 1}"
-            # keep label key in state for fills; no free-text name field
             st.session_state[f"cmp_s{i}_label"] = label
             base = _base_speed_input(f"cmp_s{i}", "Kapasitas produksi (zona/periode)", 1.0)
             var = st.selectbox(
@@ -791,12 +762,10 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
                     options=_BATCH_OPTIONS,
                     format_func=_batch_label,
                     key=f"cmp_s{i}_batch",
-                    help="1 = one-piece flow; 4 = standar kelas.",
                 )
             )
             spec = _pair_from_base_and_var(base, var)
-            st.caption(f"{_format_pair(spec)} · batch **{batch_i}**")
-            scenarios_cfg.append((label.strip() or f"S{i + 1}", spec, var, batch_i))
+            scenarios_cfg.append((label, spec, var, batch_i))
 
     if st.button("Jalankan perbandingan", type="primary", key="run_cmp", use_container_width=True):
         results = {}
@@ -823,11 +792,8 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
         if results:
             st.session_state.cmp_multi = results
             st.session_state.cmp_meta = meta
-            batches = [meta[n]["batch"] for n in results]
-            st.success(f"Selesai · **{len(results)}** skenario · batch = {batches}")
 
     if "cmp_multi" not in st.session_state:
-        st.info("Atur skenario → **Jalankan perbandingan**. Coba **Batch 1 vs 4** atau **5× variability**.")
         return
 
     results = st.session_state.cmp_multi
@@ -847,30 +813,23 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
             "Throughput": round(r.system_throughput, 3),
             "T5 selesai": r.trade_metrics[-1].periods_to_finish,
         })
-    st.markdown("##### Ringkasan (durasi naik)")
+    st.divider()
+    st.markdown("##### Ringkasan")
     st.dataframe(sorted(rows, key=lambda x: x["Durasi"]), use_container_width=True, hide_index=True)
 
     fig, ax = plt.subplots(figsize=(10, 5.5))
     plot_comparison_lob(
         results,
         ax=ax,
-        title="LOB skenario — mulai (0,0) · tim terakhir · batch bisa beda",
+        title="Line of Balance — perbandingan skenario",
         last_trade_only=True,
     )
     fig.tight_layout()
     _fig_to_st(fig)
-    st.caption(
-        "Semua kurva **mulai dari (periode 0, zona 0)**. "
-        "Garis = kumulatif **tim terakhir** (proyek selesai). "
-        "Batch=1 (one-piece): tim terakhir mulai paling awal. "
-        "Batch besar: tim terakhir mulai lebih lambat (tunggu handoff)."
-    )
 
     with st.expander("Detail tim satu skenario"):
         pick = st.selectbox("Skenario", list(results.keys()), key="cmp_detail_pick")
-        st.caption(f"Batch skenario ini = **{results[pick].config.batch_size}**")
         _trade_table(results[pick])
-        st.caption(_starts_caption(results[pick]))
 
 
 
