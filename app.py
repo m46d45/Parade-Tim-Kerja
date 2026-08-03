@@ -31,6 +31,7 @@ export_takt_csv,
     littles_law_metrics,
     evaluate_at_wip,
     build_takt_plan,
+    takt_plan_from_lob_result,
     required_rate_for_duration,
     takt_design_table,
     takt_plan_reliability,
@@ -59,7 +60,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-04-takt-30-50-v68"
+_APP_BUILD = "2026-08-04-takt-ui-v69"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1296,17 +1297,13 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
 
 
 def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
-    """Takt plan edukasi: one-piece flow + dampak jumlah zona pada parade."""
+    """Takt plan: (1) baseline LOB+wagon, (2) bandingan zonasi LOB+wagon."""
     st.subheader("Takt plan")
-    st.caption("One-piece flow · bandingkan jumlah zonasi (kasar ↔ halus)")
+    st.caption("One-piece flow · Takt plan = wagon chart · LOB = kemajuan kumulatif")
 
-    c1, c2, c3 = st.columns(3)
-    z_base = int(c1.number_input(
-        "Zona baseline",
-        min_value=4, max_value=200, value=int(total_units), step=1,
-        key="takt_z_base",
-    ))
-    rate = float(c2.selectbox(
+    # Shared capacity / variability
+    c1, c2 = st.columns(2)
+    rate = float(c1.selectbox(
         "Kapasitas (zona/periode)",
         options=[1.0 / 3.0, 0.5, 1.0, 2.0, 3.0],
         index=2,
@@ -1319,67 +1316,119 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
         ),
         key="takt_rate_zone",
     ))
-    var_mode = c3.selectbox(
+    var_mode = c2.selectbox(
         "Variability",
         ["no_variability", "low", "medium", "high", "very_high"],
         format_func=lambda x: VAR_LABELS.get(x, x),
         key="takt_var_zone",
     )
 
-    # Zone trio: kasar / baseline / halus (default 30 / baseline / 50)
+    # ------------------------------------------------------------------
+    # 1) Baseline
+    # ------------------------------------------------------------------
+    st.markdown("##### 1. Baseline")
+    z_base = int(st.number_input(
+        "Jumlah zona baseline",
+        min_value=4, max_value=200, value=40, step=1,
+        key="takt_z_base",
+    ))
+
+    b1, b2, _ = st.columns([1, 1, 2])
+    run_base = b1.button("Jalankan baseline", type="primary", use_container_width=True, key="takt_run_base")
+    clear_base = b2.button("Hapus baseline", use_container_width=True, key="takt_clear_base")
+    if clear_base:
+        st.session_state.pop("takt_base_result", None)
+        st.session_state.pop("takt_base_plan", None)
+
+    if run_base:
+        pairs = [_pair_from_base_and_var(float(rate), var_mode)] * n_trades
+        try:
+            cfg = _build_config_from_pairs(pairs, int(z_base), seed, batch_size=1)
+            res = ParadeOfTrades(cfg).run()
+            st.session_state["takt_base_result"] = res
+            st.session_state["takt_base_plan"] = takt_plan_from_lob_result(res)
+        except RuntimeError as exc:
+            st.error(str(exc))
+
+    base_res = st.session_state.get("takt_base_result")
+    base_plan = st.session_state.get("takt_base_plan")
+    if base_res is not None and base_plan is not None:
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Zona", f"{z_base}")
+        m2.metric("Durasi", f"{base_res.duration} p")
+        m3.metric("TH", f"{base_res.system_throughput:.3f}")
+
+        fig, ax = plt.subplots(figsize=(10, 4.8))
+        plot_line_of_balance(
+            base_res, ax=ax,
+            title=f"Line of Balance — baseline ({z_base} zona)",
+        )
+        fig.tight_layout()
+        _fig_to_st(fig)
+
+        fig, ax = plt.subplots(figsize=(10, 4.2))
+        plot_takt_wagon_chart(
+            base_plan, ax=ax,
+            max_zones=min(16, z_base),
+            title=f"Takt plan (wagon) — baseline ({z_base} zona)",
+        )
+        fig.tight_layout()
+        _fig_to_st(fig)
+
+        _export_takt_block(
+            base_res, base_plan,
+            takt_plan_reliability(base_res, build_takt_plan(n_trades, z_base, 1, rate)),
+            duration_plan=base_res.duration,
+            key="takt_base",
+        )
+    else:
+        st.info("Tekan **Jalankan baseline** untuk menampilkan LOB dan takt plan (wagon).")
+
+    # ------------------------------------------------------------------
+    # 2) Perbandingan jumlah zonasi
+    # ------------------------------------------------------------------
+    st.divider()
+    st.markdown("##### 2. Perbandingan jumlah zonasi")
     zc1, zc2 = st.columns(2)
     z_low = int(zc1.number_input(
-        "Zona kasar (lebih sedikit)",
+        "Zona lebih sedikit",
         min_value=4, max_value=200, value=30, step=1, key="takt_z_low",
     ))
     z_high = int(zc2.number_input(
-        "Zona halus (lebih banyak)",
+        "Zona lebih banyak",
         min_value=4, max_value=200, value=50, step=1, key="takt_z_high",
     ))
-    # Pastikan urutan kasar ≤ baseline ≤ halus untuk skenario
-    z_a = max(4, min(z_low, z_base))
-    z_c = min(200, max(z_high, z_base))
-    if z_a >= z_base:
-        z_a = max(4, z_base - 1)
-    if z_c <= z_base:
-        z_c = min(200, z_base + 1)
-
-    btn1, btn2, _ = st.columns([1, 1, 2])
-    run = btn1.button("Jalankan", type="primary", use_container_width=True, key="takt_run")
-    clear = btn2.button("Hapus hasil", use_container_width=True, key="takt_clear")
-    if clear:
-        for k in ("takt_zone_results", "takt_zone_plans", "takt_zone_meta"):
-            st.session_state.pop(k, None)
 
     scenarios = [
-        ("A · Kasar", z_a),
-        ("B · Baseline", z_base),
-        ("C · Halus", z_c),
+        ("A · Lebih sedikit", int(z_low)),
+        ("B · Baseline", int(z_base)),
+        ("C · Lebih banyak", int(z_high)),
     ]
 
-    # Ideal plans (always show)
-    plans = {
-        label: build_takt_plan(n_trades, int(z), batch_size=1, rate=rate, handoff_lag=1)
-        for label, z in scenarios
-    }
-    mcols = st.columns(3)
-    for i, (label, z) in enumerate(scenarios):
-        p = plans[label]
-        mcols[i].metric(label, f"{z} zona", delta=f"rencana {p.duration} p", delta_color="off")
+    c1, c2, _ = st.columns([1, 1, 2])
+    run_cmp = c1.button("Jalankan perbandingan", type="primary", use_container_width=True, key="takt_run_cmp")
+    clear_cmp = c2.button("Hapus perbandingan", use_container_width=True, key="takt_clear_cmp")
+    if clear_cmp:
+        st.session_state.pop("takt_zone_results", None)
+        st.session_state.pop("takt_zone_plans", None)
+        st.session_state.pop("takt_zone_meta", None)
 
-    if run:
+    if run_cmp:
         results = {}
+        plans = {}
         meta = {}
         pairs = [_pair_from_base_and_var(float(rate), var_mode)] * n_trades
         try:
             for label, z in scenarios:
                 cfg = _build_config_from_pairs(pairs, int(z), seed, batch_size=1)
-                results[label] = ParadeOfTrades(cfg).run()
+                r = ParadeOfTrades(cfg).run()
+                results[label] = r
+                plans[label] = takt_plan_from_lob_result(r)
                 meta[label] = {
                     "zona": int(z),
                     "var_label": VAR_LABELS.get(var_mode, var_mode),
                     "pace": f"{rate:g}/p",
-                    "plan_duration": plans[label].duration,
+                    "plan_duration": build_takt_plan(n_trades, int(z), 1, rate).duration,
                 }
             st.session_state["takt_zone_results"] = results
             st.session_state["takt_zone_plans"] = plans
@@ -1388,119 +1437,58 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
             st.error(str(exc))
 
     results = st.session_state.get("takt_zone_results")
-    plans_snap = st.session_state.get("takt_zone_plans") or plans
+    plans = st.session_state.get("takt_zone_plans") or {}
     meta = st.session_state.get("takt_zone_meta") or {}
 
-    # What-if curve (plan only) — always useful for education
-    st.markdown("##### Durasi rencana vs jumlah zona (OPF ideal)")
-    curve_zones = sorted(set(
-        [z_low, z_base, z_high] + list(range(8, 81, 8)) + [100, 120, 160, 200]
-    ))
-    curve_zones = [z for z in curve_zones if 4 <= z <= 200]
-    curve_rows = []
-    for z in curve_zones:
-        p = build_takt_plan(n_trades, int(z), batch_size=1, rate=rate, handoff_lag=1)
-        curve_rows.append({"Zona": z, "Durasi rencana": p.duration, "Takt time": round(p.takt_time, 3)})
-    # plot
-    fig, ax = plt.subplots(figsize=(9.5, 4.0))
-    xs = [r["Zona"] for r in curve_rows]
-    ys = [r["Durasi rencana"] for r in curve_rows]
-    ax.plot(xs, ys, color="#2563eb", linewidth=2.0, marker="o", markersize=3, label="Durasi rencana OPF")
-    for label, z in scenarios:
-        p = plans_snap[label]
-        ax.scatter([z], [p.duration], s=80, zorder=5, label=f"{label} ({z})")
-    ax.set_xlabel("Jumlah zona")
-    ax.set_ylabel("Durasi rencana (periode)")
-    ax.set_title("Semakin banyak zona → train lebih panjang (one-piece)")
-    ax.legend(loc="upper left", fontsize=8)
-    ax.grid(True, alpha=0.3)
-    fig.tight_layout()
-    _fig_to_st(fig)
-
     if not results:
-        # show baseline plan preview only
-        p0 = plans_snap["B · Baseline"]
-        fig, ax = plt.subplots(figsize=(10, 4.6))
-        plot_takt_plan(p0, ax=ax, result=None, title=f"Rencana OPF baseline ({z_base} zona)")
-        fig.tight_layout()
-        _fig_to_st(fig)
+        st.info(
+            "Tekan **Jalankan perbandingan** untuk LOB + takt plan (wagon) "
+            "pada tiga jumlah zona."
+        )
         return
 
-    # ---- Results after run ----
-    st.divider()
-    st.markdown("##### Ringkasan tiga skenario zona")
+    # Ringkasan singkat
     from parade_of_trades_analysis import littles_law_metrics as _llm
     rows = []
     for label, r in results.items():
         ll = _llm(r)
-        p = plans_snap[label]
-        rel = takt_plan_reliability(r, p)
         rows.append({
             "Skenario": label,
             "Zona": meta.get(label, {}).get("zona", r.config.total_units),
-            "Durasi aktual": r.duration,
-            "Durasi rencana": p.duration,
-            "Δ vs rencana": r.duration - p.duration,
-            "TH": round(ll.throughput, 3),
+            "Durasi (p)": r.duration,
+            "TH (zona/p)": round(ll.throughput, 3),
             "WIP⌀": round(ll.avg_pipeline_wip, 2),
-            "CT": round(ll.cycle_time_pipeline, 2),
-            "Puncak WIP": _peak_wip(r),
-            "Reliability": f"{100 * rel['reliability']:.0f}%",
             "Idle": r.total_idle_capacity,
         })
     st.dataframe(rows, use_container_width=True, hide_index=True)
 
-    # Overlay last trade (ringkas)
-    st.markdown("##### LOB tim terakhir — ketiga skenario")
-    fig, ax = plt.subplots(figsize=(10, 4.8))
-    plot_comparison_lob(
-        results, ax=ax,
-        title="Line of Balance — dampak jumlah zona (tim terakhir)",
-        last_trade_only=True,
-    )
-    fig.tight_layout()
-    _fig_to_st(fig)
+    # Side-by-side LOB (3 columns)
+    st.markdown("**Line of Balance**")
+    cols = st.columns(3)
+    for i, (label, r) in enumerate(results.items()):
+        z_n = meta.get(label, {}).get("zona", r.config.total_units)
+        with cols[i]:
+            fig, ax = plt.subplots(figsize=(4.0, 3.6))
+            plot_line_of_balance(r, ax=ax, title=f"{label}\n{z_n} zona · T={r.duration}p")
+            fig.tight_layout()
+            _fig_to_st(fig)
 
-    # Setiap skenario: LOB lengkap + Takt plan (rencana vs aktual) + wagon
-    st.markdown("##### LOB & Takt plan per skenario")
-    for label, r in results.items():
+    # Side-by-side Takt plan (wagon)
+    st.markdown("**Takt plan (wagon)**")
+    cols2 = st.columns(3)
+    for i, (label, r) in enumerate(results.items()):
         z_n = int(meta.get(label, {}).get("zona", r.config.total_units))
-        plan_i = plans_snap[label]
-        st.markdown(f"**{label}** · {z_n} zona · durasi aktual {r.duration} p · rencana {plan_i.duration} p")
+        plan_i = plans[label]
+        with cols2[i]:
+            fig, ax = plt.subplots(figsize=(4.0, 3.8))
+            plot_takt_wagon_chart(
+                plan_i, ax=ax,
+                max_zones=min(12, z_n),
+                title=f"{label} · wagon",
+            )
+            fig.tight_layout()
+            _fig_to_st(fig)
 
-        fig, ax = plt.subplots(figsize=(10, 4.6))
-        plot_line_of_balance(r, ax=ax, title=f"LOB — {label} ({z_n} zona)")
-        fig.tight_layout()
-        _fig_to_st(fig)
-
-        fig, ax = plt.subplots(figsize=(10, 4.6))
-        plot_takt_plan(
-            plan_i, ax=ax, result=r,
-            title=f"Takt plan OPF — {label} ({z_n} zona)",
-        )
-        fig.tight_layout()
-        _fig_to_st(fig)
-
-        fig, ax = plt.subplots(figsize=(10, 3.8))
-        plot_takt_wagon_chart(
-            plan_i, ax=ax,
-            max_zones=min(12, z_n),
-            title=f"Wagon — {label} (zona 1–{min(12, z_n)})",
-        )
-        fig.tight_layout()
-        _fig_to_st(fig)
-
-        # unduh paket takt per skenario
-        safe = label.split("·")[0].strip().replace(" ", "")
-        _export_takt_block(
-            r, plan_i,
-            takt_plan_reliability(r, plan_i),
-            duration_plan=plan_i.duration,
-            buffers_info=None,
-            key=f"takt_{safe}",
-        )
-
-    st.markdown("##### Unduh data perbandingan")
     _export_comparison_block(results, meta, key="takt_zone")
 
 
