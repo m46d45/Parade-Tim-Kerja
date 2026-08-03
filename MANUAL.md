@@ -360,12 +360,12 @@ Kurva klasik **service–inventory tradeoff** (Factory Physics / inventory theor
 
 | Sumbu | Arti |
 |-------|------|
-| **X — Inventory** | Rata-rata WIP di **buffer** antar-tim (zona menunggu) |
-| **Y — Fill rate** | % permintaan yang terpenuhi **langsung dari stok** (tanpa stockout / starvation) |
+| **X — Fill rate** | % permintaan yang terpenuhi **langsung dari stok** (tanpa stockout / starvation) |
+| **Y — Inventory** | Rata-rata WIP di **buffer** antar-tim (zona menunggu) |
 
 ### Intuisi
 
-- Inventory naik → fill rate naik, tetapi **makin datar** mendekati 100% (diminishing returns).
+- Fill rate mendekati 100% → inventory yang dibutuhkan **naik tajam** (diminishing returns).
 - Variability tinggi → butuh **lebih banyak** inventory untuk fill rate yang sama.
 - Batch besar menumpuk inventory; one-piece menjaga inventory tipis (fill rate hilir bergantung keandalan hulu).
 

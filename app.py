@@ -48,7 +48,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-inv-fr-v43"
+_APP_BUILD = "2026-08-03-fr-inv-axes-v44"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1052,17 +1052,17 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
         fig, ax = plt.subplots(figsize=(9, 4.6))
         # theoretical curve from first scenario as backdrop
         first = next(iter(results.values()))
-        plot_inventory_fill_rate(first, ax=ax, title="Inventory vs fill rate — titik skenario")
+        plot_inventory_fill_rate(first, ax=ax, title="Fill rate vs inventory — titik skenario")
         colors = ["#2563eb", "#ea580c", "#16a34a", "#dc2626", "#7c3aed"]
         # re-scatter all scenarios on top
         for i, (name, r) in enumerate(results.items()):
             fr = inventory_fill_rate_metrics(r)
             ax.scatter(
-                [fr["avg_inventory_system"]], [100 * fr["fill_rate_system"]],
+                [100 * fr["fill_rate_system"]], [fr["avg_inventory_system"]],
                 s=100, zorder=6, color=colors[i % len(colors)],
                 edgecolors="white", label=name,
             )
-        ax.legend(loc="lower right", fontsize=7.5, framealpha=0.92)
+        ax.legend(loc="upper left", fontsize=7.5, framealpha=0.92)
         fig.tight_layout()
         _fig_to_st(fig)
 

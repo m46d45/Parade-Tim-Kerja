@@ -1185,11 +1185,10 @@ def plot_inventory_fill_rate(
     title: Optional[str] = None,
 ) -> Axes:
     """
-    Inventory (X) vs fill rate (Y) — classic service–inventory tradeoff.
+    Fill rate (X) vs inventory (Y) — service–inventory tradeoff.
 
-    Curve: theoretical base-stock / normal-loss shape (diminishing returns).
-    Point: system operating point from the run (avg buffer inventory, fill rate).
-    Extra markers: each interface buffer B1..B4.
+    Curve: theoretical base-stock / normal-loss (inventory rises as FR → 100%).
+    Point: system operating point; diamonds = per-buffer interfaces.
     """
     if ax is None:
         _, ax = plt.subplots(figsize=(9, 4.6))
@@ -1197,34 +1196,34 @@ def plot_inventory_fill_rate(
 
     d = inventory_fill_rate_curve(result)
     inv, fr = d["inventory"], d["fill_rate"]
-    # sort by inventory
-    order = sorted(range(len(inv)), key=lambda i: inv[i])
+    # sort by fill rate for a clean curve left→right
+    order = sorted(range(len(fr)), key=lambda i: fr[i])
+    fr_s = [100 * fr[i] for i in order]
     inv_s = [inv[i] for i in order]
-    fr_s = [fr[i] for i in order]
 
-    ax.plot(inv_s, [100 * f for f in fr_s], color="#0f766e", linewidth=2.2,
+    ax.plot(fr_s, inv_s, color="#0f766e", linewidth=2.2,
             label="Kurva teoritis (base-stock)")
     ax.scatter(
-        [d["op_inventory"]], [100 * d["op_fill_rate"]],
+        [100 * d["op_fill_rate"]], [d["op_inventory"]],
         s=100, zorder=5, color="#0f172a", edgecolors="white", linewidths=1.2,
-        label=f"Sistem (I̅={d['op_inventory']:.2f}, FR={100*d['op_fill_rate']:.1f}%)",
+        label=f"Sistem (FR={100*d['op_fill_rate']:.1f}%, I̅={d['op_inventory']:.2f})",
     )
     colors = ["#2563eb", "#ea580c", "#16a34a", "#dc2626"]
     for i, row in enumerate(d.get("interfaces") or []):
         ax.scatter(
-            [row["avg_inventory"]], [100 * row["fill_rate"]],
+            [100 * row["fill_rate"]], [row["avg_inventory"]],
             s=70, zorder=4, color=colors[i % len(colors)],
             edgecolors="white", marker="D",
-            label=f"{row['buffer']} FR={100*row['fill_rate']:.0f}%",
+            label=f"{row['buffer']} I̅={row['avg_inventory']:.2f}",
         )
 
-    ax.set_xlabel("Inventory / WIP buffer (zona, rata-rata)")
-    ax.set_ylabel("Fill rate (%)")
-    ax.set_ylim(0, 105)
-    ax.set_xlim(left=0)
-    ax.axhline(100, color="0.75", linestyle="--", linewidth=0.9)
-    ax.set_title(title or "Inventory vs fill rate (tradeoff service–persediaan)")
-    ax.legend(loc="lower right", fontsize=7.5, framealpha=0.92)
+    ax.set_xlabel("Fill rate (%)")
+    ax.set_ylabel("Inventory / WIP buffer (zona, rata-rata)")
+    ax.set_xlim(0, 105)
+    ax.set_ylim(bottom=0)
+    ax.axvline(100, color="0.75", linestyle="--", linewidth=0.9)
+    ax.set_title(title or "Fill rate vs inventory (tradeoff service–persediaan)")
+    ax.legend(loc="upper left", fontsize=7.5, framealpha=0.92)
     _apply_axes_style(ax)
     return ax
 
