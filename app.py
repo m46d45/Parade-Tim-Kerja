@@ -42,10 +42,11 @@ from parade_of_trades_plots import (
     plot_line_of_balance,
     plot_line_of_balance_detail,
     plot_littles_law_wip,
+    plot_wip_th_ct,
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-kingman-curve-v41"
+_APP_BUILD = "2026-08-03-wip-th-ct-v42"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -642,7 +643,12 @@ def _plot_single_result(result: ParadeResult) -> None:
         d2.metric("CT buffer", f"{ll.cycle_time_buffer:.2f}")
         d3.metric("TH × CT (cek)", f"{ll.check_pipeline:.2f}",
                   help="Harus ≈ WIP pipeline rata-rata")
-        fig, ax = plt.subplots(figsize=(9, 4.2))
+        # Dual-axis: X=WIP, YL=TH, YR=CT
+        fig, ax = plt.subplots(figsize=(9.5, 4.8))
+        plot_wip_th_ct(result, ax=ax)
+        fig.tight_layout()
+        _fig_to_st(fig)
+        fig, ax = plt.subplots(figsize=(9, 4.0))
         plot_littles_law_wip(result, ax=ax)
         fig.tight_layout()
         _fig_to_st(fig)
@@ -918,25 +924,46 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
                 "TH×CT": round(ll.check_pipeline, 3),
             })
         st.dataframe(ll_rows, use_container_width=True, hide_index=True)
-        # Bar compare CT and WIP
+        # Dual-axis operating points: X=WIP, YL=TH, YR=CT
         import numpy as np
         names = list(results.keys())
-        cts = [littles_law_metrics(results[n]).cycle_time_pipeline for n in names]
+        colors = ["#2563eb", "#ea580c", "#16a34a", "#dc2626", "#7c3aed"]
+        fig, ax = plt.subplots(figsize=(9.5, 4.8))
+        ax2 = ax.twinx()
+        for i, name in enumerate(names):
+            ll = littles_law_metrics(results[name])
+            c = colors[i % len(colors)]
+            ax.scatter([ll.avg_pipeline_wip], [ll.throughput], s=90, color=c,
+                       edgecolors="white", zorder=5, label=f"{name} TH")
+            ax2.scatter([ll.avg_pipeline_wip], [ll.cycle_time_pipeline], s=90, color=c,
+                        marker="s", edgecolors="white", zorder=5, alpha=0.85)
+        ax.set_xlabel("WIP pipeline ⌀ (zona)")
+        ax.set_ylabel("Throughput TH (zona/periode)", color="#2563eb")
+        ax2.set_ylabel("Cycle time CT (periode)", color="#dc2626")
+        ax.set_xlim(left=0)
+        ax.set_ylim(bottom=0)
+        ax2.set_ylim(bottom=0)
+        ax.set_title("Titik operasi skenario · X=WIP · Yₖᵢᵣᵢ=TH · Yₖₐₙₐₙ=CT")
+        ax.legend(loc="upper left", fontsize=7.5, framealpha=0.92)
+        fig.tight_layout()
+        _fig_to_st(fig)
+        # bars secondary
         wips = [littles_law_metrics(results[n]).avg_pipeline_wip for n in names]
-        fig, axes = plt.subplots(1, 2, figsize=(10, 3.8))
+        cts = [littles_law_metrics(results[n]).cycle_time_pipeline for n in names]
+        fig, axes = plt.subplots(1, 2, figsize=(10, 3.6))
         x = np.arange(len(names))
         axes[0].bar(x, wips, color="#1a365d", edgecolor="white")
         axes[0].set_xticks(x)
         axes[0].set_xticklabels(names, rotation=20, ha="right", fontsize=8)
-        axes[0].set_ylabel("WIP pipeline ⌀ (zona)")
-        axes[0].set_title("WIP rata-rata")
+        axes[0].set_ylabel("WIP pipeline ⌀")
+        axes[0].set_title("WIP")
         axes[1].bar(x, cts, color="#2b6cb0", edgecolor="white")
         axes[1].set_xticks(x)
         axes[1].set_xticklabels(names, rotation=20, ha="right", fontsize=8)
-        axes[1].set_ylabel("CT (periode)")
-        axes[1].set_title("Cycle time (WIP÷TH)")
-        for ax in axes:
-            ax.set_ylim(bottom=0)
+        axes[1].set_ylabel("CT")
+        axes[1].set_title("Cycle time")
+        for a in axes:
+            a.set_ylim(bottom=0)
         fig.tight_layout()
         _fig_to_st(fig)
 

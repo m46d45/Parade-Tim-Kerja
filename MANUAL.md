@@ -280,6 +280,18 @@ Artikel [Little’s Law in Production Systems with Yield Loss](https://projectpr
 
 Di app ini **tidak ada yield loss**, jadi bentuk klasik langsung dipakai. Cek numerik: **TH × CT ≈ WIP rata-rata**.
 
+### Grafik WIP–TH–CT
+
+Satu gambar gabungan (tab Little's Law):
+
+| Sumbu | Isi |
+|-------|-----|
+| **X** | WIP |
+| **Y kiri** | Throughput (TH) |
+| **Y kanan** | Cycle time (CT) |
+
+Kurva dari **Little** (WIP = TH × CT) + **Kingman** (CT vs utilisasi). Titik = operasi run Anda.
+
 ### Di mana di app?
 
 - Tab **Simulasi** → sub-tab **Little's Law** (setelah Jalankan)  

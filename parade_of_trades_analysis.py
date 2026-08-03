@@ -391,6 +391,60 @@ def kingman_combined(result: ParadeResult) -> dict:
     }
 
 
+
+def littles_operations_curve(
+    result: ParadeResult,
+    n_points: int = 80,
+) -> Dict[str, List[float]]:
+    """
+    Parametric operations curve linking WIP–TH–CT via Little + Kingman.
+
+    For combined (gabungan) station parameters from the run:
+      TH(u) ≈ u / t_e          (zona/periode, satu server efektif)
+      CT(u) = Kingman(u, t_e, c_a, c_e)
+      WIP(u) = TH(u) × CT(u)   (Little's Law)
+
+    Returns lists of wip, th, ct, u for plotting dual-axis chart.
+    """
+    comb = kingman_combined(result)
+    t_e = max(float(comb["t_e"]), 1e-9)
+    c_a = float(comb["c_a"])
+    c_e = float(comb["c_e"])
+
+    wips: List[float] = []
+    ths: List[float] = []
+    cts: List[float] = []
+    us: List[float] = []
+
+    # u from near 0 to 0.96
+    for i in range(n_points):
+        u = 0.02 + (0.96 - 0.02) * i / max(n_points - 1, 1)
+        wait, ct, _, _ = kingman_ct(u, t_e, c_a, c_e)
+        if not math.isfinite(ct) or ct <= 0:
+            continue
+        th = u / t_e  # capacity-limited throughput
+        wip = th * ct
+        us.append(u)
+        ths.append(th)
+        cts.append(ct)
+        wips.append(wip)
+
+    # Operating point from simulation (Little on pipeline)
+    ll = littles_law_metrics(result)
+    return {
+        "wip": wips,
+        "th": ths,
+        "ct": cts,
+        "u": us,
+        "op_wip": ll.avg_pipeline_wip,
+        "op_th": ll.throughput,
+        "op_ct": ll.cycle_time_pipeline,
+        "t_e": t_e,
+        "v": float(comb["v"]),
+        "u_bar": float(comb["u_bar"]),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Statistics helpers
 # ---------------------------------------------------------------------------

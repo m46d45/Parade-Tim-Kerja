@@ -1111,3 +1111,71 @@ def plot_kingman_vut_curve(
     _apply_axes_style(ax)
     return ax
 
+def plot_wip_th_ct(
+    result: ParadeResult,
+    ax: Optional[Axes] = None,
+    title: Optional[str] = None,
+) -> Axes:
+    """
+    Dual-axis operations chart:
+      X  = WIP
+      YL = Throughput (TH)
+      YR = Cycle time (CT)
+
+    Curves from Little's Law + Kingman (parametric in utilization).
+    Dot = operating point from the simulation (pipeline Little metrics).
+    """
+    if ax is None:
+        _, ax = plt.subplots(figsize=(9.5, 4.8))
+    from parade_of_trades_analysis import littles_operations_curve
+
+    d = littles_operations_curve(result)
+    wip, th, ct = d["wip"], d["th"], d["ct"]
+    if not wip:
+        ax.text(0.5, 0.5, "Kurva tidak tersedia", ha="center", va="center")
+        return ax
+
+    # Sort by WIP for clean lines
+    order = sorted(range(len(wip)), key=lambda i: wip[i])
+    wip_s = [wip[i] for i in order]
+    th_s = [th[i] for i in order]
+    ct_s = [ct[i] for i in order]
+
+    color_th = "#2563eb"
+    color_ct = "#dc2626"
+
+    line_th, = ax.plot(wip_s, th_s, color=color_th, linewidth=2.1, label="Throughput (TH)")
+    ax.set_xlabel("WIP (zona)")
+    ax.set_ylabel("Throughput TH (zona / periode)", color=color_th)
+    ax.tick_params(axis="y", labelcolor=color_th)
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0)
+
+    ax2 = ax.twinx()
+    line_ct, = ax2.plot(wip_s, ct_s, color=color_ct, linewidth=2.1, linestyle="--", label="Cycle time (CT)")
+    ax2.set_ylabel("Cycle time CT (periode)", color=color_ct)
+    ax2.tick_params(axis="y", labelcolor=color_ct)
+    ax2.set_ylim(bottom=0)
+
+    # Operating point
+    op_w, op_th, op_ct = d["op_wip"], d["op_th"], d["op_ct"]
+    ax.scatter([op_w], [op_th], s=95, color=color_th, zorder=5, edgecolors="white", linewidths=1.2)
+    ax2.scatter([op_w], [op_ct], s=95, color=color_ct, zorder=5, edgecolors="white", linewidths=1.2,
+                marker="s")
+    ax.axvline(op_w, color="#64748b", linestyle=":", linewidth=1.0, alpha=0.7)
+
+    ax.set_title(
+        title
+        or f"WIP–TH–CT (Little) · titik operasi WIP={op_w:.2f}, TH={op_th:.3f}, CT={op_ct:.2f}"
+    )
+    # combined legend
+    lines = [line_th, line_ct]
+    labels = [l.get_label() for l in lines]
+    ax.legend(lines, labels + [f"Operasi TH @ WIP", f"Operasi CT @ WIP"], loc="center right", fontsize=8, framealpha=0.92)
+    # Fix legend - only two lines + note in title
+    ax.legend(lines, labels, loc="upper left", fontsize=8, framealpha=0.92)
+
+    _apply_axes_style(ax)
+    ax2.grid(False)
+    return ax
+
