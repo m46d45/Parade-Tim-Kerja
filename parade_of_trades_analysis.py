@@ -397,39 +397,68 @@ def littles_operations_curve(
     n_points: int = 80,
 ) -> Dict[str, List[float]]:
     """
-    Parametric operations curve linking WIP–TH–CT via Little + Kingman.
+    Operations curves linking WIP–TH–CT (Little + Kingman + best-case bound).
 
-    For combined (gabungan) station parameters from the run:
-      TH(u) ≈ u / t_e          (zona/periode, satu server efektif)
-      CT(u) = Kingman(u, t_e, c_a, c_e)
-      WIP(u) = TH(u) × CT(u)   (Little's Law)
+    **Best case (Factory Physics, no variability, bottleneck capacity):**
+      TH_max = min_i mean capacity (zona/periode)
+      T0     = sum_i t_e,i   (raw process time through all stations)
+      W0     = TH_max × T0   (critical WIP)
+      For W ≤ W0:  TH = W/T0 ,  CT = T0
+      For W ≥ W0:  TH = TH_max , CT = W/TH_max
 
-    Returns lists of wip, th, ct, u for plotting dual-axis chart.
+    **Actual (with variability):** Kingman CT(u), TH≈u/t_e_avg, WIP=TH×CT
+    — lies *worse* than the best-case envelope (lower TH / higher CT).
     """
     comb = kingman_combined(result)
-    t_e = max(float(comb["t_e"]), 1e-9)
+    t_e_avg = max(float(comb["t_e"]), 1e-9)
     c_a = float(comb["c_a"])
     c_e = float(comb["c_e"])
 
+    # --- Best-case parameters from config (no var, max capacity = means) ---
+    means = []
+    t0 = 0.0
+    for tr in result.config.trades:
+        mean_c = float(tr.mean) if tr.mean and tr.mean > 0 else max(float(tr.base_speed or 1.0), 1e-9)
+        means.append(mean_c)
+        t0 += 1.0 / max(mean_c, 1e-9)
+    th_max = min(means) if means else 1.0
+    t0 = max(t0, 1e-9)
+    w0 = th_max * t0  # critical WIP
+
+    # Best-case curves over WIP grid
+    w_hi = max(w0 * 4.0, 8.0, float(result.config.total_units) * 0.6)
+    w_grid = [w_hi * i / max(n_points - 1, 1) for i in range(n_points)]
+    # start slightly above 0
+    w_grid = [max(w, 1e-6) for w in w_grid]
+    bc_th: List[float] = []
+    bc_ct: List[float] = []
+    for w in w_grid:
+        if w <= w0:
+            bc_th.append(w / t0)
+            bc_ct.append(t0)
+        else:
+            bc_th.append(th_max)
+            bc_ct.append(w / th_max)
+
+    # Actual (variability) parametric in u
     wips: List[float] = []
     ths: List[float] = []
     cts: List[float] = []
     us: List[float] = []
-
-    # u from near 0 to 0.96
     for i in range(n_points):
         u = 0.02 + (0.96 - 0.02) * i / max(n_points - 1, 1)
-        wait, ct, _, _ = kingman_ct(u, t_e, c_a, c_e)
+        wait, ct, _, _ = kingman_ct(u, t_e_avg, c_a, c_e)
         if not math.isfinite(ct) or ct <= 0:
             continue
-        th = u / t_e  # capacity-limited throughput
+        th = u / t_e_avg
+        # Cap TH by bottleneck max capacity
+        th = min(th, th_max * 0.999)
         wip = th * ct
         us.append(u)
         ths.append(th)
         cts.append(ct)
         wips.append(wip)
 
-    # Operating point from simulation (Little on pipeline)
     ll = littles_law_metrics(result)
     return {
         "wip": wips,
@@ -439,9 +468,16 @@ def littles_operations_curve(
         "op_wip": ll.avg_pipeline_wip,
         "op_th": ll.throughput,
         "op_ct": ll.cycle_time_pipeline,
-        "t_e": t_e,
+        "t_e": t_e_avg,
         "v": float(comb["v"]),
         "u_bar": float(comb["u_bar"]),
+        # best-case envelope
+        "bc_wip": w_grid,
+        "bc_th": bc_th,
+        "bc_ct": bc_ct,
+        "th_max": th_max,
+        "t0": t0,
+        "w0": w0,
     }
 
 

@@ -292,6 +292,14 @@ Satu gambar gabungan (tab Little's Law):
 
 Kurva dari **Little** (WIP = TH × CT) + **Kingman** (CT vs utilisasi). Titik = operasi run Anda.
 
+**Batas ideal (tanpa variasi, kapasitas bottleneck):**
+- TH_max = kapasitas mean terendah di antara 5 tim  
+- T0 = jumlah waktu proses murni semua stasiun  
+- W0 = TH_max × T0 (critical WIP)  
+- W ≤ W0 → CT = T0, TH = W/T0; W ≥ W0 → TH = TH_max, CT = W/TH_max  
+
+Kurva aktual (dengan variability) **tidak boleh lebih baik** dari batas ini (TH lebih rendah / CT lebih tinggi).
+
 ### Di mana di app?
 
 - Tab **Simulasi** → sub-tab **Little's Law** (setelah Jalankan)  

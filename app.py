@@ -48,7 +48,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-fr-inv-axes-v44"
+_APP_BUILD = "2026-08-03-ops-bound-v45"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -646,10 +646,16 @@ def _plot_single_result(result: ParadeResult) -> None:
         d3.metric("TH × CT (cek)", f"{ll.check_pipeline:.2f}",
                   help="Harus ≈ WIP pipeline rata-rata")
         # Dual-axis: X=WIP, YL=TH, YR=CT
-        fig, ax = plt.subplots(figsize=(9.5, 4.8))
+        fig, ax = plt.subplots(figsize=(9.5, 5.0))
         plot_wip_th_ct(result, ax=ax)
         fig.tight_layout()
         _fig_to_st(fig)
+        from parade_of_trades_analysis import littles_operations_curve as _loc
+        _d = _loc(result)
+        st.caption(
+            f"Batas tanpa variasi: TH_max={_d['th_max']:.3f} · T0={_d['t0']:.2f} · W0={_d['w0']:.2f} "
+            f"(critical WIP). Kurva aktual (dengan var) di bawah TH_max / di atas T0."
+        )
         fig, ax = plt.subplots(figsize=(9, 4.0))
         plot_littles_law_wip(result, ax=ax)
         fig.tight_layout()

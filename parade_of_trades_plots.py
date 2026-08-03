@@ -1117,63 +1117,109 @@ def plot_wip_th_ct(
     title: Optional[str] = None,
 ) -> Axes:
     """
-    Dual-axis operations chart:
+    Dual-axis operations chart (Factory Physics style):
       X  = WIP
       YL = Throughput (TH)
       YR = Cycle time (CT)
 
-    Curves from Little's Law + Kingman (parametric in utilization).
-    Dot = operating point from the simulation (pipeline Little metrics).
+    - **Best case** (tanpa variasi, kapasitas bottleneck): envelope batas
+      TH → TH_max, CT → T0 (lalu CT = WIP/TH_max)
+    - **Dengan variability**: kurva Kingman+Little (lebih buruk dari batas)
+    - Titik = operasi simulasi
     """
     if ax is None:
-        _, ax = plt.subplots(figsize=(9.5, 4.8))
+        _, ax = plt.subplots(figsize=(9.5, 5.0))
     from parade_of_trades_analysis import littles_operations_curve
 
     d = littles_operations_curve(result)
-    wip, th, ct = d["wip"], d["th"], d["ct"]
-    if not wip:
-        ax.text(0.5, 0.5, "Kurva tidak tersedia", ha="center", va="center")
-        return ax
-
-    # Sort by WIP for clean lines
-    order = sorted(range(len(wip)), key=lambda i: wip[i])
-    wip_s = [wip[i] for i in order]
-    th_s = [th[i] for i in order]
-    ct_s = [ct[i] for i in order]
-
     color_th = "#2563eb"
     color_ct = "#dc2626"
-
-    line_th, = ax.plot(wip_s, th_s, color=color_th, linewidth=2.1, label="Throughput (TH)")
-    ax.set_xlabel("WIP (zona)")
-    ax.set_ylabel("Throughput TH (zona / periode)", color=color_th)
-    ax.tick_params(axis="y", labelcolor=color_th)
-    ax.set_xlim(left=0)
-    ax.set_ylim(bottom=0)
+    color_bc_th = "#93c5fd"
+    color_bc_ct = "#fca5a5"
 
     ax2 = ax.twinx()
-    line_ct, = ax2.plot(wip_s, ct_s, color=color_ct, linewidth=2.1, linestyle="--", label="Cycle time (CT)")
-    ax2.set_ylabel("Cycle time CT (periode)", color=color_ct)
-    ax2.tick_params(axis="y", labelcolor=color_ct)
-    ax2.set_ylim(bottom=0)
+
+    # --- Best-case envelope (boundary) ---
+    bc_w = d.get("bc_wip") or []
+    bc_th = d.get("bc_th") or []
+    bc_ct = d.get("bc_ct") or []
+    th_max = float(d.get("th_max") or 1.0)
+    t0 = float(d.get("t0") or 1.0)
+    w0 = float(d.get("w0") or 1.0)
+
+    line_bc_th = line_bc_ct = None
+    if bc_w and bc_th:
+        line_bc_th, = ax.plot(
+            bc_w, bc_th, color=color_bc_th, linewidth=2.4, linestyle="-",
+            label=f"TH batas (no var, TH_max={th_max:.2f})",
+        )
+        # fill under best-case TH as "feasible region ceiling"
+        ax.fill_between(bc_w, bc_th, alpha=0.12, color=color_bc_th)
+    if bc_w and bc_ct:
+        line_bc_ct, = ax2.plot(
+            bc_w, bc_ct, color=color_bc_ct, linewidth=2.4, linestyle="-",
+            label=f"CT batas (no var, T0={t0:.2f})",
+        )
+
+    # Mark critical WIP W0 and TH_max / T0
+    ax.axhline(th_max, color=color_bc_th, linestyle=":", linewidth=1.1, alpha=0.9)
+    ax2.axhline(t0, color=color_bc_ct, linestyle=":", linewidth=1.1, alpha=0.9)
+    ax.axvline(w0, color="#94a3b8", linestyle="--", linewidth=1.0, alpha=0.85)
+    ax.text(w0, ax.get_ylim()[1] if False else th_max * 0.08, f"  W0={w0:.1f}",
+            fontsize=8, color="#64748b", va="bottom")
+
+    # --- Actual curve (with variability) ---
+    wip, th, ct = d["wip"], d["th"], d["ct"]
+    line_th = line_ct = None
+    if wip:
+        order = sorted(range(len(wip)), key=lambda i: wip[i])
+        wip_s = [wip[i] for i in order]
+        th_s = [th[i] for i in order]
+        ct_s = [ct[i] for i in order]
+        line_th, = ax.plot(
+            wip_s, th_s, color=color_th, linewidth=2.2,
+            label="TH aktual (dengan var)",
+        )
+        line_ct, = ax2.plot(
+            wip_s, ct_s, color=color_ct, linewidth=2.2, linestyle="--",
+            label="CT aktual (dengan var)",
+        )
 
     # Operating point
     op_w, op_th, op_ct = d["op_wip"], d["op_th"], d["op_ct"]
-    ax.scatter([op_w], [op_th], s=95, color=color_th, zorder=5, edgecolors="white", linewidths=1.2)
-    ax2.scatter([op_w], [op_ct], s=95, color=color_ct, zorder=5, edgecolors="white", linewidths=1.2,
-                marker="s")
-    ax.axvline(op_w, color="#64748b", linestyle=":", linewidth=1.0, alpha=0.7)
+    ax.scatter([op_w], [op_th], s=100, color=color_th, zorder=6, edgecolors="white", linewidths=1.2)
+    ax2.scatter([op_w], [op_ct], s=100, color=color_ct, zorder=6, edgecolors="white",
+                linewidths=1.2, marker="s")
+    ax.axvline(op_w, color="#64748b", linestyle=":", linewidth=1.0, alpha=0.55)
+
+    ax.set_xlabel("WIP (zona)")
+    ax.set_ylabel("Throughput TH (zona / periode)", color=color_th)
+    ax.tick_params(axis="y", labelcolor=color_th)
+    ax2.set_ylabel("Cycle time CT (periode)", color=color_ct)
+    ax2.tick_params(axis="y", labelcolor=color_ct)
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0)
+    ax2.set_ylim(bottom=0)
+    # headroom
+    ymax_th = max(th_max * 1.25, op_th * 1.3, 0.5)
+    ax.set_ylim(0, ymax_th)
+    ymax_ct = max(t0 * 3.0, op_ct * 1.35, max(bc_ct) * 1.05 if bc_ct else 1.0)
+    # keep readable if actual CT shoots up
+    if ct:
+        ymax_ct = min(max(ymax_ct, max(ct) * 1.05), max(ymax_ct, t0 * 12))
+    ax2.set_ylim(0, ymax_ct)
 
     ax.set_title(
         title
-        or f"WIP–TH–CT (Little) · titik operasi WIP={op_w:.2f}, TH={op_th:.3f}, CT={op_ct:.2f}"
+        or (
+            f"WIP–TH–CT · batas no-var (TH_max={th_max:.2f}, T0={t0:.2f}, W0={w0:.1f}) · "
+            f"operasi WIP={op_w:.2f}"
+        )
     )
-    # combined legend
-    lines = [line_th, line_ct]
+
+    lines = [x for x in (line_bc_th, line_th, line_bc_ct, line_ct) if x is not None]
     labels = [l.get_label() for l in lines]
-    ax.legend(lines, labels + [f"Operasi TH @ WIP", f"Operasi CT @ WIP"], loc="center right", fontsize=8, framealpha=0.92)
-    # Fix legend - only two lines + note in title
-    ax.legend(lines, labels, loc="upper left", fontsize=8, framealpha=0.92)
+    ax.legend(lines, labels, loc="center right", fontsize=7.5, framealpha=0.92)
 
     _apply_axes_style(ax)
     ax2.grid(False)
