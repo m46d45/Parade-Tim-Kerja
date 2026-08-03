@@ -113,7 +113,7 @@ def _format_pair(spec: Tuple) -> str:
     return f"rate zona {lo:g}–{hi:g} (var per zona)"
 
 
-def _base_speed_input(key: str, label: str = "Kecepatan dasar", default: float = 1.0) -> float:
+def _base_speed_input(key: str, label: str = "Kapasitas produksi (zona/periode)", default: float = 1.0) -> float:
     labels = [c[0] for c in _SPEED_CHOICES]
     values = {c[0]: c[1] for c in _SPEED_CHOICES}
     default_label = "Normal — 1 zona / 1 periode"
@@ -691,7 +691,7 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
     st.markdown(
         '<div class="pot-callout">'
         "Bandingkan <strong>2 sampai 5</strong> skenario. "
-        "Tiap skenario punya <strong>kecepatan</strong>, <strong>variability</strong>, "
+        "Tiap skenario punya <strong>kapasitas produksi</strong>, <strong>variability</strong>, "
         "dan <strong>batch</strong> handoff sendiri — cocok membandingkan "
         "tingkat variability <em>atau</em> one-piece vs batch besar."
         "</div>",
@@ -902,7 +902,7 @@ def tab_manual() -> None:
 | | |
 |---|---|
 | Build | `{_APP_BUILD}` |
-| Model | **Zone-flow** (kecepatan & variability **per zona**) |
+| Model | **Zone-flow** (kapasitas & variability **per zona**) |
 | Batch default | **4** (sidebar) |
 | Trade | 5 (floor cycle Indonesia) |
 
