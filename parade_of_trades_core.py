@@ -858,6 +858,12 @@ class ParadeOfTrades:
                 else:
                     break
 
+            # Flush partial batch when this trade finished all zones (remainder
+            # e.g. total=50 batch=4 → last 2 would otherwise never hand off).
+            if self.cumulative[i] >= total and self._batch_done[i] > 0:
+                released[i] += self._batch_done[i]
+                self._batch_done[i] = 0
+
             cap = int(round(rate_applied)) if rate_applied > 0 else 0
             capacities[i] = cap
             effectives[i] = max(cap, productions[i])
@@ -914,14 +920,23 @@ class ParadeOfTrades:
             cannot hang forever.
         """
         if max_periods is None:
-            min_cap = min(t.low for t in self.config.trades)
-            # Worst case: every trade always rolls 1 (or min) with starvation.
-            # Bound generously; pure no-variability needs total/mean periods.
-            max_periods = max(
-                self.config.total_units * self.config.n_trades * 5,
-                self.config.total_units * 10,
-                1,
-            )
+            min_cap = min(float(t.low) for t in self.config.trades)
+            # Zone-flow with fractional rates needs more periods (e.g. rate 0.1).
+            if self.config.zone_flow:
+                min_rate = min(max(float(t.low), 1e-6) for t in self.config.trades)
+                max_periods = max(
+                    int(self.config.total_units / min_rate * self.config.n_trades * 4)
+                    + self.config.batch_size * self.config.n_trades * 2
+                    + 100,
+                    self.config.total_units * self.config.n_trades * 5,
+                    500,
+                )
+            else:
+                max_periods = max(
+                    self.config.total_units * self.config.n_trades * 5,
+                    self.config.total_units * 10,
+                    1,
+                )
             if min_cap == 0:
                 # zero capacity can never finish – still bound the loop
                 max_periods = self.config.total_units * 20

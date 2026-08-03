@@ -36,7 +36,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-cmp-skenario-v13"
+_APP_BUILD = "2026-08-03-batch-flush-v14"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -410,12 +410,15 @@ def tab_single_run(total_units: int, seed: Optional[int], n_trades: int) -> None
             st.success("Reset.")
         if run_c:
             cfg = _build_config_from_pairs(pairs, total_units, seed)
-            res = ParadeOfTrades(cfg).run()
-            st.session_state.single_result = res
-            st.success(
-                f"Selesai · Duration **{res.duration}** · batch={cfg.batch_size} · "
-                f"{_starts_caption(res)}"
-            )
+            try:
+                res = ParadeOfTrades(cfg).run()
+                st.session_state.single_result = res
+                st.success(
+                    f"Selesai · Duration **{res.duration}** · batch={cfg.batch_size} · "
+                    f"{_starts_caption(res)}"
+                )
+            except RuntimeError as exc:
+                st.error(f"Simulasi gagal: {exc}")
 
     st.divider()
     result = st.session_state.get("single_result")
@@ -555,26 +558,30 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
     if st.button("Run comparison", type="primary", key="run_cmp", use_container_width=True):
         results = {}
         meta = {}
+        errors = []
         for idx, (label, spec, var, batch_i) in enumerate(scenarios_cfg):
-            # Stable short name for chart/table
             name = f"Skenario {idx + 1}"
             pairs = [spec] * n_trades
-            results[name] = ParadeOfTrades(
-                _build_config_from_pairs(pairs, total_units, seed, batch_size=batch_i)
-            ).run()
-            meta[name] = {
-                "label": label,
-                "var": var,
-                "var_label": VAR_LABELS.get(var, var),
-                "batch": batch_i,
-                "pace": _format_pair(spec),
-            }
-        st.session_state.cmp_multi = results
-        st.session_state.cmp_meta = meta
-        batches = [scenarios_cfg[i][3] for i in range(len(scenarios_cfg))]
-        st.success(
-            f"Selesai · **{len(results)}** skenario · batch = {batches}"
-        )
+            try:
+                results[name] = ParadeOfTrades(
+                    _build_config_from_pairs(pairs, total_units, seed, batch_size=batch_i)
+                ).run()
+                meta[name] = {
+                    "label": label,
+                    "var": var,
+                    "var_label": VAR_LABELS.get(var, var),
+                    "batch": batch_i,
+                    "pace": _format_pair(spec),
+                }
+            except RuntimeError as exc:
+                errors.append(f"{name}: {exc}")
+        if errors:
+            st.error("Gagal menjalankan:\n- " + "\n- ".join(errors))
+        if results:
+            st.session_state.cmp_multi = results
+            st.session_state.cmp_meta = meta
+            batches = [meta[n]["batch"] for n in results]
+            st.success(f"Selesai · **{len(results)}** skenario · batch = {batches}")
 
     if "cmp_multi" not in st.session_state:
         st.info("Atur skenario → **Run comparison**. Coba tombol **Batch 1 vs 4** atau **5× variability**.")
