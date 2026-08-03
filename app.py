@@ -37,7 +37,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-sim-labels-v20"
+_APP_BUILD = "2026-08-03-sim-stable-done-v21"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -192,13 +192,15 @@ def _render_parade_sim_banner() -> None:
     box-shadow: 0 4px 12px rgba(0,0,0,.3);
   }
   .chip small { display:block; font-weight:600; font-size:10px; opacity:.92; margin-top:2px; }
-  .chip.show { display: block; animation: pop .28s ease; }
+  .chip.on { display: block; }
+  .chip.enter { display: block; animation: pop .28s ease; }
   .chip.t1 { background: var(--t1); color:#fff; }
   .chip.t2 { background: var(--t2); color:#1a1200; }
   .chip.t3 { background: var(--t3); color:#fff; }
   .chip.t4 { background: var(--t4); color:#fff; }
   .chip.t5 { background: var(--t5); color:#fff; }
   .chip.done-block {
+    display: block;
     background: linear-gradient(180deg, #e2e8f0, #cbd5e1);
     color: #0f172a;
     border: 1px solid rgba(15,23,42,.12);
@@ -255,72 +257,70 @@ def _render_parade_sim_banner() -> None:
     grid.appendChild(zone);
   }
 
-  function clearSlots() {
-    for (let z = 1; z <= N; z++) {
-      const slot = document.getElementById("slot-" + z);
-      slot.innerHTML = "";
-      document.getElementById("zone-" + z).classList.remove("done");
+  // Stable zone DOM: "Selesai" is not rebuilt each tick (no blink).
+  const zoneState = {};
+
+  function setSlot(zone, kind, key, html, clsList, animate) {
+    const prev = zoneState[zone];
+    if (prev && prev.kind === kind && prev.key === key) return;
+    const slot = document.getElementById("slot-" + zone);
+    const zoneEl = document.getElementById("zone-" + zone);
+    slot.innerHTML = "";
+    if (kind === "empty") {
+      zoneEl.classList.remove("done");
+      zoneState[zone] = { kind: "empty", key: "" };
+      return;
     }
-  }
-
-  function putTeam(zone, team) {
-    const slot = document.getElementById("slot-" + zone);
     const chip = document.createElement("div");
-    chip.className = "chip show " + team.cls;
-    chip.innerHTML = "<span>" + team.name + "</span><small>" + team.job + "</small>";
+    chip.className = clsList + (animate ? " enter" : " on");
+    chip.innerHTML = html;
     slot.appendChild(chip);
-  }
-
-  function putDone(zone) {
-    const slot = document.getElementById("slot-" + zone);
-    const chip = document.createElement("div");
-    chip.className = "chip show done-block";
-    chip.innerHTML = "<span>✓ Selesai</span>";
-    slot.appendChild(chip);
-    document.getElementById("zone-" + zone).classList.add("done");
+    if (kind === "done") zoneEl.classList.add("done");
+    else zoneEl.classList.remove("done");
+    zoneState[zone] = { kind: kind, key: key };
   }
 
   /*
-    Discrete one-piece state for period p (1-based):
-      Team t is in zone (p - t + 1) if that zone is in 1..5.
-      Zone z is fully done when period > z + 4  (T5 finished z at period z+4).
-    Period 0: empty
-    Period 1: T1@1
-    Period 5: T1@5,T2@4,T3@3,T4@2,T5@1
-    Period 6: T2@5,...,T5@2; Z1 done (T5 left Z1)
-    Period 9: T5@5; Z1..Z4 done
-    Period 10: all done
+    Period p: team t at zone (p - t + 1) if in 1..5.
+    Zone z done (hasil kerja) when p >= z + 5 (after T5 left).
   */
   function renderPeriodFixed(p) {
-    clearSlots();
-    if (p === 0) return;
-
-    for (let z = 1; z <= N; z++) {
-      if (p >= z + 5) {
-        putDone(z);
+    const occ = {};
+    if (p > 0) {
+      for (let t = 1; t <= N; t++) {
+        const z = p - t + 1;
+        if (z >= 1 && z <= N) occ[z] = t - 1;
       }
     }
-
-    for (let t = 1; t <= N; t++) {
-      const z = p - t + 1;
-      if (z >= 1 && z <= N) {
-        const slot = document.getElementById("slot-" + z);
-        slot.innerHTML = "";
-        document.getElementById("zone-" + z).classList.remove("done");
-        putTeam(z, TEAMS[t - 1]);
+    for (let z = 1; z <= N; z++) {
+      if (occ[z] !== undefined) {
+        const team = TEAMS[occ[z]];
+        setSlot(
+          z, "team", team.name + "-p" + p + "-z" + z,
+          "<span>" + team.name + "</span><small>" + team.job + "</small>",
+          "chip " + team.cls, true
+        );
+      } else if (p >= z + 5) {
+        setSlot(
+          z, "done", "done-" + z,
+          "<span>✓ Selesai</span>",
+          "chip done-block", false
+        );
+      } else {
+        setSlot(z, "empty", "", "", "", false);
       }
     }
   }
 
   let p = 0;
-  const MAX_P = 10; // 0 empty … 10 all done
+  const MAX_P = 10;
 
   function tick() {
     renderPeriodFixed(p);
     if (p >= MAX_P) {
-      // hold full complete, then reset to empty and restart
       setTimeout(function () {
         p = 0;
+        for (let z = 1; z <= N; z++) delete zoneState[z];
         renderPeriodFixed(0);
         setTimeout(function () {
           p = 1;
