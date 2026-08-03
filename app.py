@@ -56,7 +56,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-conwip-slider-fix-v53"
+_APP_BUILD = "2026-08-03-wopt-fix-v54"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -658,10 +658,20 @@ def _plot_single_result(result: ParadeResult) -> None:
         w_min = float(_d["w_min"])
         w_opt = float(_d["w_opt"])
         e1, e2, e3, e4 = st.columns(4)
-        e1.metric("W_min (kritis)", f"{w_min:.2f}", help="WIP minimal kasus terbaik untuk TH_max")
-        e2.metric("W_opt", f"{w_opt:.2f}", help="WIP optimal: TH≈95% TH_max pada kurva aktual")
+        e1.metric("W_min (kritis)", f"{w_min:.2f}", help="W0 = TH_max × T0 — WIP minimal kasus terbaik")
+        e2.metric("W_opt", f"{w_opt:.2f}", help="WIP optimal praktis (naik jika V>0): α·W0·(1+V·α/(1-α))")
         e3.metric("WIP operasi", f"{_d['op_wip']:.2f}")
-        e4.metric("TH_max / T0", f"{_d['th_max']:.2f} / {_d['t0']:.2f}")
+        e4.metric("V (var factor)", f"{float(_d.get('v_factor', _d.get('v', 0))):.3f}")
+        if abs(w_opt - w_min) < 1e-6:
+            st.caption(
+                "W_min = W_opt karena **variability ≈ 0** (kasus deterministik). "
+                "Naikkan variability di Simulasi agar W_opt > W_min."
+            )
+        else:
+            st.caption(
+                f"W_opt > W_min karena ada variability (V={float(_d.get('v_factor', 0)):.3f}). "
+                f"Butuh lebih banyak WIP untuk menjaga throughput tinggi."
+            )
 
         # Slider CONWIP: fixed bounds + session state only (no value=) agar tidak error
         # saat digeser / saat metrik run berubah.
@@ -696,11 +706,11 @@ def _plot_single_result(result: ParadeResult) -> None:
         fig.tight_layout()
         _fig_to_st(fig)
         st.caption(
-            f"**W_min**={w_min:.2f} (WIP minimal/kritis, = W0) · "
-            f"**W_opt**={w_opt:.2f} (WIP optimal) · "
+            f"**W_min**=W0=TH_max×T0={w_min:.2f} · "
+            f"**W_opt**={w_opt:.2f} (V={float(_d.get('v_factor', 0)):.3f}) · "
             f"**CONWIP**={float(conwip_lvl):.1f} · "
             f"TH_max={_d['th_max']:.3f} · T0={_d['t0']:.2f}. "
-            f"Pita ungu: wilayah W_min→CONWIP. Kurva aktual (var) di bawah TH_max / di atas T0."
+            f"Pita ungu: W_min→CONWIP."
         )
         fig, ax = plt.subplots(figsize=(9, 4.0))
         plot_littles_law_wip(result, ax=ax)
@@ -1005,8 +1015,8 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
             })
         st.dataframe(ll_rows, use_container_width=True, hide_index=True)
         st.caption(
-            "W_min = WIP kritis (terbaik). W_opt = WIP optimal (TH≈95% TH_max). "
-            "CONWIP★ = saran batas WIP konstan (=W_opt). WIP vs W_opt: + berarti lebih gemuk dari optimal."
+            "W_min = W0 kritis (tanpa var). W_opt = α·W0·(1+V·α/(1-α)) — naik jika variability naik. "
+            "Bila V=0 maka W_min=W_opt (bukan error). CONWIP★ ≈ W_opt."
         )
         # Dual-axis operating points: X=WIP, YL=TH, YR=CT
         import numpy as np

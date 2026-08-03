@@ -369,14 +369,15 @@ Artikel PPI membahas perluasan bila ada **yield loss**. Di app ini **y = 1** (ti
 
 | Konsep | Arti | Di grafik |
 |--------|------|-----------|
-| **W_min (W0)** | WIP **minimal/kritis** — WIP terkecil pada kasus terbaik (tanpa var) agar sistem mencapai TH_max | Garis hijau putus-putus |
-| **W_opt** | WIP **optimal** — di kurva aktual (dengan var), WIP di mana TH ≈ 95% TH_max; biasanya **≥ W_min** | Garis oranye putus-putus |
-| **CONWIP** | *Constant Work-In-Process* — kebijakan **membatasi WIP** di tingkat konstan; kerja baru dirilis hanya jika WIP di bawah batas | Garis ungu + pita W_min→CONWIP |
+| **W_min (W0)** | WIP **minimal/kritis** = TH_max × T0 (Factory Physics best case) | Garis hijau |
+| **W_opt** | WIP **optimal praktis** dengan variability: α·W0·(1 + V·α/(1−α)), α≈0,9. Jika **V=0** maka **W_opt = W_min** (benar, bukan bug). | Garis oranye |
+| **CONWIP** | *Constant WIP* — batas WIP konstan; saran awal = W_opt | Garis ungu + pita |
 
-**Intuisi project production:**  
-- Terlalu sedikit WIP → TH jauh di bawah TH_max (kelaparan).  
-- Terlalu banyak WIP → CT membengkak (Little: CT = WIP/TH) tanpa TH tambahan.  
-- **CONWIP ≈ W_opt** menahan inventory sambil menjaga throughput mendekati kapasitas.
+**Intuisi:**  
+- V = 0 → cukup W_min untuk TH penuh → W_opt = W_min.  
+- V > 0 → antrian → butuh WIP lebih besar → **W_opt > W_min**.  
+- Terlalu sedikit WIP → TH rendah; terlalu banyak → CT membengkak.  
+- **CONWIP ≈ W_opt** menahan inventory sambil menjaga throughput.
 
 Slider CONWIP di tab Little's Law (Simulasi) memindahkan batas ungu di grafik.
 

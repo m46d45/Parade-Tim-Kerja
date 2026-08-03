@@ -462,33 +462,36 @@ def littles_operations_curve(
     ll = littles_law_metrics(result)
 
     # --- WIP landmarks (project production / Factory Physics) ---
-    # W_min = W0 = critical WIP (best-case minimum to reach TH_max)
-    w_min = w0
-    # W_opt ≈ first WIP on *actual* (var) curve where TH reaches 95% TH_max;
-    # fallback: WIP that maximizes TH/CT (efficiency) on actual curve.
-    w_opt = None
-    th_target = 0.95 * th_max
-    if wips and ths:
-        order = sorted(range(len(wips)), key=lambda i: wips[i])
-        for i in order:
-            if ths[i] >= th_target - 1e-12:
-                w_opt = wips[i]
-                break
-        if w_opt is None:
-            best_i, best_score = order[0], -1.0
-            for i in order:
-                if cts[i] > 1e-12:
-                    score = ths[i] / cts[i]
-                    if score > best_score:
-                        best_score, best_i = score, i
-            w_opt = wips[best_i]
-    if w_opt is None:
-        w_opt = w_min
-    # Ensure W_opt >= W_min for teaching (variability needs more WIP)
-    w_opt = max(float(w_opt), float(w_min))
+    # W_min = W0 = critical WIP (best-case minimum WIP to reach TH_max).
+    #   W0 = TH_max × T0
+    w_min = float(w0)
 
-    # CONWIP level suggestion: between W_min and W_opt (or = W_opt)
-    # Classic teaching: set CONWIP near optimal WIP to cap inventory while keeping TH
+    # W_opt = practical optimal WIP under variability (Hopp & Spearman style):
+    #   Without variability (V≈0): W_opt = W_min  (deterministic critical is enough)
+    #   With variability: need more WIP to hold high utilization / TH.
+    #   Approximate at target utilization α:
+    #     inflation = 1 + V × α/(1-α)     (VUT wait factor on raw process)
+    #     W_opt = α × W0 × inflation
+    #   so W_opt > W_min whenever V > 0.
+    V = max(float(comb.get("v") or 0.0), 0.0)
+    alpha = 0.90  # target fraction of bottleneck rate for "optimal" region
+    if V < 1e-9:
+        w_opt = w_min
+    else:
+        inflation = 1.0 + V * (alpha / (1.0 - alpha))
+        w_opt = alpha * w_min * inflation
+        # never below critical
+        w_opt = max(w_opt, w_min)
+
+    # Practical upper teaching mark: WIP if pushing α→0.95 with same V
+    alpha_hi = 0.95
+    if V < 1e-9:
+        w_pwc = w_min  # same as critical when deterministic
+    else:
+        infl_hi = 1.0 + V * (alpha_hi / (1.0 - alpha_hi))
+        w_pwc = max(w_opt, alpha_hi * w_min * infl_hi)
+
+    # CONWIP suggestion = W_opt (cap WIP near optimal)
     conwip = float(w_opt)
 
     return {
@@ -510,7 +513,9 @@ def littles_operations_curve(
         "t0": t0,
         "w0": w0,
         "w_min": w_min,
-        "w_opt": w_opt,
+        "w_opt": float(w_opt),
+        "w_pwc": float(w_pwc),
+        "v_factor": float(V),
         "conwip": conwip,
     }
 
