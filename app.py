@@ -1196,7 +1196,7 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
 
 
 def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
-    """Takt plan: UI ringkas + Tommelein 2020 lengkap."""
+    """Takt plan: zona, buffer TPI, simulasi."""
     st.subheader("Takt plan")
 
     c1, c2 = st.columns(2)
