@@ -1,4 +1,4 @@
-"""Parade of Trades – Streamlit app (zone-flow classroom model)."""
+"""Parade Tim Kerja – Streamlit app (model zone-flow untuk kelas)."""
 from __future__ import annotations
 
 import importlib
@@ -37,7 +37,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-sim-slide-v22"
+_APP_BUILD = "2026-08-03-id-brand-v23"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -45,7 +45,7 @@ _LOGO_ICON = _ASSETS_DIR / "logo_icon.jpg"
 _MANUAL_PATH = _APP_DIR / "MANUAL.md"
 
 st.set_page_config(
-    page_title="Parade of Trades",
+    page_title="Parade Tim Kerja",
     page_icon=str(_LOGO_ICON) if _LOGO_ICON.exists() else "🏗️",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -60,11 +60,11 @@ VAR_FACTORS = {
     "very_high": (0.1, 1.9),
 }
 VAR_LABELS = {
-    "no_variability": "No variability — kecepatan sama tiap zona",
-    "low": "Low — rate zona ×0.75 atau ×1.25",
-    "medium": "Medium — rate zona ×0.5 atau ×1.5",
-    "high": "High — rate zona ×0.25 atau ×1.75",
-    "very_high": "Very high — rate zona ×0.1 atau ×1.9",
+    "no_variability": "Tanpa variability — kecepatan sama tiap zona",
+    "low": "Rendah — rate zona ×0.75 atau ×1.25",
+    "medium": "Sedang — rate zona ×0.5 atau ×1.5",
+    "high": "Tinggi — rate zona ×0.25 atau ×1.75",
+    "very_high": "Sangat tinggi — rate zona ×0.1 atau ×1.9",
 }
 _BATCH_OPTIONS = [4, 5, 3, 2, 1]
 
@@ -440,10 +440,10 @@ def _render_header() -> None:
         with c1:
             st.image(str(_LOGO_ICON), width=64)
         with c2:
-            st.markdown("## Parade of Trades")
-            st.caption("Zone-flow · batch/one-piece · kecepatan & variability **per zona**")
+            st.markdown("## Parade Tim Kerja")
+            st.caption("Zone-flow · batch / one-piece · kecepatan & variability **per zona**")
     else:
-        st.title("Parade of Trades")
+        st.title("Parade Tim Kerja")
 
 
 def _build_config_from_pairs(
@@ -485,13 +485,13 @@ def _capacity_setup(
             "Tanpa var: rate sama tiap zona. Dengan var: undi rate <em>per zona</em> "
             "(mis. medium ×0.5 / ×1.5).<br/>"
             f"<strong>Batch handoff</strong> (sidebar) = <strong>{_batch_size()}</strong> — "
-            "zona dilepas ke trade hilir setelah batch penuh (periode berikutnya)."
+            "zona dilepas ke tim hilir setelah batch penuh (periode berikutnya)."
             "</div>",
             unsafe_allow_html=True,
         )
     mode = st.radio(
         "Pengaturan trade",
-        ["Seragam (semua trade sama)", "Per trade (dasar & variability bisa beda)"],
+        ["Seragam (semua tim sama)", "Per tim (dasar & variability bisa beda)"],
         horizontal=True,
         key=f"{key_prefix}_speed_mode",
     )
@@ -500,24 +500,24 @@ def _capacity_setup(
         return PRESET_OPTIONS.index(name) if name in PRESET_OPTIONS else 0
 
     if mode.startswith("Seragam"):
-        base = _base_speed_input(f"{key_prefix}_base", "Kecepatan dasar semua trade", default_base)
+        base = _base_speed_input(f"{key_prefix}_base", "Kecepatan dasar semua tim", default_base)
         var = st.selectbox(
-            "Variability (semua trade)",
+            "Variability (semua tim)",
             PRESET_OPTIONS,
             index=_vi(default_var),
             format_func=lambda x: VAR_LABELS.get(x, x),
             key=f"{key_prefix}_var",
         )
         spec = _pair_from_base_and_var(base, var)
-        st.info(f"Semua trade: **{_format_pair(spec)}** · {VAR_LABELS[var]}")
+        st.info(f"Semua tim: **{_format_pair(spec)}** · {VAR_LABELS[var]}")
         return [spec] * n_trades
 
     pairs: List[Tuple] = []
     for i in range(n_trades):
-        with st.expander(f"Trade {i + 1}: {_trade_name(i)}", expanded=(i < 2)):
-            base_i = _base_speed_input(f"{key_prefix}_base_t{i}", f"Kecepatan T{i + 1}", default_base)
+        with st.expander(f"Tim {i + 1}: {_trade_name(i)}", expanded=(i < 2)):
+            base_i = _base_speed_input(f"{key_prefix}_base_t{i}", f"Kecepatan Tim {i + 1}", default_base)
             var_i = st.selectbox(
-                "Variability trade ini",
+                "Variability tim ini",
                 PRESET_OPTIONS,
                 index=_vi(default_var),
                 format_func=lambda x: VAR_LABELS.get(x, x),
@@ -535,17 +535,17 @@ def _peak_wip(result: ParadeResult) -> int:
 
 def _metrics_row(result: ParadeResult) -> None:
     cols = st.columns(6)
-    cols[0].metric("Duration", f"{result.duration}")
+    cols[0].metric("Durasi", f"{result.duration}")
     cols[1].metric("vs Ideal", f"{result.duration - result.ideal_duration:+.1f}")
     cols[2].metric("Throughput", f"{result.system_throughput:.3f}")
-    cols[3].metric("Total Idle", f"{result.total_idle_capacity}")
-    cols[4].metric("Peak WIP", f"{_peak_wip(result)}")
+    cols[3].metric("Idle total", f"{result.total_idle_capacity}")
+    cols[4].metric("Puncak WIP", f"{_peak_wip(result)}")
     cols[5].metric("Batch", f"{result.config.batch_size}")
 
 
 def _starts_caption(result: ParadeResult) -> str:
     starts = [t.start_period for t in result.trade_metrics]
-    return "Start periode: " + " · ".join(f"T{i + 1}=p{s}" for i, s in enumerate(starts))
+    return "Mulai periode: " + " · ".join(f"T{i + 1}=p{s}" for i, s in enumerate(starts))
 
 
 def _trade_table(result: ParadeResult) -> None:
@@ -553,13 +553,13 @@ def _trade_table(result: ParadeResult) -> None:
     for i, m in enumerate(result.trade_metrics):
         rows.append({
             "#": i + 1,
-            "Trade": m.name,
+            "Tim": m.name,
             "Pace": result.config.trades[i].label(),
-            "Production": m.total_production,
+            "Produksi": m.total_production,
             "Idle": m.total_idle,
-            "Start": m.start_period if m.start_period is not None else "—",
-            "Finish": m.periods_to_finish,
-            "Time on site": m.time_on_site,
+            "Mulai": m.start_period if m.start_period is not None else "—",
+            "Selesai": m.periods_to_finish,
+            "Waktu di lapangan": m.time_on_site,
         })
     st.dataframe(rows, use_container_width=True, hide_index=True)
 
@@ -570,7 +570,7 @@ def _fig_to_st(fig) -> None:
 
 
 def _export_block(result: ParadeResult, key: str) -> None:
-    st.markdown("##### Export")
+    st.markdown("##### Unduh data")
     with tempfile.TemporaryDirectory() as td:
         td_path = Path(td)
         hist = td_path / "history.csv"
@@ -579,7 +579,7 @@ def _export_block(result: ParadeResult, key: str) -> None:
         export_result_excel(result, xlsx)
         c1, c2 = st.columns(2)
         c1.download_button(
-            "⬇ History CSV", hist.read_bytes(), "parade_history.csv", "text/csv",
+            "⬇ CSV riwayat", hist.read_bytes(), "parade_history.csv", "text/csv",
             key=f"{key}_csv", use_container_width=True,
         )
         c2.download_button(
@@ -590,11 +590,11 @@ def _export_block(result: ParadeResult, key: str) -> None:
 
 
 def _plot_single_result(result: ParadeResult) -> None:
-    tab_lob, tab_buf, tab_util = st.tabs(["Line of Balance", "Buffer / WIP", "Utilization"])
+    tab_lob, tab_buf, tab_util = st.tabs(["Line of Balance", "Buffer / WIP", "Utilisasi"])
     with tab_lob:
         st.caption(
             "Sumbu X = periode (dari 0). Sumbu Y = zona kumulatif (dari 0). "
-            f"Batch={result.config.batch_size}: trade hilir mulai setelah handoff batch. "
+            f"Batch={result.config.batch_size}: tim hilir mulai setelah handoff batch. "
             "Garis **bergeser**, tidak menumpuk."
         )
         fig, ax = plt.subplots(figsize=(10, 4.5))
@@ -641,19 +641,19 @@ def render_sidebar():
         with a:
             st.image(str(_LOGO_ICON), width=64)
         with b:
-            st.markdown("### Parade of Trades")
-            st.caption("Zone-flow Indonesia")
+            st.markdown("### Parade Tim Kerja")
+            st.caption("Zone-flow · Indonesia")
     else:
-        st.sidebar.title("Parade of Trades")
+        st.sidebar.title("Parade Tim Kerja")
     st.sidebar.success(
         f"**Build {_APP_BUILD}** — zone-flow · batch default 4 · var per zona. "
-        "Refresh (Ctrl/Cmd+Shift+R) jika banner tidak muncul."
+        "Muat ulang halaman (Ctrl/Cmd+Shift+R) jika banner tidak muncul."
     )
     st.sidebar.divider()
     total_units = st.sidebar.number_input("Total zona", 1, 1000, 20, 5)
-    use_seed = st.sidebar.checkbox("Fix random seed", True)
+    use_seed = st.sidebar.checkbox("Kunci seed acak", True)
     seed = int(st.sidebar.number_input("Seed", 0, 10_000_000, 42, 1)) if use_seed else None
-    st.sidebar.markdown("**Jumlah trade:** 5 (tetap)")
+    st.sidebar.markdown("**Jumlah tim:** 5 (tetap)")
     st.sidebar.caption("1 Bekisting · 2 Tulangan · 3 Cor · 4 Bongkar · 5 Finishing")
     st.sidebar.divider()
     st.sidebar.markdown("**Batch / one-piece flow**")
@@ -667,11 +667,11 @@ def render_sidebar():
             else "1 — One-piece flow (zona per zona)"
         ),
         key="batch_size",
-        help="Default 4: kumpulkan 4 zona dulu baru dilepas ke trade hilir. "
+        help="Default 4: kumpulkan 4 zona dulu baru dilepas ke tim hilir. "
              "1 = one-piece flow.",
     )
     st.sidebar.caption(
-        "Batch dipakai di **Single run** dan **Comparison**."
+        "Batch dipakai di tab **Simulasi** dan **Perbandingan**."
     )
     return int(total_units), seed, 5
 
@@ -679,13 +679,13 @@ def render_sidebar():
 # ----- Tabs -----------------------------------------------------------------
 
 def tab_single_run(total_units: int, seed: Optional[int], n_trades: int) -> None:
-    st.subheader("Single scenario (zone-flow)")
+    st.subheader("Simulasi (zone-flow)")
     st.markdown(
         '<div class="pot-callout">'
         f"<strong>Default batch = {_batch_size()}</strong> (sidebar). "
-        "Semua Normal + No var → T2 mulai setelah T1 melepas batch; LOB dari 0 dan bergeser.<br/>"
+        "Semua Normal + tanpa variability → T2 mulai setelah T1 melepas batch; LOB dari 0 dan bergeser.<br/>"
         "Ubah batch ke <strong>1</strong> untuk one-piece. "
-        "T1 Medium → rate diundi per zona (bukan lompat massal +3 zona)."
+        "T1 variability sedang → rate diundi per zona (bukan lompat massal +3 zona)."
         "</div>",
         unsafe_allow_html=True,
     )
@@ -693,25 +693,25 @@ def tab_single_run(total_units: int, seed: Optional[int], n_trades: int) -> None
     with col_cfg:
         pairs = _capacity_setup("single", n_trades, "no_variability", 1.0)
         st.caption(
-            "Parade: "
+            "Urutan: "
             + " → ".join(f"{_trade_name(i)[:10]} [{_format_pair(pairs[i])}]" for i in range(n_trades))
         )
     with col_ctrl:
         b1, b2 = st.columns(2)
-        run_c = b1.button("Run", type="primary", use_container_width=True, key="single_run")
-        reset_c = b2.button("Reset", use_container_width=True, key="single_reset")
+        run_c = b1.button("Jalankan", type="primary", use_container_width=True, key="single_run")
+        reset_c = b2.button("Atur ulang", use_container_width=True, key="single_reset")
         if "single_result" not in st.session_state:
             st.session_state.single_result = None
         if reset_c:
             st.session_state.single_result = None
-            st.success("Reset.")
+            st.success("Diatur ulang.")
         if run_c:
             cfg = _build_config_from_pairs(pairs, total_units, seed)
             try:
                 res = ParadeOfTrades(cfg).run()
                 st.session_state.single_result = res
                 st.success(
-                    f"Selesai · Duration **{res.duration}** · batch={cfg.batch_size} · "
+                    f"Selesai · Durasi **{res.duration}** · batch={cfg.batch_size} · "
                     f"{_starts_caption(res)}"
                 )
             except RuntimeError as exc:
@@ -720,14 +720,14 @@ def tab_single_run(total_units: int, seed: Optional[int], n_trades: int) -> None
     st.divider()
     result = st.session_state.get("single_result")
     if not result or not result.history:
-        st.info("Atur kapasitas → **Run**.")
+        st.info("Atur kapasitas → **Jalankan**.")
         return
     _metrics_row(result)
     left, right = st.columns([1.25, 1])
     with left:
         _plot_single_result(result)
     with right:
-        st.markdown("##### Trade metrics")
+        st.markdown("##### Metrik per tim")
         _trade_table(result)
         _export_block(result, "single")
 
@@ -737,17 +737,17 @@ def _batch_label(b: int) -> str:
         return "1 — One-piece"
     if b == 4:
         return "4 — Standar"
-    return f"{b} — Handoff tiap {b}"
+    return f"{b} — Handoff tiap {b} zona"
 
 
 def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
-    st.subheader("Comparison (2–5 skenario, zone-flow)")
+    st.subheader("Perbandingan (2–5 skenario, zone-flow)")
     st.markdown(
         '<div class="pot-callout">'
         "Bandingkan <strong>2 sampai 5</strong> skenario. "
         "Tiap skenario punya <strong>kecepatan</strong>, <strong>variability</strong>, "
-        "dan <strong>batch handoff</strong> sendiri — cocok membandingkan "
-        "level variability <em>atau</em> one-piece vs batch besar."
+        "dan <strong>batch</strong> handoff sendiri — cocok membandingkan "
+        "tingkat variability <em>atau</em> one-piece vs batch besar."
         "</div>",
         unsafe_allow_html=True,
     )
@@ -759,12 +759,12 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
     c1, c2, c3, c4 = st.columns(4)
     fill_five = c1.button(
         "5× variability", key="cmp_fill_five", use_container_width=True,
-        help="5 skenario: Skenario 1–5 = No→Very high, batch = sidebar",
+        help="5 skenario: Skenario 1–5 = tanpa var → sangat tinggi, batch = sidebar",
     )
-    fill_two = c2.button("No vs Medium", key="cmp_fill_two", use_container_width=True)
+    fill_two = c2.button("Tanpa var vs Sedang", key="cmp_fill_two", use_container_width=True)
     fill_batch = c3.button(
         "Batch 1 vs 4", key="cmp_fill_batch", use_container_width=True,
-        help="Skenario 1 = one-piece, Skenario 2 = batch 4 (No var)",
+        help="Skenario 1 = one-piece, Skenario 2 = batch 4 (tanpa variability)",
     )
     clear_res = c4.button("Hapus hasil", key="cmp_clear", use_container_width=True)
 
@@ -852,7 +852,7 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
             st.caption(f"{_format_pair(spec)} · batch **{batch_i}**")
             scenarios_cfg.append((label.strip() or f"S{i + 1}", spec, var, batch_i))
 
-    if st.button("Run comparison", type="primary", key="run_cmp", use_container_width=True):
+    if st.button("Jalankan perbandingan", type="primary", key="run_cmp", use_container_width=True):
         results = {}
         meta = {}
         errors = []
@@ -881,7 +881,7 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
             st.success(f"Selesai · **{len(results)}** skenario · batch = {batches}")
 
     if "cmp_multi" not in st.session_state:
-        st.info("Atur skenario → **Run comparison**. Coba tombol **Batch 1 vs 4** atau **5× variability**.")
+        st.info("Atur skenario → **Jalankan perbandingan**. Coba **Batch 1 vs 4** atau **5× variability**.")
         return
 
     results = st.session_state.cmp_multi
@@ -894,33 +894,33 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
             "Variability": m.get("var_label", "—"),
             "Batch": r.config.batch_size,
             "Pace": m.get("pace", r.config.trades[0].label()),
-            "Duration": r.duration,
+            "Durasi": r.duration,
             "vs Ideal": round(r.duration - r.ideal_duration, 1),
             "Idle": r.total_idle_capacity,
-            "Peak WIP": _peak_wip(r),
+            "Puncak WIP": _peak_wip(r),
             "Throughput": round(r.system_throughput, 3),
-            "T5 finish": r.trade_metrics[-1].periods_to_finish,
+            "T5 selesai": r.trade_metrics[-1].periods_to_finish,
         })
-    st.markdown("##### Ringkasan (duration naik)")
-    st.dataframe(sorted(rows, key=lambda x: x["Duration"]), use_container_width=True, hide_index=True)
+    st.markdown("##### Ringkasan (durasi naik)")
+    st.dataframe(sorted(rows, key=lambda x: x["Durasi"]), use_container_width=True, hide_index=True)
 
     fig, ax = plt.subplots(figsize=(10, 5.5))
     plot_comparison_lob(
         results,
         ax=ax,
-        title="LOB skenario — mulai (0,0) · trade terakhir · batch bisa beda",
+        title="LOB skenario — mulai (0,0) · tim terakhir · batch bisa beda",
         last_trade_only=True,
     )
     fig.tight_layout()
     _fig_to_st(fig)
     st.caption(
         "Semua kurva **mulai dari (periode 0, zona 0)**. "
-        "Garis = kumulatif **trade terakhir** (proyek selesai). "
-        "Batch=1 (one-piece): trade terakhir mulai paling awal. "
-        "Batch besar: trade terakhir mulai lebih lambat (tunggu handoff)."
+        "Garis = kumulatif **tim terakhir** (proyek selesai). "
+        "Batch=1 (one-piece): tim terakhir mulai paling awal. "
+        "Batch besar: tim terakhir mulai lebih lambat (tunggu handoff)."
     )
 
-    with st.expander("Detail trade satu skenario"):
+    with st.expander("Detail tim satu skenario"):
         pick = st.selectbox("Skenario", list(results.keys()), key="cmp_detail_pick")
         st.caption(f"Batch skenario ini = **{results[pick].config.batch_size}**")
         _trade_table(results[pick])
@@ -932,8 +932,8 @@ def tab_manual() -> None:
     st.subheader("📖 Manual & tentang model")
     st.markdown(
         '<div class="pot-field">'
-        "Panduan zone-flow untuk kelas. Ringkas: tiga tab saja — "
-        "<strong>Single run</strong> (eksperimen), <strong>Comparison</strong> (2–5 skenario), "
+        "Panduan zone-flow untuk kelas. Tiga tab: "
+        "<strong>Simulasi</strong> (eksperimen), <strong>Perbandingan</strong> (2–5 skenario), "
         "<strong>Manual</strong> (panduan)."
         "</div>",
         unsafe_allow_html=True,
@@ -942,7 +942,7 @@ def tab_manual() -> None:
         st.download_button(
             "⬇ Unduh MANUAL.md",
             data=_MANUAL_PATH.read_text(encoding="utf-8").encode("utf-8"),
-            file_name="Parade_of_Trades_Manual_ZoneFlow.md",
+            file_name="Parade_Tim_Kerja_Manual.md",
             mime="text/markdown",
             key="manual_dl",
         )
@@ -956,13 +956,13 @@ def tab_manual() -> None:
 | | |
 |---|---|
 | Build | `{_APP_BUILD}` |
-| Model | **Zone-flow** (kecepatan & var **per zona**) |
+| Model | **Zone-flow** (kecepatan & variability **per zona**) |
 | Batch default | **4** (sidebar) |
 | Trade | 5 (floor cycle Indonesia) |
 
 **Tab yang dipakai**
-1. **Single run** — satu skenario, LOB / buffer / utilization  
-2. **Comparison** — 2–5 skenario (var & **batch** bisa beda)  
+1. **Simulasi** — satu skenario, LOB / buffer / utilisasi  
+2. **Perbandingan** — 2–5 skenario (variability & **batch** bisa beda)  
 3. **Manual** — panduan belajar + tentang  
 
 Referensi: Tommelein, Riley & Howell (1999); Choo & Tommelein (1999); Tommelein (2020).
@@ -972,7 +972,7 @@ Referensi: Tommelein, Riley & Howell (1999); Choo & Tommelein (1999); Tommelein 
 def main() -> None:
     total_units, seed, n_trades = render_sidebar()
     _render_header()
-    tabs = st.tabs(["Single run", "Comparison", "Manual"])
+    tabs = st.tabs(["Simulasi", "Perbandingan", "Manual"])
     with tabs[0]:
         tab_single_run(total_units, seed, n_trades)
     with tabs[1]:

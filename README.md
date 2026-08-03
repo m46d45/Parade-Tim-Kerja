@@ -1,4 +1,4 @@
-# Parade of Trades
+# Parade Tim Kerja
 
 Simulasi **Lean Construction** interaktif untuk belajar dampak *variability* dan ketergantungan sekuensial antar trade terhadap durasi, throughput, WIP, dan waste.
 
@@ -28,8 +28,8 @@ Mahasiswa **tidak perlu menginstal Python** — cukup buka link di browser.
 
 | Tab | Fungsi |
 |-----|--------|
-| **Single run** | Satu skenario zone-flow: kecepatan + variability **per zona**, LOB / WIP / utilization |
-| **Comparison** | Bandingkan **2–5** skenario (mis. kelima level variability) |
+| **Simulasi** | Satu skenario zone-flow: kecepatan + variability **per zona**, LOB / WIP / utilization |
+| **Perbandingan** | Bandingkan **2–5** skenario (mis. kelima level variability) |
 | **Manual** | Panduan belajar + tentang model |
 
 **Batch handoff** default **4 zona** (sidebar; 1 = one-piece flow).  
@@ -73,8 +73,8 @@ Detail langkah: lihat file [DEPLOY.md](DEPLOY.md).
 
 - Tommelein, Riley & Howell (1999). *Parade Game…* ASCE J. Constr. Eng. Manage.  
 - Choo & Tommelein (1999). Technical Report 99-1, UC Berkeley.  
-- Tommelein (2020). *Takting the Parade of Trades.* IGLC28.  
-- [P2SL — Parade of Trades](https://p2sl.berkeley.edu/parade-of-trades-game-2/)
+- Tommelein (2020). *Takting the Parade Tim Kerja.* IGLC28.  
+- [P2SL — Parade Tim Kerja](https://p2sl.berkeley.edu/parade-of-trades-game-2/)
 
 ## Lisensi & kredit
 

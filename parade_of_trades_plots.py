@@ -329,7 +329,7 @@ def plot_buffer_profile(
 
     ax.set_xlim(left=0)
     ax.set_ylim(bottom=0)
-    ax.set_xlabel("Period")
+    ax.set_xlabel("Periode")
     ax.set_title(title or "Buffer / WIP Profile")
     ax.legend(loc="upper right", fontsize=8, framealpha=0.92)
     _apply_axes_style(ax)
@@ -518,8 +518,8 @@ def plot_comparison_lob(
     ax.set_xlim(0, max(max_period, 1) * 1.02)
     ax.set_ylim(0, total * 1.08)
     ax.set_xlabel("Periode (mulai 0)")
-    ax.set_ylabel("Zona kumulatif trade terakhir (mulai 0)")
-    ax.set_title(title or "Line of Balance – perbandingan skenario (dari 0,0)")
+    ax.set_ylabel("Zona kumulatif tim terakhir (mulai 0)")
+    ax.set_title(title or "Line of Balance — perbandingan skenario (dari 0,0)")
     ax.legend(loc="lower right", fontsize=8, framealpha=0.92)
     _apply_axes_style(ax)
     return ax
@@ -552,7 +552,7 @@ def plot_comparison_buffers(
 
     ax.set_xlim(left=0)
     ax.set_ylim(bottom=0)
-    ax.set_xlabel("Period")
+    ax.set_xlabel("Periode")
     ax.set_ylabel("Total WIP (all interfaces)")
     ax.set_title(title or "Total Buffer / WIP – Scenario Comparison")
     ax.legend(loc="upper right", fontsize=8, framealpha=0.92)
