@@ -24,32 +24,22 @@ Mahasiswa **tidak perlu menginstal Python** — cukup buka link di browser.
 - Peserta workshop Lean Construction  
 - Dosen yang butuh demo interaktif di kelas  
 
-## Fitur
+## Fitur (zone-flow classroom)
 
 | Tab | Fungsi |
 |-----|--------|
-| Single run | Satu skenario, Run / Step, grafik LOB · WIP · utilization |
-| Compare 2 | Bandingkan dua skenario berdampingan |
-| Preset sweep | Semua tingkat variability sekaligus |
-| Takt 2020 | Capacity buffer (Tommelein 2020) + multi-replikasi |
-| Replications | Statistik mean / std / min–max |
-| Manual | Panduan belajar mahasiswa (Bahasa Indonesia) |
+| **Single run** | Satu skenario zone-flow: kecepatan + variability **per zona**, LOB / WIP / utilization |
+| **Comparison** | Bandingkan **2–5** skenario (mis. kelima level variability) |
+| **Manual** | Panduan belajar + tentang model |
 
-## Trade default (floor cycle)
-
-1. Pemasangan Bekisting  
-2. Pemasangan Tulangan  
-3. Pengecoran Beton  
-4. Pembongkaran Bekisting  
-5. Finishing Lantai  
-
-Default: **100 zona**, mean capacity **5** unit/periode.
+**Batch handoff** default **4 zona** (sidebar; 1 = one-piece flow).  
+Default demo: **20 zona**, 5 trade floor cycle Indonesia.
 
 ## Menjalankan di komputer sendiri (opsional, untuk pengembang)
 
 ```bash
-git clone https://github.com/USERNAME/parade-of-trades.git
-cd parade-of-trades
+git clone https://github.com/m46d45/Parade-Tim-Kerja.git
+cd Parade-Tim-Kerja
 python -m pip install -r requirements.txt
 streamlit run app.py
 ```
