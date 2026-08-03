@@ -1115,20 +1115,25 @@ def plot_wip_th_ct(
     result: ParadeResult,
     ax: Optional[Axes] = None,
     title: Optional[str] = None,
+    conwip_level: Optional[float] = None,
 ) -> Axes:
     """
-    Dual-axis operations chart (Factory Physics style):
+    Dual-axis operations chart with WIP landmarks:
+
       X  = WIP
       YL = Throughput (TH)
       YR = Cycle time (CT)
 
-    - **Best case** (tanpa variasi, kapasitas bottleneck): envelope batas
-      TH → TH_max, CT → T0 (lalu CT = WIP/TH_max)
-    - **Dengan variability**: kurva Kingman+Little (lebih buruk dari batas)
-    - Titik = operasi simulasi
+    - Best-case envelope (no var, bottleneck)
+    - Actual curve (with variability)
+    - **W_min (W0)**: WIP minimal/kritis — WIP terkecil (kasus terbaik) untuk
+      mencapai TH_max
+    - **W_opt**: WIP optimal (ajaran) — WIP di kurva aktual di mana TH ≈ 95%
+      TH_max (butuh ≥ W_min jika ada variability)
+    - **CONWIP**: batas WIP konstan (Constant WIP); default = W_opt
     """
     if ax is None:
-        _, ax = plt.subplots(figsize=(9.5, 5.0))
+        _, ax = plt.subplots(figsize=(9.5, 5.2))
     from parade_of_trades_analysis import littles_operations_curve
 
     d = littles_operations_curve(result)
@@ -1139,36 +1144,32 @@ def plot_wip_th_ct(
 
     ax2 = ax.twinx()
 
-    # --- Best-case envelope (boundary) ---
     bc_w = d.get("bc_wip") or []
     bc_th = d.get("bc_th") or []
     bc_ct = d.get("bc_ct") or []
     th_max = float(d.get("th_max") or 1.0)
     t0 = float(d.get("t0") or 1.0)
-    w0 = float(d.get("w0") or 1.0)
+    w_min = float(d.get("w_min") or d.get("w0") or 1.0)
+    w_opt = float(d.get("w_opt") or w_min)
+    conwip = float(conwip_level) if conwip_level is not None else float(d.get("conwip") or w_opt)
 
     line_bc_th = line_bc_ct = None
     if bc_w and bc_th:
         line_bc_th, = ax.plot(
-            bc_w, bc_th, color=color_bc_th, linewidth=2.4, linestyle="-",
+            bc_w, bc_th, color=color_bc_th, linewidth=2.2,
             label=f"TH batas (no var, TH_max={th_max:.2f})",
         )
-        # fill under best-case TH as "feasible region ceiling"
-        ax.fill_between(bc_w, bc_th, alpha=0.12, color=color_bc_th)
+        ax.fill_between(bc_w, bc_th, alpha=0.10, color=color_bc_th)
     if bc_w and bc_ct:
         line_bc_ct, = ax2.plot(
-            bc_w, bc_ct, color=color_bc_ct, linewidth=2.4, linestyle="-",
-            label=f"CT batas (no var, T0={t0:.2f})",
+            bc_w, bc_ct, color=color_bc_ct, linewidth=2.2,
+            label=f"CT batas (T0={t0:.2f})",
         )
 
-    # Mark critical WIP W0 and TH_max / T0
-    ax.axhline(th_max, color=color_bc_th, linestyle=":", linewidth=1.1, alpha=0.9)
-    ax2.axhline(t0, color=color_bc_ct, linestyle=":", linewidth=1.1, alpha=0.9)
-    ax.axvline(w0, color="#94a3b8", linestyle="--", linewidth=1.0, alpha=0.85)
-    ax.text(w0, ax.get_ylim()[1] if False else th_max * 0.08, f"  W0={w0:.1f}",
-            fontsize=8, color="#64748b", va="bottom")
+    ax.axhline(th_max, color=color_bc_th, linestyle=":", linewidth=1.0, alpha=0.85)
+    ax2.axhline(t0, color=color_bc_ct, linestyle=":", linewidth=1.0, alpha=0.85)
 
-    # --- Actual curve (with variability) ---
+    # Actual curves
     wip, th, ct = d["wip"], d["th"], d["ct"]
     line_th = line_ct = None
     if wip:
@@ -1176,35 +1177,36 @@ def plot_wip_th_ct(
         wip_s = [wip[i] for i in order]
         th_s = [th[i] for i in order]
         ct_s = [ct[i] for i in order]
-        line_th, = ax.plot(
-            wip_s, th_s, color=color_th, linewidth=2.2,
-            label="TH aktual (dengan var)",
-        )
-        line_ct, = ax2.plot(
-            wip_s, ct_s, color=color_ct, linewidth=2.2, linestyle="--",
-            label="CT aktual (dengan var)",
-        )
+        line_th, = ax.plot(wip_s, th_s, color=color_th, linewidth=2.2, label="TH aktual (var)")
+        line_ct, = ax2.plot(wip_s, ct_s, color=color_ct, linewidth=2.2, linestyle="--", label="CT aktual (var)")
+
+    # --- Landmarks: W_min, W_opt, CONWIP ---
+    ymax_th = max(th_max * 1.25, float(d["op_th"]) * 1.3, 0.5)
+    ax.axvline(w_min, color="#15803d", linestyle="--", linewidth=1.6, alpha=0.9)
+    ax.axvline(w_opt, color="#c2410c", linestyle="--", linewidth=1.6, alpha=0.9)
+    ax.axvline(conwip, color="#7c3aed", linestyle="-", linewidth=2.0, alpha=0.85)
+    # soft band: W_min .. CONWIP = recommended CONWIP operating region
+    x_right = max(bc_w[-1] if bc_w else w_opt * 3, d["op_wip"] * 1.2, conwip * 1.5, w_opt * 2)
+    ax.axvspan(w_min, conwip, color="#7c3aed", alpha=0.06, zorder=0)
+
+    ax.text(w_min, ymax_th * 0.92, f" W_min={w_min:.1f}", color="#15803d", fontsize=8, va="top")
+    ax.text(w_opt, ymax_th * 0.80, f" W_opt={w_opt:.1f}", color="#c2410c", fontsize=8, va="top")
+    ax.text(conwip, ymax_th * 0.68, f" CONWIP={conwip:.1f}", color="#7c3aed", fontsize=8, va="top")
 
     # Operating point
     op_w, op_th, op_ct = d["op_wip"], d["op_th"], d["op_ct"]
     ax.scatter([op_w], [op_th], s=100, color=color_th, zorder=6, edgecolors="white", linewidths=1.2)
     ax2.scatter([op_w], [op_ct], s=100, color=color_ct, zorder=6, edgecolors="white",
                 linewidths=1.2, marker="s")
-    ax.axvline(op_w, color="#64748b", linestyle=":", linewidth=1.0, alpha=0.55)
 
     ax.set_xlabel("WIP (zona)")
     ax.set_ylabel("Throughput TH (zona / periode)", color=color_th)
     ax.tick_params(axis="y", labelcolor=color_th)
     ax2.set_ylabel("Cycle time CT (periode)", color=color_ct)
     ax2.tick_params(axis="y", labelcolor=color_ct)
-    ax.set_xlim(left=0)
-    ax.set_ylim(bottom=0)
-    ax2.set_ylim(bottom=0)
-    # headroom
-    ymax_th = max(th_max * 1.25, op_th * 1.3, 0.5)
+    ax.set_xlim(0, x_right)
     ax.set_ylim(0, ymax_th)
     ymax_ct = max(t0 * 3.0, op_ct * 1.35, max(bc_ct) * 1.05 if bc_ct else 1.0)
-    # keep readable if actual CT shoots up
     if ct:
         ymax_ct = min(max(ymax_ct, max(ct) * 1.05), max(ymax_ct, t0 * 12))
     ax2.set_ylim(0, ymax_ct)
@@ -1212,18 +1214,28 @@ def plot_wip_th_ct(
     ax.set_title(
         title
         or (
-            f"WIP–TH–CT · batas no-var (TH_max={th_max:.2f}, T0={t0:.2f}, W0={w0:.1f}) · "
+            f"WIP–TH–CT · W_min={w_min:.1f} · W_opt={w_opt:.1f} · CONWIP={conwip:.1f} · "
             f"operasi WIP={op_w:.2f}"
         )
     )
 
     lines = [x for x in (line_bc_th, line_th, line_bc_ct, line_ct) if x is not None]
     labels = [l.get_label() for l in lines]
-    ax.legend(lines, labels, loc="center right", fontsize=7.5, framealpha=0.92)
+    # landmark proxies for legend
+    from matplotlib.lines import Line2D
+    extra = [
+        Line2D([0], [0], color="#15803d", linestyle="--", label="W_min (WIP minimal/kritis)"),
+        Line2D([0], [0], color="#c2410c", linestyle="--", label="W_opt (WIP optimal)"),
+        Line2D([0], [0], color="#7c3aed", linestyle="-", linewidth=2, label="CONWIP (batas WIP)"),
+    ]
+    ax.legend(lines + extra, labels + [e.get_label() for e in extra],
+              loc="center right", fontsize=7.2, framealpha=0.92)
 
     _apply_axes_style(ax)
     ax2.grid(False)
     return ax
+
+
 
 def plot_inventory_fill_rate(
     result: ParadeResult,

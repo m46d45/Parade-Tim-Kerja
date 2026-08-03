@@ -365,7 +365,22 @@ Artikel PPI membahas perluasan bila ada **yield loss**. Di app ini **y = 1** (ti
 | **Y kiri** | Throughput (TH) |
 | **Y kanan** | Cycle time (CT) |
 
-### 10.3 Batas ideal Factory Physics (tanpa variasi)
+### 10.3 WIP minimal, WIP optimal, dan CONWIP
+
+| Konsep | Arti | Di grafik |
+|--------|------|-----------|
+| **W_min (W0)** | WIP **minimal/kritis** — WIP terkecil pada kasus terbaik (tanpa var) agar sistem mencapai TH_max | Garis hijau putus-putus |
+| **W_opt** | WIP **optimal** — di kurva aktual (dengan var), WIP di mana TH ≈ 95% TH_max; biasanya **≥ W_min** | Garis oranye putus-putus |
+| **CONWIP** | *Constant Work-In-Process* — kebijakan **membatasi WIP** di tingkat konstan; kerja baru dirilis hanya jika WIP di bawah batas | Garis ungu + pita W_min→CONWIP |
+
+**Intuisi project production:**  
+- Terlalu sedikit WIP → TH jauh di bawah TH_max (kelaparan).  
+- Terlalu banyak WIP → CT membengkak (Little: CT = WIP/TH) tanpa TH tambahan.  
+- **CONWIP ≈ W_opt** menahan inventory sambil menjaga throughput mendekati kapasitas.
+
+Slider CONWIP di tab Little's Law (Simulasi) memindahkan batas ungu di grafik.
+
+### 10.4 Batas ideal Factory Physics (tanpa variasi)
 
 | Simbol | Arti |
 |--------|------|
@@ -382,7 +397,7 @@ Kurva aktual (dengan variability) **tidak lebih baik** dari batas: TH lebih rend
 
 Contoh Normal: TH_max = 1, T0 = 5, W0 = 5.
 
-### 10.4 Jejak WIP
+### 10.5 Jejak WIP
 
 Grafik pipeline WIP vs buffer WIP sepanjang periode — melihat “isi pipa” proyek.
 

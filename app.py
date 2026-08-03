@@ -56,7 +56,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-takt-buffers-v51"
+_APP_BUILD = "2026-08-03-conwip-v52"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -653,16 +653,37 @@ def _plot_single_result(result: ParadeResult) -> None:
         d2.metric("CT buffer", f"{ll.cycle_time_buffer:.2f}")
         d3.metric("TH × CT (cek)", f"{ll.check_pipeline:.2f}",
                   help="Harus ≈ WIP pipeline rata-rata")
-        # Dual-axis: X=WIP, YL=TH, YR=CT
-        fig, ax = plt.subplots(figsize=(9.5, 5.0))
-        plot_wip_th_ct(result, ax=ax)
-        fig.tight_layout()
-        _fig_to_st(fig)
         from parade_of_trades_analysis import littles_operations_curve as _loc
         _d = _loc(result)
+        w_min = float(_d["w_min"])
+        w_opt = float(_d["w_opt"])
+        e1, e2, e3, e4 = st.columns(4)
+        e1.metric("W_min (kritis)", f"{w_min:.2f}", help="WIP minimal kasus terbaik untuk TH_max")
+        e2.metric("W_opt", f"{w_opt:.2f}", help="WIP optimal: TH≈95% TH_max pada kurva aktual")
+        e3.metric("WIP operasi", f"{_d['op_wip']:.2f}")
+        e4.metric("TH_max / T0", f"{_d['th_max']:.2f} / {_d['t0']:.2f}")
+
+        conwip_default = float(_d["conwip"])
+        conwip_lvl = st.slider(
+            "CONWIP — batas WIP konstan",
+            min_value=0.5,
+            max_value=max(float(_d["op_wip"]) * 2.5, w_opt * 3.0, w_min * 4.0, 8.0),
+            value=min(max(conwip_default, w_min), max(float(_d["op_wip"]) * 2.5, w_opt * 3.0, 8.0)),
+            step=0.5,
+            key="ll_conwip_level",
+            help="Constant Work-In-Process: rilis kerja baru hanya jika WIP di bawah batas ini.",
+        )
+
+        fig, ax = plt.subplots(figsize=(9.5, 5.2))
+        plot_wip_th_ct(result, ax=ax, conwip_level=float(conwip_lvl))
+        fig.tight_layout()
+        _fig_to_st(fig)
         st.caption(
-            f"Batas tanpa variasi: TH_max={_d['th_max']:.3f} · T0={_d['t0']:.2f} · W0={_d['w0']:.2f} "
-            f"(critical WIP). Kurva aktual (dengan var) di bawah TH_max / di atas T0."
+            f"**W_min**={w_min:.2f} (WIP minimal/kritis, = W0) · "
+            f"**W_opt**={w_opt:.2f} (WIP optimal) · "
+            f"**CONWIP**={float(conwip_lvl):.1f} · "
+            f"TH_max={_d['th_max']:.3f} · T0={_d['t0']:.2f}. "
+            f"Pita ungu: wilayah W_min→CONWIP. Kurva aktual (var) di bawah TH_max / di atas T0."
         )
         fig, ax = plt.subplots(figsize=(9, 4.0))
         plot_littles_law_wip(result, ax=ax)
@@ -950,25 +971,37 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
         fig.tight_layout()
         _fig_to_st(fig)
     with tab_ll:
+        from parade_of_trades_analysis import littles_operations_curve as _loc
         ll_rows = []
         for name, r in results.items():
             ll = littles_law_metrics(r)
+            d = _loc(r)
             ll_rows.append({
                 "Skenario": name,
                 "TH": round(ll.throughput, 4),
-                "WIP pipeline ⌀": round(ll.avg_pipeline_wip, 3),
-                "CT pipeline": round(ll.cycle_time_pipeline, 3),
-                "WIP buffer ⌀": round(ll.avg_buffer_wip, 3),
-                "CT buffer": round(ll.cycle_time_buffer, 3),
-                "TH×CT": round(ll.check_pipeline, 3),
+                "WIP⌀": round(ll.avg_pipeline_wip, 3),
+                "CT": round(ll.cycle_time_pipeline, 3),
+                "W_min": round(d["w_min"], 2),
+                "W_opt": round(d["w_opt"], 2),
+                "CONWIP★": round(d["conwip"], 2),
+                "WIP vs W_opt": round(ll.avg_pipeline_wip - d["w_opt"], 2),
             })
         st.dataframe(ll_rows, use_container_width=True, hide_index=True)
+        st.caption(
+            "W_min = WIP kritis (terbaik). W_opt = WIP optimal (TH≈95% TH_max). "
+            "CONWIP★ = saran batas WIP konstan (=W_opt). WIP vs W_opt: + berarti lebih gemuk dari optimal."
+        )
         # Dual-axis operating points: X=WIP, YL=TH, YR=CT
         import numpy as np
         names = list(results.keys())
         colors = ["#2563eb", "#ea580c", "#16a34a", "#dc2626", "#7c3aed"]
         fig, ax = plt.subplots(figsize=(9.5, 4.8))
         ax2 = ax.twinx()
+        # reference landmarks from first scenario
+        _d0 = _loc(results[names[0]])
+        ax.axvline(_d0["w_min"], color="#15803d", linestyle="--", linewidth=1.2, alpha=0.8, label="W_min")
+        ax.axvline(_d0["w_opt"], color="#c2410c", linestyle="--", linewidth=1.2, alpha=0.8, label="W_opt")
+        ax.axvline(_d0["conwip"], color="#7c3aed", linestyle="-", linewidth=1.5, alpha=0.75, label="CONWIP★")
         for i, name in enumerate(names):
             ll = littles_law_metrics(results[name])
             c = colors[i % len(colors)]
@@ -982,7 +1015,7 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
         ax.set_xlim(left=0)
         ax.set_ylim(bottom=0)
         ax2.set_ylim(bottom=0)
-        ax.set_title("Titik operasi skenario · X=WIP · Yₖᵢᵣᵢ=TH · Yₖₐₙₐₙ=CT")
+        ax.set_title("Titik operasi · X=WIP · Yₖᵢᵣᵢ=TH · Yₖₐₙₐₙ=CT (bandingkan ke W_min/W_opt di Simulasi)")
         ax.legend(loc="upper left", fontsize=7.5, framealpha=0.92)
         fig.tight_layout()
         _fig_to_st(fig)

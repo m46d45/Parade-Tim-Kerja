@@ -460,6 +460,37 @@ def littles_operations_curve(
         wips.append(wip)
 
     ll = littles_law_metrics(result)
+
+    # --- WIP landmarks (project production / Factory Physics) ---
+    # W_min = W0 = critical WIP (best-case minimum to reach TH_max)
+    w_min = w0
+    # W_opt ≈ first WIP on *actual* (var) curve where TH reaches 95% TH_max;
+    # fallback: WIP that maximizes TH/CT (efficiency) on actual curve.
+    w_opt = None
+    th_target = 0.95 * th_max
+    if wips and ths:
+        order = sorted(range(len(wips)), key=lambda i: wips[i])
+        for i in order:
+            if ths[i] >= th_target - 1e-12:
+                w_opt = wips[i]
+                break
+        if w_opt is None:
+            best_i, best_score = order[0], -1.0
+            for i in order:
+                if cts[i] > 1e-12:
+                    score = ths[i] / cts[i]
+                    if score > best_score:
+                        best_score, best_i = score, i
+            w_opt = wips[best_i]
+    if w_opt is None:
+        w_opt = w_min
+    # Ensure W_opt >= W_min for teaching (variability needs more WIP)
+    w_opt = max(float(w_opt), float(w_min))
+
+    # CONWIP level suggestion: between W_min and W_opt (or = W_opt)
+    # Classic teaching: set CONWIP near optimal WIP to cap inventory while keeping TH
+    conwip = float(w_opt)
+
     return {
         "wip": wips,
         "th": ths,
@@ -478,6 +509,9 @@ def littles_operations_curve(
         "th_max": th_max,
         "t0": t0,
         "w0": w0,
+        "w_min": w_min,
+        "w_opt": w_opt,
+        "conwip": conwip,
     }
 
 
