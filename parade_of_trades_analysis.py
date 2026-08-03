@@ -648,57 +648,163 @@ def build_takt_plan(
     handoff_lag: int = 1,
 ) -> TaktPlan:
     """
-    Build an ideal takt plan (zone-flow, no variability).
+    Ideal takt plan = hasil simulasi zone-flow deterministik (tanpa variability).
 
-    - Capacity ``rate`` zona/periode per tim (konstan).
-    - Waktu satu zona di satu stasiun: takt_time = 1/rate.
-    - Batch handoff: zona dalam batch dilepas bersama setelah hulu
-      menyelesaikan zona terakhir batch; + handoff_lag periode.
-    - Outer loop = trade (hulu selesai semua zona dulu di struktur data).
+    Variabel desain:
+    - ``n_zones``: jumlah zona
+    - ``batch_size``: ukuran takt / batch handoff (zona per serah-terima)
+    - ``rate``: kapasitas rencana (zona/periode)
+    - ``handoff_lag``: disimpan untuk metadata (engine memakai next-period = 1)
+
+    Durasi rencana = durasi simulasi ideal (selaras dengan tab Simulasi
+    bila kapasitas & batch sama, tanpa var).
     """
     rate = max(float(rate), 1e-9)
-    tt = 1.0 / rate
     batch_size = max(1, int(batch_size))
-    dur = max(1, int(math.ceil(tt - 1e-12)))
-    finish: List[List[int]] = [[0] * n_zones for _ in range(n_trades)]
-    start: List[List[int]] = [[0] * n_zones for _ in range(n_trades)]
-    cells: List[TaktPlanCell] = []
+    n_zones = max(1, int(n_zones))
+    n_trades = max(1, int(n_trades))
+    tt = 1.0 / rate
 
-    for i in range(n_trades):
+    pairs = [(rate, rate, 0.5, rate, True)] * n_trades
+    cfg = ParadeConfig.from_pairs(
+        pairs,
+        total_units=n_zones,
+        seed=0,
+        zone_flow=True,
+        batch_size=batch_size,
+    )
+    result = ParadeOfTrades(cfg).run()
+
+    # Infer per-zone finish periods from cumulative history
+    n = n_trades
+    actual_fin: List[List[Optional[int]]] = [[None] * n_zones for _ in range(n)]
+    actual_start: List[List[Optional[int]]] = [[None] * n_zones for _ in range(n)]
+    prev_cum = [0] * n
+    for rec in result.history:
+        for i in range(n):
+            cum = int(rec.cumulative[i])
+            if cum > prev_cum[i]:
+                for z in range(prev_cum[i], min(cum, n_zones)):
+                    actual_fin[i][z] = rec.period
+                    # start ≈ finish - ceil(tt) + 1 for rate<=1; use prev finish+1
+                    if z == 0:
+                        actual_start[i][z] = result.trade_metrics[i].start_period or rec.period
+                    else:
+                        prev_f = actual_fin[i][z - 1]
+                        actual_start[i][z] = (prev_f + 1) if prev_f else rec.period
+                prev_cum[i] = cum
+
+    cells: List[TaktPlanCell] = []
+    for i in range(n):
         for z in range(n_zones):
-            if i == 0:
-                p0 = 1 if z == 0 else finish[0][z - 1] + 1
-            else:
-                group_end = min(((z // batch_size) + 1) * batch_size - 1, n_zones - 1)
-                release = finish[i - 1][group_end] + handoff_lag
-                if z == 0:
-                    p0 = release
-                else:
-                    p0 = max(release, finish[i][z - 1] + 1)
-            p1 = p0 + dur - 1
-            start[i][z] = p0
-            finish[i][z] = p1
+            pe = actual_fin[i][z] or result.duration
+            ps = actual_start[i][z] or pe
+            if ps > pe:
+                ps = pe
             cells.append(
                 TaktPlanCell(
                     trade_index=i,
                     zone=z + 1,
-                    period_start=p0,
-                    period_end=p1,
+                    period_start=int(ps),
+                    period_end=int(pe),
                     planned_rate=rate,
                 )
             )
 
-    duration = max(finish[i][z] for i in range(n_trades) for z in range(n_zones))
     return TaktPlan(
         n_trades=n_trades,
         n_zones=n_zones,
         batch_size=batch_size,
         rate=rate,
         cells=cells,
-        duration=duration,
+        duration=int(result.duration),
         takt_time=tt,
-        handoff_lag=handoff_lag,
+        handoff_lag=max(1, int(handoff_lag)),
     )
+
+
+
+def required_rate_for_duration(
+    n_trades: int,
+    n_zones: int,
+    batch_size: int,
+    target_duration: int,
+    handoff_lag: int = 1,
+    rate_min: float = 0.2,
+    rate_max: float = 5.0,
+    tol: float = 0.01,
+) -> dict:
+    """
+    Binary-search capacity rate (zona/periode) so ideal takt plan duration
+    is <= target_duration. Returns feasibility and bounding rates.
+    """
+    target_duration = max(1, int(target_duration))
+    lo, hi = float(rate_min), float(rate_max)
+    best = None
+    # check extremes
+    p_lo = build_takt_plan(n_trades, n_zones, batch_size, lo, handoff_lag)
+    p_hi = build_takt_plan(n_trades, n_zones, batch_size, hi, handoff_lag)
+    if p_hi.duration > target_duration:
+        return {
+            "feasible": False,
+            "rate": hi,
+            "duration": p_hi.duration,
+            "target": target_duration,
+            "message": (
+                f"Target {target_duration} terlalu ketat bahkan di rate {hi:g} "
+                f"(rencana {p_hi.duration}). Naikkan target atau turunkan zona/batch."
+            ),
+        }
+    # search
+    for _ in range(40):
+        mid = 0.5 * (lo + hi)
+        p = build_takt_plan(n_trades, n_zones, batch_size, mid, handoff_lag)
+        if p.duration <= target_duration:
+            best = (mid, p.duration)
+            hi = mid
+        else:
+            lo = mid
+        if hi - lo < tol:
+            break
+    if best is None:
+        best = (hi, p_hi.duration)
+    rate, dur = best
+    return {
+        "feasible": True,
+        "rate": rate,
+        "duration": dur,
+        "target": target_duration,
+        "takt_time": 1.0 / rate,
+        "message": (
+            f"Butuh kapasitas ≈ {rate:.3f} zona/periode "
+            f"(takt time ≈ {1.0/rate:.2f} periode/zona) untuk durasi ≤ {target_duration}."
+        ),
+    }
+
+
+def takt_design_table(
+    n_trades: int,
+    n_zones: int,
+    rates: Optional[Sequence[float]] = None,
+    batches: Optional[Sequence[int]] = None,
+) -> List[dict]:
+    """What-if table: planned duration for combinations of rate × batch."""
+    if rates is None:
+        rates = [1.0 / 3.0, 0.5, 1.0, 2.0, 3.0]
+    if batches is None:
+        batches = [1, 2, 3, 4, 5]
+    rows = []
+    for r in rates:
+        for b in batches:
+            p = build_takt_plan(n_trades, n_zones, int(b), float(r), 1)
+            rows.append({
+                "Kapasitas": round(float(r), 4),
+                "Batch / ukuran takt": int(b),
+                "Takt time": round(p.takt_time, 3),
+                "Durasi rencana": p.duration,
+                "Zona": n_zones,
+            })
+    return rows
 
 
 def takt_plan_reliability(

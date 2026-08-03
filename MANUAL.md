@@ -210,36 +210,55 @@ Line of Balance · Buffer / WIP · Utilisasi · Little's Law · Kingman · Inven
 
 | Istilah | Arti di app |
 |---------|-------------|
-| **Takt time** | Waktu rencana selesaikan **satu zona** di satu stasiun (= 1 / kapasitas) |
-| **Zona takt** | Lokasi kerja 1…N |
-| **Batch handoff** | Berapa zona dikumpulkan sebelum dilepas ke hilir |
-| **Takt train / wagon** | Urutan T1→T5 yang “berjalan” melewati zona |
-| **Reliability** | % (tim, zona) selesai **pada atau sebelum** waktu rencana |
+| **Jumlah zona** | Berapa zonasi yang direncanakan (variabel desain utama) |
+| **Ukuran takt / batch** | Berapa zona per serah-terima handoff (ukuran wagon) |
+| **Kapasitas rencana** | Zona/periode per tim di rencana ideal |
+| **Takt time** | Waktu rencana per zona di satu stasiun (= 1 / kapasitas) |
+| **Target periode** | Batas waktu proyek (mode desain alternatif) |
+| **Durasi rencana** | Total periode rencana ideal (tanpa variability) |
+| **Reliability** | % (tim, zona) selesai pada/sebelum rencana |
 
-### 6.2 Alur di tab
+### 6.2 Variabel yang dimainkan perencana
 
-1. Atur kapasitas rencana, batch, jumlah zona, variability aktual.  
-2. Tekan **Jalankan simulasi** (di **atas** grafik).  
-3. Lihat metrik rencana (takt time, durasi rencana).  
-4. Setelah run: reliability, durasi aktual, selisih, overlay rencana vs aktual.  
-5. Opsional: **Tommelein (2020)** — S1 classic 4/6, S2 takt 5 + standby 1, S3 classic 5/7.
+Perencana takt biasanya menyeimbangkan **zonasi** dan **waktu**:
 
-### 6.3 Grafik takt
+| Variabel | Efek tipikal |
+|----------|----------------|
+| Zona ↑ | Durasi rencana ↑ (lebih banyak unit) |
+| Ukuran takt (batch) ↑ | Handoff jarang → train lebih panjang → durasi ↑ |
+| Kapasitas ↑ | Takt time ↓ → durasi ↓ |
+| Target periode ketat | Membutuhkan kapasitas lebih tinggi (atau batch lebih kecil) |
+
+**Dua mode desain di app:**
+
+1. **Dari kapasitas** — pilih kapasitas + zona + ukuran takt → **hitung durasi rencana**.  
+2. **Dari target periode** — pilih zona + ukuran takt + target waktu → **hitung kapasitas minimum** yang dibutuhkan.
+
+Tabel **what-if** menampilkan kombinasi kapasitas × ukuran takt untuk jumlah zona terpilih.
+
+### 6.3 Alur di tab
+
+1. Pilih mode desain; atur **zona**, **ukuran takt**, kapasitas *atau* target periode.  
+2. Tekan **Jalankan simulasi** (di atas grafik) — tidak otomatis.  
+3. Bandingkan aktual (bisa dengan variability) vs rencana: reliability & selisih durasi.  
+4. Opsional: skenario **Tommelein (2020)** capacity buffer.
+
+### 6.4 Grafik takt
 
 | Grafik | Isi |
 |--------|-----|
-| **LOB rencana** | Garis putus-putus: kumulatif rencana tiap tim |
-| **LOB aktual** | Garis tegas: hasil simulasi (setelah Jalankan) |
-| **Wagon chart** | Batang waktu per zona × warna tim (cuplikan zona 1–12) |
+| **LOB rencana** | Putus-putus: kumulatif ideal tiap tim |
+| **LOB aktual** | Tegas: simulasi (setelah Jalankan) |
+| **Wagon chart** | Batang waktu per zona × warna tim |
 
-### 6.4 Teori singkat
+### 6.5 Teori singkat
 
-- Rencana takt = **janji irama** (tanpa variability).  
-- Variability membuat aktual melenceng → reliability turun, durasi naik.  
-- **Capacity buffer / standby** (Tommelein 2020) = cadangan kapasitas agar komitmen takt tetap terpenuhi saat undian rendah.  
-- Batch besar memperpanjang train; one-piece memendekkan.
+- Rencana takt = **janji irama** (simulasi deterministik = engine yang sama, tanpa var).  
+- Variability → aktual melenceng → reliability turun.  
+- **Capacity buffer / standby** (Tommelein 2020) menjaga komitmen takt.  
+- “Takt plan bagus” = target periode terpenuhi dengan kapasitas realistis, ukuran takt yang menyeimbangkan WIP dan durasi.
 
-Contoh (Normal, 40 zona): batch 4 → rencana **56** periode; batch 1 → **44** periode.
+Contoh (Normal, 40 zona): batch 4 → **56** periode; batch 1 → **44** periode.
 
 ---
 
