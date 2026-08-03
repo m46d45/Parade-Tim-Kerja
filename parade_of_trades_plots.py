@@ -304,7 +304,7 @@ def plot_buffer_profile(
             colors=[_buffer_color(j) for j in range(n_if)],
             alpha=0.85,
         )
-        ax.set_ylabel("WIP (stacked units)")
+        ax.set_ylabel("WIP (zona, ditumpuk)")
     else:
         for j in range(n_if):
             up = result.config.trades[j]
@@ -325,12 +325,12 @@ def plot_buffer_profile(
                     linewidth=1.0,
                     alpha=0.55,
                 )
-        ax.set_ylabel("Buffer size (units)")
+        ax.set_ylabel("Isi buffer (zona)")
 
     ax.set_xlim(left=0)
     ax.set_ylim(bottom=0)
     ax.set_xlabel("Periode")
-    ax.set_title(title or "Buffer / WIP Profile")
+    ax.set_title(title or "Buffer / WIP antar tim")
     ax.legend(loc="upper right", fontsize=8, framealpha=0.92)
     _apply_axes_style(ax)
     return ax
@@ -355,8 +355,8 @@ def plot_utilization(
     ax.set_yticks(y)
     ax.set_yticklabels(names)
     ax.set_xlim(0, 105)
-    ax.set_xlabel("Utilization (%)")
-    ax.set_title(title or "Trade Utilization")
+    ax.set_xlabel("Utilisasi (%)")
+    ax.set_title(title or "Utilisasi kapasitas per tim")
     ax.axvline(100, color="0.6", linestyle="--", linewidth=1.0)
 
     for bar, m in zip(bars, metrics):

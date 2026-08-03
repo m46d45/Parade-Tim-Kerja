@@ -404,7 +404,7 @@ class TradeMetrics:
     total_capacity: int  # sum of die rolls while active
     total_production: int
     total_idle: int  # sum(effective - production)
-    utilization: float  # production / effective_capacity (0..1)
+    utilization: float  # production / effective_capacity (0..1); idle = starvation
     periods_to_finish: int  # first period where cumulative == total_units
     total_standby_used: int = 0
     total_effective_capacity: int = 0
@@ -810,12 +810,36 @@ class ParadeOfTrades:
             if self.cumulative[i] >= total or not self._is_mobilized(i):
                 continue
 
+            tcfg = self.config.trades[i]
+            base_rate = float(
+                tcfg.base_speed if tcfg.base_speed is not None else tcfg.mean
+            )
+            # Crew-period capacity unit (int): at least 1 when active
+            def _crew_cap(rate: float) -> int:
+                if rate + 1e-12 >= 1.0:
+                    return max(1, int(round(rate)))
+                return 1
+
             rate_applied = 0.0
+            has_started = self._start_period[i] is not None
+
+            # --- Starvation: already on site, no zone to work ---
+            # (matches classic parade: once started, empty buffer = idle capacity)
+            if not self._working[i] and available[i] <= 0:
+                if has_started and self.cumulative[i] < total:
+                    cap = _crew_cap(base_rate)
+                    capacities[i] = cap
+                    effectives[i] = cap
+                    productions[i] = 0
+                    idles[i] = cap
+                    self._executions[i] += 1
+                    self._total_capacity[i] += cap
+                    self._total_effective[i] += cap
+                    self._total_idle[i] += cap
+                continue
 
             # Start a zone if idle and inbound exists
             if not self._working[i]:
-                if available[i] <= 0:
-                    continue
                 available[i] -= 1
                 self._working[i] = True
                 self._zone_progress[i] = 0.0
@@ -851,25 +875,36 @@ class ParadeOfTrades:
                         available[i] -= 1
                         self._working[i] = True
                         self._zone_rate[i] = self._draw_zone_rate(i)
-                        # leftover progress carries onto the new zone
                     else:
+                        # leftover capacity blocked by missing inbound = idle
                         self._zone_progress[i] = 0.0
                         break
                 else:
                     break
 
-            # Flush partial batch when this trade finished all zones (remainder
-            # e.g. total=50 batch=4 → last 2 would otherwise never hand off).
+            # Flush partial batch when this trade finished all zones
             if self.cumulative[i] >= total and self._batch_done[i] > 0:
                 released[i] += self._batch_done[i]
                 self._batch_done[i] = 0
 
-            cap = int(round(rate_applied)) if rate_applied > 0 else 0
-            capacities[i] = cap
-            effectives[i] = max(cap, productions[i])
-            idles[i] = max(0, effectives[i] - productions[i])
+            # Capacity / idle while working
+            # - rate >= 1: offered ≈ rate; idle if production < capacity
+            #   (e.g. finished a zone mid-period then no inbound left)
+            # - rate < 1: count capacity only when a zone completes so a fully
+            #   busy slow crew stays ~100% util (not 50% for 0.5 rate)
+            if rate_applied + 1e-12 >= 1.0:
+                cap = max(productions[i], _crew_cap(rate_applied))
+                idle = max(0, cap - productions[i])
+            else:
+                cap = productions[i]
+                idle = 0
 
-            if productions[i] > 0 or self._working[i]:
+            capacities[i] = cap
+            effectives[i] = cap
+            idles[i] = idle
+
+            # Count execution when working or producing (partial zone still "on tool")
+            if productions[i] > 0 or self._working[i] or idle > 0:
                 self._executions[i] += 1
             self._total_capacity[i] += capacities[i]
             self._total_effective[i] += effectives[i]

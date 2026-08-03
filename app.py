@@ -39,7 +39,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-cmp-plots-v36"
+_APP_BUILD = "2026-08-03-buf-util-fix-v37"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -579,43 +579,50 @@ def _export_block(result: ParadeResult, key: str) -> None:
 def _plot_single_result(result: ParadeResult) -> None:
     tab_lob, tab_buf, tab_util = st.tabs(["Line of Balance", "Buffer / WIP", "Utilisasi"])
     with tab_lob:
-        st.caption(f"Batch handoff = {result.config.batch_size}")
         fig, ax = plt.subplots(figsize=(10, 4.5))
         plot_line_of_balance_detail(result, ax=ax, max_period=min(16, result.duration + 1))
         fig.tight_layout()
         _fig_to_st(fig)
-        st.caption("↑ Detail awal · ↓ Seluruh proyek")
         fig, ax = plt.subplots(figsize=(10, 5.8))
         plot_line_of_balance(result, ax=ax)
         fig.tight_layout()
         _fig_to_st(fig)
-        st.caption(_starts_caption(result))
-        if result.history:
-            rows = [{
-                "Periode": rec.period,
-                "T1 prod": rec.production[0],
-                "T1 zona": rec.cumulative[0],
-                "T2 zona": rec.cumulative[1],
-                "T5 zona": rec.cumulative[-1],
-            } for rec in result.history[:16]]
-            st.dataframe(rows, use_container_width=True, hide_index=True)
     with tab_buf:
         c1, c2 = st.columns(2)
         with c1:
-            fig, ax = plt.subplots(figsize=(6, 4))
+            fig, ax = plt.subplots(figsize=(6.2, 4.2))
             plot_buffer_profile(result, ax=ax, stacked=False)
             fig.tight_layout()
             _fig_to_st(fig)
         with c2:
-            fig, ax = plt.subplots(figsize=(6, 4))
+            fig, ax = plt.subplots(figsize=(6.2, 4.2))
             plot_buffer_profile(result, ax=ax, stacked=True, show_max=False)
             fig.tight_layout()
             _fig_to_st(fig)
+        # Peak WIP per interface
+        peak_rows = [
+            {
+                "Buffer": f"B{j + 1}: {result.config.trades[j].name} → {result.config.trades[j + 1].name}",
+                "Puncak WIP": result.max_buffer[j],
+            }
+            for j in range(result.config.n_interfaces)
+        ]
+        st.dataframe(peak_rows, use_container_width=True, hide_index=True)
     with tab_util:
         fig, ax = plt.subplots(figsize=(8, 3.8))
         plot_utilization(result, ax=ax)
         fig.tight_layout()
         _fig_to_st(fig)
+        util_rows = []
+        for i, m in enumerate(result.trade_metrics):
+            util_rows.append({
+                "Tim": m.name,
+                "Produksi": m.total_production,
+                "Kapasitas efektif": m.total_effective_capacity,
+                "Idle": m.total_idle,
+                "Utilisasi %": round(100.0 * m.utilization, 1),
+            })
+        st.dataframe(util_rows, use_container_width=True, hide_index=True)
 
 
 def render_sidebar():
