@@ -36,7 +36,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-tabs-slim-v10"
+_APP_BUILD = "2026-08-03-comparison-n-v11"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -370,7 +370,7 @@ def render_sidebar():
              "1 = one-piece flow.",
     )
     st.sidebar.caption(
-        "Batch dipakai di **Single run** dan **Compare 2**."
+        "Batch dipakai di **Single run** dan **Comparison**."
     )
     return int(total_units), seed, 5
 
@@ -429,80 +429,144 @@ def tab_single_run(total_units: int, seed: Optional[int], n_trades: int) -> None
 
 
 def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
-    st.subheader("Compare 2 (zone-flow)")
+    st.subheader("Comparison (2–5 skenario, zone-flow)")
     st.markdown(
         '<div class="pot-callout">'
-        "Bandingkan dua setup zone-flow dengan <strong>batch yang sama</strong> (sidebar). "
-        "Contoh: A = No variability, B = Medium — lihat duration, idle, start trade, dan LOB."
+        "Bandingkan <strong>2 sampai 5</strong> skenario zone-flow (batch dari sidebar). "
+        "Cocok untuk kelima level variability, atau hanya 2–3 yang dipilih user. "
+        "Tiap skenario: nama + kecepatan + variability (seragam semua trade)."
         "</div>",
         unsafe_allow_html=True,
     )
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown("### Skenario A")
-        pa = _capacity_setup("cmp_a", n_trades, "no_variability", 1.0)
-    with c2:
-        st.markdown("### Skenario B")
-        pb = _capacity_setup("cmp_b", n_trades, "medium", 1.0)
 
-    if st.button("Run comparison", type="primary", key="run_cmp"):
-        ra = ParadeOfTrades(_build_config_from_pairs(pa, total_units, seed)).run()
-        rb = ParadeOfTrades(_build_config_from_pairs(pb, total_units, seed)).run()
-        st.session_state.cmp = {"A": ra, "B": rb}
+    default_vars = list(PRESET_OPTIONS)
+    default_labels = {
+        "no_variability": "No var",
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+        "very_high": "Very high",
+    }
 
-    if "cmp" not in st.session_state:
-        st.info("Atur A & B → **Run comparison**.")
-        return
+    # --- Quick-fill buttons FIRST (mutate state before widgets bind) ---
+    c1, c2, c3 = st.columns([1, 1, 1])
+    fill_five = c1.button("Isi 5 level variability", key="cmp_fill_five", use_container_width=True)
+    fill_two = c2.button("Isi 2 (No vs Medium)", key="cmp_fill_two", use_container_width=True)
+    clear_res = c3.button("Hapus hasil", key="cmp_clear", use_container_width=True)
 
-    results = st.session_state.cmp
-    m1, m2 = st.columns(2)
-    with m1:
-        st.markdown("**A**")
-        _metrics_row(results["A"])
-        st.caption(_starts_caption(results["A"]))
-    with m2:
-        st.markdown("**B**")
-        _metrics_row(results["B"])
-        st.caption(_starts_caption(results["B"]))
+    if clear_res:
+        st.session_state.pop("cmp_multi", None)
+        st.session_state.pop("cmp_multi_meta", None)
 
-    # Delta table
-    da, db = results["A"].duration, results["B"].duration
-    st.markdown("##### Ringkasan selisih")
-    st.dataframe(
-        [{
-            "Metrik": "Duration",
-            "A": da,
-            "B": db,
-            "B − A": db - da,
-        }, {
-            "Metrik": "Total idle",
-            "A": results["A"].total_idle_capacity,
-            "B": results["B"].total_idle_capacity,
-            "B − A": results["B"].total_idle_capacity - results["A"].total_idle_capacity,
-        }, {
-            "Metrik": "Peak WIP",
-            "A": _peak_wip(results["A"]),
-            "B": _peak_wip(results["B"]),
-            "B − A": _peak_wip(results["B"]) - _peak_wip(results["A"]),
-        }],
-        use_container_width=True,
-        hide_index=True,
+    if fill_five:
+        st.session_state["cmp_n_scen"] = 5
+        for i, v in enumerate(default_vars):
+            st.session_state[f"cmp_s{i}_label"] = default_labels[v]
+            st.session_state[f"cmp_s{i}_var"] = v
+            st.session_state[f"cmp_s{i}_profile"] = "Normal — 1 zona / 1 periode"
+
+    if fill_two:
+        st.session_state["cmp_n_scen"] = 2
+        st.session_state["cmp_s0_label"] = "No var"
+        st.session_state["cmp_s0_var"] = "no_variability"
+        st.session_state["cmp_s0_profile"] = "Normal — 1 zona / 1 periode"
+        st.session_state["cmp_s1_label"] = "Medium"
+        st.session_state["cmp_s1_var"] = "medium"
+        st.session_state["cmp_s1_profile"] = "Normal — 1 zona / 1 periode"
+
+    # Defaults for any missing keys
+    st.session_state.setdefault("cmp_n_scen", 5)
+    for i in range(5):
+        dv = default_vars[i] if i < len(default_vars) else "no_variability"
+        st.session_state.setdefault(f"cmp_s{i}_label", default_labels.get(dv, f"S{i+1}"))
+        st.session_state.setdefault(f"cmp_s{i}_var", dv)
+
+    n_scen = int(
+        st.slider(
+            "Jumlah skenario",
+            min_value=2,
+            max_value=5,
+            key="cmp_n_scen",
+            help="2–5 skenario. Default 5 = semua level variability.",
+        )
     )
 
-    fig, ax = plt.subplots(figsize=(9, 5))
+    st.caption(
+        f"Batch = **{_batch_size()}** · Zona = **{total_units}** · "
+        f"Seed = **{seed}** (sama untuk semua skenario)."
+    )
+
+    scenarios_cfg = []
+    cols = st.columns(n_scen)
+    for i in range(n_scen):
+        with cols[i]:
+            st.markdown(f"##### S{i + 1}")
+            label = st.text_input("Nama", key=f"cmp_s{i}_label")
+            base = _base_speed_input(f"cmp_s{i}", "Kecepatan", 1.0)
+            var = st.selectbox(
+                "Variability",
+                PRESET_OPTIONS,
+                format_func=lambda x: VAR_LABELS.get(x, x),
+                key=f"cmp_s{i}_var",
+            )
+            spec = _pair_from_base_and_var(base, var)
+            st.caption(_format_pair(spec))
+            scenarios_cfg.append((label.strip() or f"S{i + 1}", spec, var))
+
+    if st.button("Run comparison", type="primary", key="run_cmp", use_container_width=True):
+        results = {}
+        used = set()
+        for label, spec, var in scenarios_cfg:
+            name = label
+            base_n, k = name, 2
+            while name in used:
+                name = f"{base_n} ({k})"
+                k += 1
+            used.add(name)
+            pairs = [spec] * n_trades
+            results[name] = ParadeOfTrades(
+                _build_config_from_pairs(pairs, total_units, seed)
+            ).run()
+        st.session_state.cmp_multi = results
+        st.success(f"Selesai · **{len(results)}** skenario · batch={_batch_size()}")
+
+    if "cmp_multi" not in st.session_state:
+        st.info("Atur skenario (atau tombol isi cepat) → **Run comparison**.")
+        return
+
+    results = st.session_state.cmp_multi
+    rows = []
+    for name, r in results.items():
+        rows.append({
+            "Skenario": name,
+            "Duration": r.duration,
+            "vs Ideal": round(r.duration - r.ideal_duration, 1),
+            "Idle": r.total_idle_capacity,
+            "Peak WIP": _peak_wip(r),
+            "Throughput": round(r.system_throughput, 3),
+            "T1 start": r.trade_metrics[0].start_period,
+            "T5 start": r.trade_metrics[-1].start_period,
+            "T5 finish": r.trade_metrics[-1].periods_to_finish,
+        })
+    st.markdown("##### Ringkasan (duration naik)")
+    st.dataframe(sorted(rows, key=lambda x: x["Duration"]), use_container_width=True, hide_index=True)
+
+    fig, ax = plt.subplots(figsize=(10, 5.5))
     plot_comparison_lob(
-        {"A (zone-flow)": results["A"], "B (zone-flow)": results["B"]},
+        results,
         ax=ax,
-        title=f"LOB Compare — batch {_batch_size()}",
+        title=f"LOB skenario (trade terakhir = selesai proyek) · batch {_batch_size()}",
+        last_trade_only=True,
     )
     fig.tight_layout()
     _fig_to_st(fig)
+    st.caption("Setiap garis = satu skenario (kumulatif trade terakhir). Semakin kanan = semakin lama.")
 
-    t1, t2 = st.tabs(["Metrics A", "Metrics B"])
-    with t1:
-        _trade_table(results["A"])
-    with t2:
-        _trade_table(results["B"])
+    with st.expander("Detail trade satu skenario"):
+        pick = st.selectbox("Skenario", list(results.keys()), key="cmp_detail_pick")
+        _trade_table(results[pick])
+        st.caption(_starts_caption(results[pick]))
+
 
 
 def tab_manual() -> None:
@@ -510,7 +574,7 @@ def tab_manual() -> None:
     st.markdown(
         '<div class="pot-field">'
         "Panduan zone-flow untuk kelas. Ringkas: tiga tab saja — "
-        "<strong>Single run</strong> (eksperimen), <strong>Compare 2</strong> (A vs B), "
+        "<strong>Single run</strong> (eksperimen), <strong>Comparison</strong> (2–5 skenario), "
         "<strong>Manual</strong> (panduan)."
         "</div>",
         unsafe_allow_html=True,
@@ -539,7 +603,7 @@ def tab_manual() -> None:
 
 **Tab yang dipakai**
 1. **Single run** — satu skenario, LOB / buffer / utilization  
-2. **Compare 2** — dua skenario berdampingan (mis. No var vs Medium)  
+2. **Comparison** — 2–5 skenario (mis. kelima level variability)  
 3. **Manual** — panduan belajar + tentang  
 
 Referensi: Tommelein, Riley & Howell (1999); Choo & Tommelein (1999); Tommelein (2020).
@@ -549,7 +613,7 @@ Referensi: Tommelein, Riley & Howell (1999); Choo & Tommelein (1999); Tommelein 
 def main() -> None:
     total_units, seed, n_trades = render_sidebar()
     _render_header()
-    tabs = st.tabs(["Single run", "Compare 2", "Manual"])
+    tabs = st.tabs(["Single run", "Comparison", "Manual"])
     with tabs[0]:
         tab_single_run(total_units, seed, n_trades)
     with tabs[1]:

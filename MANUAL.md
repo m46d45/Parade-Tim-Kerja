@@ -19,7 +19,7 @@ Simulasi Lean Construction interaktif: **kecepatan per zona**, **variability per
 2. Membedakan **tanpa variability** (rate sama tiap zona) vs **dengan variability** (rate diundi **per zona**).
 3. Memahami **batch handoff** vs **one-piece flow** dan dampaknya ke LOB.
 4. Membaca Line of Balance yang **mulai dari 0** dan **bergeser** antar trade.
-5. Membandingkan skenario dengan **Compare 2** (mis. No var vs Medium).
+5. Membandingkan 2–5 skenario di **Comparison** (termasuk 5 level variability).
 
 ---
 
@@ -78,15 +78,16 @@ Bekisting → Tulangan → Cor → Bongkar bekisting → Finishing
 
 ## 4. Cara memakai setiap tab
 
-App sengaja **hanya tiga tab** agar fokus di kelas:
+App fokus **tiga tab** di kelas:
 
 ### Single run
 Atur kecepatan & variability → cek batch di sidebar → **Run**.  
 Lihat LOB (mulai dari 0), buffer, utilization, start/finish trade.
 
-### Compare 2
-Dua skenario A vs B (mis. No var vs Medium), batch sama dari sidebar.  
-Bandingkan duration, idle, peak WIP, start trade, dan LOB.
+### Comparison (2–5 skenario)
+Pilih jumlah skenario 2–5. Tiap skenario: nama, kecepatan, variability.  
+Tombol cepat: **Isi 5 level variability** atau **No vs Medium**.  
+Bandingkan duration, idle, WIP, dan LOB trade terakhir.
 
 ### Manual
 File ini + ringkasan model / build.
@@ -98,8 +99,8 @@ File ini + ringkasan model / build.
 1. **Batch 4, semua Normal + No var** → T2 start setelah batch 4; LOB bergeser.
 2. **Batch 1 (one-piece)** → T2 start periode 2; jarak antar trade = 1 zona.
 3. **T1 Medium, lain No var** → T1 lonjak/landai per zona; T2+ tetap menunggu handoff batch.
-4. **Compare 2**: A No var vs B Medium → duration & idle naik di B.
-5. Ulangi Compare dengan batch 1 (one-piece) vs batch 4 — lihat start T2.
+4. **Comparison**: isi 5 level variability → lihat duration naik seiring var.
+5. Comparison 2 skenario: No var vs Medium; coba batch 1 vs 4 di sidebar.
 
 ---
 
