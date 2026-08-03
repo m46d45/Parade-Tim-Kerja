@@ -37,7 +37,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-logo-hardhat-v28"
+_APP_BUILD = "2026-08-03-sidebar-clean-v29"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -639,21 +639,15 @@ def render_sidebar():
     if _LOGO_ICON.exists():
         st.sidebar.image(str(_LOGO_ICON), use_container_width=True)
         st.sidebar.markdown("### Parade Tim Kerja")
-        st.sidebar.caption("Zone-flow · Indonesia")
+        st.sidebar.caption("Simulasi parade tim kerja konstruksi")
     else:
         st.sidebar.title("Parade Tim Kerja")
-    st.sidebar.success(
-        f"**Build {_APP_BUILD}** — zone-flow · batch default 4 · var per zona. "
-        "Muat ulang halaman (Ctrl/Cmd+Shift+R) jika banner tidak muncul."
-    )
+        st.sidebar.caption("Simulasi parade tim kerja konstruksi")
     st.sidebar.divider()
     total_units = st.sidebar.number_input("Total zona", 1, 1000, 20, 5)
     use_seed = st.sidebar.checkbox("Kunci seed acak", True)
     seed = int(st.sidebar.number_input("Seed", 0, 10_000_000, 42, 1)) if use_seed else None
-    st.sidebar.markdown("**Jumlah tim:** 5 (tetap)")
-    st.sidebar.caption("1 Bekisting · 2 Tulangan · 3 Cor · 4 Bongkar · 5 Finishing")
     st.sidebar.divider()
-    st.sidebar.markdown("**Batch / one-piece flow**")
     st.sidebar.selectbox(
         "Ukuran batch handoff",
         options=[4, 5, 3, 2, 1],
@@ -666,9 +660,6 @@ def render_sidebar():
         key="batch_size",
         help="Default 4: kumpulkan 4 zona dulu baru dilepas ke tim hilir. "
              "1 = one-piece flow.",
-    )
-    st.sidebar.caption(
-        "Batch dipakai di tab **Simulasi** dan **Perbandingan**."
     )
     return int(total_units), seed, 5
 
