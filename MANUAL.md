@@ -204,63 +204,60 @@ Line of Balance · Buffer / WIP · Utilisasi · Little's Law · Kingman · Inven
 
 ## 6. Tab Takt plan
 
-### 6.1 Apa itu takt plan?
+### 6.1 Prinsip
 
-**Takt** (Jerman: irama/ketukan) = tempo produksi yang disepakati agar tim mengalir **ritmis** melalui zona.
+Takt plan lean construction biasanya:
 
-| Istilah | Arti di app |
-|---------|-------------|
-| **Jumlah zona** | Berapa zonasi yang direncanakan (variabel desain utama) |
-| **Ukuran takt / batch** | Berapa zona per serah-terima handoff (ukuran wagon) |
-| **Kapasitas rencana** | Zona/periode per tim di rencana ideal |
-| **Takt time** | Waktu rencana per zona di satu stasiun (= 1 / kapasitas) |
-| **Target periode** | Batas waktu proyek (mode desain alternatif) |
-| **Durasi rencana** | Total periode rencana ideal (tanpa variability) |
-| **Reliability** | % (tim, zona) selesai pada/sebelum rencana |
+1. **One-piece flow** — serah terima zona per zona (bukan batch besar).  
+2. **Jumlah zona** — variabel desain utama (menentukan panjang parade & durasi).  
+3. **Sistem buffer** — tiga jenis agar irama tetap andal.
 
-### 6.2 Variabel yang dimainkan perencana
+| Istilah | Arti |
+|---------|------|
+| **One-piece flow** | Batch handoff = 1 (tetap di tab ini) |
+| **Jumlah zona** | Skala zonasi; what-if menampilkan durasi vs zona |
+| **Takt time** | Waktu rencana per zona di satu stasiun |
+| **Reliability** | % (tim, zona) selesai sesuai/sebelum rencana |
 
-Perencana takt biasanya menyeimbangkan **zonasi** dan **waktu**:
+### 6.2 Tiga jenis buffer
 
-| Variabel | Efek tipikal |
-|----------|----------------|
-| Zona ↑ | Durasi rencana ↑ (lebih banyak unit) |
-| Ukuran takt (batch) ↑ | Handoff jarang → train lebih panjang → durasi ↑ |
-| Kapasitas ↑ | Takt time ↓ → durasi ↓ |
-| Target periode ketat | Membutuhkan kapasitas lebih tinggi (atau batch lebih kecil) |
+| Buffer | Teori | Di app |
+|--------|--------|--------|
+| **Kapasitas** | Cadangan produktivitas (standby, lembur, kru ekstra) — Tommelein 2020 | +% pada kapasitas dasar → rate efektif naik |
+| **Waktu** | Slack jadwal; takt time lebih longgar dari pure process time | +periode per zona pada takt time |
+| **Inventory** | Stok zona antar-tim (decoupling stock) | 0–1 = OPF murni; ≥2 = lepas tiap N zona |
 
-**Dua mode desain di app:**
+Tanpa buffer + tanpa variability → rencana = aktual (reliability 100%).  
+Dengan variability, buffer menolong reliability dan/atau mendekati target periode.
 
-1. **Dari kapasitas** — pilih kapasitas + zona + ukuran takt → **hitung durasi rencana**.  
-2. **Dari target periode** — pilih zona + ukuran takt + target waktu → **hitung kapasitas minimum** yang dibutuhkan.
+### 6.3 Mode desain
 
-Tabel **what-if** menampilkan kombinasi kapasitas × ukuran takt untuk jumlah zona terpilih.
+1. **Hitung durasi** dari zona + kapasitas + buffer.  
+2. **Target periode** — cek apakah rate efektif (+ buffer) mencukupi.
 
-### 6.3 Alur di tab
+### 6.4 Alur di tab
 
-1. Pilih mode desain; atur **zona**, **ukuran takt**, kapasitas *atau* target periode.  
-2. Tekan **Jalankan simulasi** (di atas grafik) — tidak otomatis.  
-3. Bandingkan aktual (bisa dengan variability) vs rencana: reliability & selisih durasi.  
-4. Opsional: skenario **Tommelein (2020)** capacity buffer.
+1. Atur **jumlah zona** dan kapasitas dasar.  
+2. Atur **3 buffer**.  
+3. **Jalankan simulasi** (tombol di atas grafik).  
+4. Baca reliability & overlay rencana vs aktual.  
+5. Opsional: Tommelein 2020 (S1/S2/S3).
 
-### 6.4 Grafik takt
+### 6.5 Grafik
 
 | Grafik | Isi |
 |--------|-----|
-| **LOB rencana** | Putus-putus: kumulatif ideal tiap tim |
-| **LOB aktual** | Tegas: simulasi (setelah Jalankan) |
-| **Wagon chart** | Batang waktu per zona × warna tim |
+| LOB rencana / aktual | Putus-putus vs tegas |
+| Wagon chart | Batang waktu per zona × tim |
+| What-if zona | Durasi OPF vs jumlah zona (tanpa buffer) |
 
-### 6.5 Teori singkat
+### 6.6 Contoh
 
-- Rencana takt = **janji irama** (simulasi deterministik = engine yang sama, tanpa var).  
-- Variability → aktual melenceng → reliability turun.  
-- **Capacity buffer / standby** (Tommelein 2020) menjaga komitmen takt.  
-- “Takt plan bagus” = target periode terpenuhi dengan kapasitas realistis, ukuran takt yang menyeimbangkan WIP dan durasi.
+- 40 zona, OPF, Normal, tanpa buffer → rencana **44** periode.  
+- Tambah buffer kapasitas 20% → rate efektif naik → durasi rencana turun.  
+- Buffer waktu +1 p/zona → takt time lebih longgar → durasi naik (jadwal lebih “aman”).  
+- Buffer inventory 4 → mirip handoff tiap 4 zona (bukan OPF murni).
 
-Contoh (Normal, 40 zona): batch 4 → **56** periode; batch 1 → **44** periode.
-
----
 
 ## 7. Hasil analisis: Line of Balance
 

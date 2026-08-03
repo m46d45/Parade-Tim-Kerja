@@ -724,6 +724,122 @@ def build_takt_plan(
 
 
 
+
+def build_takt_plan_with_buffers(
+    n_trades: int = 5,
+    n_zones: int = 20,
+    rate: float = 1.0,
+    *,
+    capacity_buffer: float = 0.0,
+    time_buffer: int = 0,
+    inventory_buffer: int = 0,
+) -> "TaktPlan":
+    """
+    Takt plan with one-piece flow + three buffer types (lean construction).
+
+    - **One-piece flow** always (batch_size = 1).
+    - **Capacity buffer** (0..1+): extra capacity fraction.
+      effective_rate = rate * (1 + capacity_buffer)
+    - **Time buffer** (periods): extra lag after each handoff beyond the
+      default next-period lag (engine lag is 1; we model extra by
+      reducing effective rate so each zone takes process_time + time_buffer
+      ... actually time buffer = added periods of lag between trades:
+      simulated via batch=1 and staggered delay — here we add time_buffer
+      to process time: t_e' = 1/rate + time_buffer, i.e. slower planned pace
+      OR as pure lag: use inventory-style wait. We use **added process slack**:
+      effective_rate = 1 / (1/rate + time_buffer) when time_buffer>0 and rate-based.
+    - **Inventory buffer** (zones): minimum inbound zones before a trade
+      starts / continues (decoupling stock). Modelled as batch_size =
+      max(1, inventory_buffer) for release grouping while plan label stays OPF
+      when inventory_buffer<=1.
+
+    Primary design variable remains **n_zones**.
+    """
+    rate = max(float(rate), 1e-9)
+    cap_b = max(0.0, float(capacity_buffer))
+    time_b = max(0, int(time_buffer))
+    inv_b = max(0, int(inventory_buffer))
+
+    # Effective process rate after capacity buffer
+    rate_eff = rate * (1.0 + cap_b)
+    # Time buffer: add slack periods to each zone's process time
+    # t = 1/rate_eff + time_b  → rate_plan = 1/t
+    t_proc = 1.0 / rate_eff
+    t_with_time_buf = t_proc + float(time_b)
+    rate_plan = 1.0 / max(t_with_time_buf, 1e-9)
+
+    # Inventory buffer: need inv_b zones released together (decoupling)
+    # inv_b=0 or 1 → pure one-piece (batch 1); inv_b=2 → release every 2, etc.
+    batch = 1 if inv_b <= 1 else inv_b
+
+    plan = build_takt_plan(
+        n_trades=n_trades,
+        n_zones=n_zones,
+        batch_size=batch,
+        rate=rate_plan,
+        handoff_lag=1,
+    )
+    # Annotate nominal rate (before buffers) on metadata via batch_size field kept
+    # Store effective design in rate field as rate_plan; keep batch_size as used
+    plan.rate = rate_plan
+    # monkey-patch design attrs for UI (TaktPlan is dataclass — add if fields exist)
+    return plan
+
+
+def run_takt_simulation_with_buffers(
+    n_trades: int,
+    n_zones: int,
+    rate: float,
+    variability: str,
+    seed: Optional[int],
+    *,
+    capacity_buffer: float = 0.0,
+    time_buffer: int = 0,
+    inventory_buffer: int = 0,
+    pair_from_base_and_var=None,
+) -> Tuple["ParadeResult", "TaktPlan"]:
+    """
+    Run zone-flow sim with OPF + buffers; return (result, ideal_plan).
+    pair_from_base_and_var: optional callable(base, var)->pair from app.
+    """
+    from parade_of_trades_core import ParadeConfig, ParadeOfTrades
+
+    rate = max(float(rate), 1e-9)
+    cap_b = max(0.0, float(capacity_buffer))
+    time_b = max(0, int(time_buffer))
+    inv_b = max(0, int(inventory_buffer))
+
+    rate_eff = rate * (1.0 + cap_b)
+    t_proc = 1.0 / rate_eff
+    rate_plan = 1.0 / max(t_proc + float(time_b), 1e-9)
+    batch = 1 if inv_b <= 1 else inv_b
+
+    plan = build_takt_plan(
+        n_trades=n_trades,
+        n_zones=n_zones,
+        batch_size=batch,
+        rate=rate_plan,
+        handoff_lag=1,
+    )
+
+    if pair_from_base_and_var is not None:
+        pairs = [pair_from_base_and_var(rate_plan, variability)] * n_trades
+    else:
+        # deterministic or simple no-var
+        pairs = [(rate_plan, rate_plan, 0.5, rate_plan, True)] * n_trades
+
+    # Build config manually if pairs are tuples of 5
+    cfg = ParadeConfig.from_pairs(
+        pairs,
+        total_units=n_zones,
+        seed=seed,
+        zone_flow=True,
+        batch_size=batch,
+    )
+    result = ParadeOfTrades(cfg).run()
+    return result, plan
+
+
 def required_rate_for_duration(
     n_trades: int,
     n_zones: int,

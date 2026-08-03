@@ -26,6 +26,7 @@ from parade_of_trades_analysis import (
     kingman_metrics,
     littles_law_metrics,
     build_takt_plan,
+    build_takt_plan_with_buffers,
     required_rate_for_duration,
     takt_design_table,
     takt_plan_reliability,
@@ -55,7 +56,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-takt-design-v50"
+_APP_BUILD = "2026-08-03-takt-buffers-v51"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1087,77 +1088,113 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
 
 
 def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
-    """Takt plan: zona, periode, ukuran takt sebagai variabel desain."""
+    """Takt plan: one-piece flow, zona utama, 3 buffer (kapasitas/waktu/inventory)."""
     st.subheader("Takt plan")
+    st.caption(
+        "Aliran **one-piece flow** (batch = 1). "
+        "Variabel utama: **jumlah zona**. "
+        "Buffer: **kapasitas**, **waktu**, **inventory**."
+    )
+
+    # --- Primary design: zones + capacity ---
+    c1, c2 = st.columns(2)
+    n_zones = int(c1.number_input(
+        "Jumlah zona (variabel utama)",
+        min_value=4, max_value=200, value=int(total_units), step=1,
+        key="takt_zones",
+        help="Berapa zonasi menentukan panjang train dan durasi rencana.",
+    ))
+    rate = float(c2.selectbox(
+        "Kapasitas dasar (zona/periode)",
+        options=[1.0 / 3.0, 0.5, 1.0, 2.0, 3.0],
+        index=2,
+        format_func=lambda x: (
+            "Sangat rendah — 1/3" if abs(x - 1 / 3) < 1e-9
+            else "Rendah — 0,5" if abs(x - 0.5) < 1e-9
+            else "Normal — 1" if abs(x - 1.0) < 1e-9
+            else "Tinggi — 2" if abs(x - 2.0) < 1e-9
+            else "Sangat tinggi — 3"
+        ),
+        key="takt_rate_plan",
+    ))
 
     mode = st.radio(
-        "Mode desain",
-        ["Dari kapasitas (hitung durasi)", "Dari target periode (hitung kapasitas)"],
+        "Mode desain waktu",
+        ["Hitung durasi dari zona + buffer", "Target periode → cek kelayakan"],
         horizontal=True,
         key="takt_design_mode",
     )
 
-    c1, c2, c3 = st.columns(3)
-    n_zones = int(c1.number_input(
-        "Jumlah zona", 4, 200, int(total_units), 1, key="takt_zones",
-        help="Berapa zonasi dalam rencana takt.",
+    # --- Three buffers ---
+    st.markdown("##### Sistem buffer (3 jenis)")
+    b1, b2, b3 = st.columns(3)
+    cap_buf_pct = int(b1.slider(
+        "Buffer kapasitas (%)",
+        min_value=0, max_value=100, value=0, step=5,
+        key="takt_cap_buf",
+        help="Cadangan kapasitas (standby/overtime). 20 = +20% kapasitas efektif.",
     ))
-    batch = int(c2.selectbox(
-        "Ukuran takt / batch handoff",
-        options=[1, 2, 3, 4, 5, 6, 8, 10],
-        index=3,
-        key="takt_batch_plan",
-        help="Berapa zona per serah-terima (ukuran wagon handoff).",
+    cap_buf = cap_buf_pct / 100.0
+    time_buf = int(b2.number_input(
+        "Buffer waktu (periode/zona)",
+        min_value=0, max_value=10, value=0, step=1,
+        key="takt_time_buf",
+        help="Slack waktu ditambahkan pada takt time tiap zona (jadwal longgar).",
     ))
-    var_mode = c3.selectbox(
+    inv_buf = int(b3.number_input(
+        "Buffer inventory (zona)",
+        min_value=0, max_value=10, value=0, step=1,
+        key="takt_inv_buf",
+        help="Stok penyangga antar-tim. 0–1 = one-piece murni; ≥2 = lepas tiap N zona.",
+    ))
+
+    var_mode = st.selectbox(
         "Variability simulasi aktual",
         ["no_variability", "low", "medium", "high", "very_high"],
         format_func=lambda x: VAR_LABELS.get(x, x),
         key="takt_var_actual",
     )
 
-    rate = 1.0
-    target_periods = None
-    req = None
+    # Effective rates for plan
+    rate_eff = rate * (1.0 + cap_buf)
+    t_proc = 1.0 / max(rate_eff, 1e-9)
+    t_plan = t_proc + float(time_buf)
+    rate_plan = 1.0 / max(t_plan, 1e-9)
+    batch = 1 if inv_buf <= 1 else inv_buf
 
-    if mode.startswith("Dari kapasitas"):
-        rate_choice = st.selectbox(
-            "Kapasitas rencana (zona/periode)",
-            options=[1.0 / 3.0, 0.5, 1.0, 2.0, 3.0],
-            index=2,
-            format_func=lambda x: (
-                "Sangat rendah — 1/3" if abs(x - 1/3) < 1e-9
-                else "Rendah — 0,5" if abs(x - 0.5) < 1e-9
-                else "Normal — 1" if abs(x - 1.0) < 1e-9
-                else "Tinggi — 2" if abs(x - 2.0) < 1e-9
-                else "Sangat tinggi — 3"
-            ),
-            key="takt_rate_plan",
-        )
-        rate = float(rate_choice)
-    else:
+    target_periods = None
+    if mode.startswith("Target"):
         target_periods = int(st.number_input(
             "Target total periode",
             min_value=n_trades,
             max_value=5000,
-            value=max(n_zones + (n_trades - 1) * batch, n_zones),
+            value=max(n_zones + n_trades, n_zones),
             step=1,
             key="takt_target_periods",
-            help="Batas waktu proyek yang diinginkan perencana.",
         ))
         req = required_rate_for_duration(
-            n_trades, n_zones, batch, target_periods, rate_max=8.0,
+            n_trades, n_zones, batch, target_periods, rate_max=10.0,
         )
+        # Compare needed rate to rate_plan (with buffers)
         if req["feasible"]:
-            rate = float(req["rate"])
-            st.info(req["message"])
+            if rate_plan + 1e-9 >= req["rate"]:
+                st.success(
+                    f"Dengan buffer saat ini, kapasitas efektif rencana ≈ **{rate_plan:.3f}** "
+                    f"zona/periode ≥ kebutuhan **{req['rate']:.3f}** untuk target {target_periods} p."
+                )
+            else:
+                st.warning(
+                    f"Butuh ≈ **{req['rate']:.3f}** zona/periode untuk target {target_periods} p; "
+                    f"rencana saat ini hanya **{rate_plan:.3f}**. "
+                    f"Naikkan kapasitas dasar, buffer kapasitas, atau longgarkan target/zona."
+                )
         else:
-            rate = 1.0
-            st.warning(req["message"])
+            st.error(req["message"])
 
-    b1, b2, _ = st.columns([1, 1, 2])
-    run = b1.button("Jalankan simulasi", type="primary", use_container_width=True, key="takt_run")
-    clear = b2.button("Hapus hasil", use_container_width=True, key="takt_clear")
+    # Buttons first (above charts)
+    btn1, btn2, _ = st.columns([1, 1, 2])
+    run = btn1.button("Jalankan simulasi", type="primary", use_container_width=True, key="takt_run")
+    clear = btn2.button("Hapus hasil", use_container_width=True, key="takt_clear")
     if clear:
         for k in ("takt_result", "takt_rel", "takt_plan_snap"):
             st.session_state.pop(k, None)
@@ -1166,26 +1203,28 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
         n_trades=n_trades,
         n_zones=n_zones,
         batch_size=batch,
-        rate=rate,
+        rate=rate_plan,
         handoff_lag=1,
     )
 
+    # Metrics
     m1, m2, m3, m4, m5 = st.columns(5)
-    m1.metric("Zona", f"{plan.n_zones}")
-    m2.metric("Ukuran takt (batch)", f"{plan.batch_size}")
-    m3.metric("Kapasitas rencana", f"{plan.rate:.3g}")
-    m4.metric("Takt time / zona", f"{plan.takt_time:.3g} p")
+    m1.metric("Zona", f"{n_zones}")
+    m2.metric("Aliran", "One-piece" if batch == 1 else f"Inv.buf={inv_buf}")
+    m3.metric("Rate efektif", f"{rate_plan:.3g}")
+    m4.metric("Takt time", f"{plan.takt_time:.3g} p")
     m5.metric("Durasi rencana", f"{plan.duration} p")
 
-    if target_periods is not None:
-        gap = plan.duration - int(target_periods)
-        if gap <= 0:
-            st.success(f"Rencana **memenuhi** target {target_periods} periode (sisa { -gap } periode).")
-        else:
-            st.error(f"Rencana **{gap} periode lebih lama** dari target {target_periods}.")
+    # Buffer summary chips
+    st.caption(
+        f"Buffer → kapasitas **+{100 * cap_buf:.0f}%** · "
+        f"waktu **+{time_buf} p/zona** · "
+        f"inventory **{inv_buf} zona** "
+        f"(dasar {rate:g} → efektif {rate_plan:.3g} zona/p)"
+    )
 
     if run:
-        pairs = [_pair_from_base_and_var(float(rate), var_mode)] * n_trades
+        pairs = [_pair_from_base_and_var(float(rate_plan), var_mode)] * n_trades
         try:
             res = ParadeOfTrades(
                 _build_config_from_pairs(pairs, n_zones, seed, batch_size=batch)
@@ -1205,17 +1244,15 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
         r1, r2, r3, r4 = st.columns(4)
         r1.metric("Reliability", f"{100 * rel['reliability']:.1f}%")
         r2.metric("Durasi aktual", f"{rel['actual_duration']} p")
-        r3.metric("Selisih vs rencana", f"{rel['actual_duration'] - rel['plan_duration']:+d} p")
+        r3.metric("vs rencana", f"{rel['actual_duration'] - rel['plan_duration']:+d} p")
         if target_periods is not None:
-            r4.metric("Selisih vs target", f"{rel['actual_duration'] - int(target_periods):+d} p")
+            r4.metric("vs target", f"{rel['actual_duration'] - int(target_periods):+d} p")
         else:
-            r4.metric("Zona", f"{n_zones}")
+            r4.metric("One-piece", "ya" if batch == 1 else "inv.buffer")
 
         fig, ax = plt.subplots(figsize=(10, 5.2))
-        plot_takt_plan(
-            plan_snap, ax=ax, result=result,
-            title="Rencana (putus-putus) vs aktual (tegas)",
-        )
+        plot_takt_plan(plan_snap, ax=ax, result=result,
+                       title="Takt plan OPF · rencana vs aktual")
         fig.tight_layout()
         _fig_to_st(fig)
 
@@ -1228,7 +1265,8 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
             st.dataframe(rel["detail"][:100], use_container_width=True, hide_index=True)
     else:
         fig, ax = plt.subplots(figsize=(10, 5.0))
-        plot_takt_plan(plan, ax=ax, result=None)
+        plot_takt_plan(plan, ax=ax, result=None,
+                       title="Takt plan ideal (one-piece + buffer)")
         fig.tight_layout()
         _fig_to_st(fig)
 
@@ -1237,17 +1275,32 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
         fig.tight_layout()
         _fig_to_st(fig)
 
-    with st.expander("What-if: durasi rencana vs kapasitas × ukuran takt"):
-        tbl = takt_design_table(n_trades, n_zones)
-        st.dataframe(tbl, use_container_width=True, hide_index=True)
-        st.caption(
-            f"Untuk **{n_zones} zona**: ubah kapasitas dan ukuran takt (batch) "
-            "untuk mencari kombinasi durasi rencana yang masuk akal."
-        )
+    with st.expander("What-if: durasi vs jumlah zona (one-piece, tanpa buffer)"):
+        rows = []
+        for z in sorted(set([8, 12, 16, 20, 24, 30, 40, 50, 60, n_zones])):
+            p = build_takt_plan(n_trades, int(z), batch_size=1, rate=rate)
+            rows.append({
+                "Zona": z,
+                "Durasi rencana (OPF)": p.duration,
+                "Takt time": round(p.takt_time, 3),
+                "Kapasitas dasar": rate,
+            })
+        st.dataframe(rows, use_container_width=True, hide_index=True)
+        st.caption("Tanpa buffer: durasi ≈ f(zona) pada one-piece flow. Buffer mengubah rate efektif & inventory.")
 
-    with st.expander("Tabel rencana (cuplikan sel)"):
-        st.dataframe(plan.as_rows()[: min(50, len(plan.as_rows()))],
-                     use_container_width=True, hide_index=True)
+    with st.expander("Teori singkat: 3 buffer"):
+        st.markdown(
+            """
+| Buffer | Arti | Di app |
+|--------|------|--------|
+| **Kapasitas** | Cadangan produktivitas (standby, lembur, kru ekstra) | +% pada kapasitas dasar |
+| **Waktu** | Slack di jadwal / takt time lebih longgar | +periode per zona pada takt time |
+| **Inventory** | Stok zona di antara tim (decoupling) | 0–1 = OPF murni; ≥2 = lepas tiap N zona |
+
+Takt plan konstruksi lean biasanya **one-piece flow**; **jumlah zona** menentukan panjang parade.  
+Buffer dipakai agar irama tetap andal saat ada variability (lihat juga Tommelein 2020 — capacity buffer).
+"""
+        )
 
     st.divider()
     st.markdown("##### Tommelein (2020) — capacity buffer / standby")
