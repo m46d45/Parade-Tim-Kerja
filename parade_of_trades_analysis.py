@@ -1621,13 +1621,13 @@ def tommelein_run_metrics(result: ParadeResult) -> dict:
     rel = (periods_ok / periods_work) if periods_work else None
     return {
         "Dadu": f"{int(t0.low)}–{int(t0.high)}" if t0.low != t0.high else str(int(t0.low)),
-        "Mean dadu": round(mean_die, 2),
-        "Takt": cfg.takt_rate if cfg.takt_rate is not None else "—",
-        "Standby": cfg.standby_capacity if cfg.takt_enabled else "—",
-        "Durasi": result.duration,
-        "TH": round(result.system_throughput, 3),
-        "Idle": result.total_idle_capacity,
-        "Standby dipakai": result.total_standby_used,
+        "Mean dadu": f"{mean_die:.2f}",
+        "Takt": str(cfg.takt_rate) if cfg.takt_rate is not None else "—",
+        "Standby": str(cfg.standby_capacity) if cfg.takt_enabled else "—",
+        "Durasi": int(result.duration),
+        "TH": round(float(result.system_throughput), 3),
+        "Idle": float(result.total_idle_capacity),
+        "Standby dipakai": int(result.total_standby_used),
         "Reliability takt": f"{100 * rel:.0f}%" if rel is not None else "—",
     }
 

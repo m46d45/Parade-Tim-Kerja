@@ -60,7 +60,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-04-takt-tommelein-v59"
+_APP_BUILD = "2026-08-04-takt-tommelein-v61"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1434,7 +1434,6 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
                 rows.append({"Skenario": label, "Durasi": str(exc)})
         st.session_state["takt_tom_rows"] = rows
         st.session_state["takt_tom_res"] = results
-        st.session_state["takt_tom_units"] = tom_units
 
     if st.session_state.get("takt_tom_res"):
         st.markdown("###### Hasil perhitungan")
