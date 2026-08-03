@@ -425,41 +425,83 @@ def littles_operations_curve(
     t0 = max(t0, 1e-9)
     w0 = th_max * t0  # critical WIP
 
-    # Best-case curves over WIP grid
-    w_hi = max(w0 * 4.0, 8.0, float(result.config.total_units) * 0.6)
-    w_grid = [w_hi * i / max(n_points - 1, 1) for i in range(n_points)]
-    # start slightly above 0
-    w_grid = [max(w, 1e-6) for w in w_grid]
+    ll = littles_law_metrics(result)
+    V_early = max(float(comb.get("v") or 0.0), 0.0)
+    # Placeholder W_opt estimate for axis range (refined below)
+    alpha_tmp = 0.90
+    if V_early < 1e-9:
+        w_opt_est = w0
+    else:
+        w_opt_est = alpha_tmp * w0 * (1.0 + V_early * (alpha_tmp / (1.0 - alpha_tmp)))
+        w_opt_est = max(w_opt_est, w0)
+
+    # Shared WIP axis: past W_opt, operating WIP, and high-WIP asymptote
+    w_hi = max(
+        w0 * 6.0,
+        w_opt_est * 2.8,
+        float(ll.avg_pipeline_wip) * 2.5,
+        float(result.config.total_units) * 0.75,
+        24.0,
+    )
+    w_grid = [max(w_hi * i / max(n_points - 1, 1), 1e-6) for i in range(n_points)]
+
+    # Best-case envelope (extended full range)
     bc_th: List[float] = []
     bc_ct: List[float] = []
     for w in w_grid:
-        if w <= w0:
+        if w <= w0 + 1e-12:
             bc_th.append(w / t0)
             bc_ct.append(t0)
         else:
             bc_th.append(th_max)
             bc_ct.append(w / th_max)
 
-    # Actual (variability) parametric in u
+    # Actual curve: Kingman parametric in u, then extend by Little's Law
+    # at saturated TH so curves continue past W_opt / operating WIP.
     wips: List[float] = []
     ths: List[float] = []
     cts: List[float] = []
     us: List[float] = []
-    for i in range(n_points):
-        u = 0.02 + (0.96 - 0.02) * i / max(n_points - 1, 1)
+    n_u = max(n_points, 120)
+    for i in range(n_u):
+        # push utilization close to 1 so CT/WIP grow
+        u = 0.02 + (0.985 - 0.02) * i / max(n_u - 1, 1)
         wait, ct, _, _ = kingman_ct(u, t_e_avg, c_a, c_e)
         if not math.isfinite(ct) or ct <= 0:
             continue
-        th = u / t_e_avg
-        # Cap TH by bottleneck max capacity
-        th = min(th, th_max * 0.999)
+        th = min(u / t_e_avg, th_max * 0.999)
+        if th <= 1e-12:
+            continue
         wip = th * ct
         us.append(u)
         ths.append(th)
         cts.append(ct)
         wips.append(wip)
 
-    ll = littles_law_metrics(result)
+    # Sort by WIP and extend to w_hi if needed (CT = WIP/TH, TH → th_sat)
+    if wips:
+        order = sorted(range(len(wips)), key=lambda i: wips[i])
+        wips = [wips[i] for i in order]
+        ths = [ths[i] for i in order]
+        cts = [cts[i] for i in order]
+        us = [us[i] for i in order]
+        w_last = wips[-1]
+        th_sat = ths[-1]
+        # gently approach a practical ceiling ≤ th_max
+        th_ceil = min(th_max * (0.92 if V_early > 1e-9 else 0.999), max(th_sat, th_max * 0.5))
+        if w_last < w_hi - 1e-6:
+            n_ext = max(20, n_points // 2)
+            for j in range(1, n_ext + 1):
+                w = w_last + (w_hi - w_last) * j / n_ext
+                # TH rises slightly toward ceiling then flattens
+                frac = j / n_ext
+                th = th_sat + (th_ceil - th_sat) * (1.0 - math.exp(-3.0 * frac))
+                th = min(th, th_max * 0.999)
+                ct = w / th  # Little's Law extension
+                wips.append(w)
+                ths.append(th)
+                cts.append(ct)
+                us.append(us[-1] if us else 0.9)
 
     # --- WIP landmarks (project production / Factory Physics) ---
     # W_min = W0 = critical WIP (best-case minimum WIP to reach TH_max).

@@ -1181,12 +1181,23 @@ def plot_wip_th_ct(
         line_ct, = ax2.plot(wip_s, ct_s, color=color_ct, linewidth=2.2, linestyle="--", label="CT aktual (var)")
 
     # --- Landmarks: W_min, W_opt, CONWIP ---
-    ymax_th = max(th_max * 1.25, float(d["op_th"]) * 1.3, 0.5)
+    op_w, op_th, op_ct = float(d["op_wip"]), float(d["op_th"]), float(d["op_ct"])
+
+    # Axis spans full extended curves (past W_opt / operating WIP)
+    x_right = max(
+        bc_w[-1] if bc_w else 0.0,
+        max(wip) if wip else 0.0,
+        w_opt * 1.15,
+        op_w * 1.15,
+        conwip * 1.15,
+        w_min * 4.0,
+        8.0,
+    )
+    ymax_th = max(th_max * 1.15, op_th * 1.25, max(th) if th else 0.0, 0.5) * 1.05
+
     ax.axvline(w_min, color="#15803d", linestyle="--", linewidth=1.6, alpha=0.9)
     ax.axvline(w_opt, color="#c2410c", linestyle="--", linewidth=1.6, alpha=0.9)
     ax.axvline(conwip, color="#7c3aed", linestyle="-", linewidth=2.0, alpha=0.85)
-    # soft band: W_min .. CONWIP = recommended CONWIP operating region
-    x_right = max(bc_w[-1] if bc_w else w_opt * 3, d["op_wip"] * 1.2, conwip * 1.5, w_opt * 2)
     ax.axvspan(min(w_min, conwip), max(w_min, conwip), color="#7c3aed", alpha=0.06, zorder=0)
 
     ax.text(w_min, ymax_th * 0.92, f" W_min={w_min:.1f}", color="#15803d", fontsize=8, va="top")
@@ -1194,7 +1205,6 @@ def plot_wip_th_ct(
     ax.text(conwip, ymax_th * 0.68, f" CONWIP={conwip:.1f}", color="#7c3aed", fontsize=8, va="top")
 
     # Operating point
-    op_w, op_th, op_ct = d["op_wip"], d["op_th"], d["op_ct"]
     ax.scatter([op_w], [op_th], s=100, color=color_th, zorder=6, edgecolors="white", linewidths=1.2)
     ax2.scatter([op_w], [op_ct], s=100, color=color_ct, zorder=6, edgecolors="white",
                 linewidths=1.2, marker="s")
@@ -1206,9 +1216,13 @@ def plot_wip_th_ct(
     ax2.tick_params(axis="y", labelcolor=color_ct)
     ax.set_xlim(0, x_right)
     ax.set_ylim(0, ymax_th)
-    ymax_ct = max(t0 * 3.0, op_ct * 1.35, max(bc_ct) * 1.05 if bc_ct else 1.0)
+    # CT scale: show extended branch (batas + aktual) without crushing low end too much
+    ct_peak = 0.0
+    if bc_ct:
+        ct_peak = max(ct_peak, max(bc_ct))
     if ct:
-        ymax_ct = min(max(ymax_ct, max(ct) * 1.05), max(ymax_ct, t0 * 12))
+        ct_peak = max(ct_peak, max(ct))
+    ymax_ct = max(t0 * 2.0, op_ct * 1.4, ct_peak * 1.05, 1.0)
     ax2.set_ylim(0, ymax_ct)
 
     ax.set_title(
