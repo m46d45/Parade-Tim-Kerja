@@ -37,7 +37,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-03-sim-stable-done-v21"
+_APP_BUILD = "2026-08-03-sim-slide-v22"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -126,110 +126,146 @@ def _base_speed_input(key: str, label: str = "Kecepatan dasar", default: float =
 
 
 def _render_parade_sim_banner() -> None:
-    """Accurate one-piece parade: 5 zones × 5 teams, step timeline, then loop."""
-    # Full HTML+JS so positions snap to CSS grid cells (not free-floating %).
+    """One-piece parade: teams *slide* between zones; done blocks stay solid."""
     html = r"""
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"/>
 <style>
   :root {
     --t1:#3b82f6; --t2:#f59e0b; --t3:#10b981; --t4:#ef4444; --t5:#8b5cf6;
-    --done:#94a3b8; --bg0:#0f2744; --bg1:#1a365d;
+    --bg0:#0f2744; --bg1:#1a365d;
+    --slide: 0.55s;
   }
   * { box-sizing: border-box; }
   body {
-    margin: 0; font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+    margin: 0;
+    font-family: system-ui, -apple-system, Segoe UI, sans-serif;
     background: transparent; color: #e8eef7;
   }
   .wrap {
     background: linear-gradient(135deg, var(--bg0) 0%, var(--bg1) 55%, #234e76 100%);
-    border-radius: 14px; padding: 12px 12px 10px;
+    border-radius: 14px; padding: 12px;
     box-shadow: 0 8px 28px rgba(15,39,68,.28);
   }
-  .head { margin-bottom: 10px; }
-  .title { font-weight: 700; font-size: 16px; }
-  .sub { font-size: 12.5px; opacity: .9; margin-top: 3px; line-height: 1.4; }
-  .grid {
+  .board {
+    position: relative;
+    border-radius: 12px;
+    background: rgba(0,0,0,.14);
+    padding: 8px 6px 10px;
+  }
+  .labels {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
     gap: 8px;
+    margin-bottom: 4px;
   }
-  .zone {
-    background: rgba(255,255,255,.07);
+  .labels span {
+    text-align: center;
+    font-size: 11px; font-weight: 700;
+    color: rgba(255,255,255,.82);
+    letter-spacing: .03em;
+  }
+  .lanes {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    min-height: 92px;
+  }
+  .cell {
     border: 1px dashed rgba(255,255,255,.32);
     border-radius: 10px;
-    min-height: 100px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 6px 4px 8px;
-    transition: background .25s, border-color .25s;
+    background: rgba(255,255,255,.06);
+    min-height: 92px;
+    transition: background .3s, border-color .3s;
+    position: relative;
   }
-  .zone.done {
+  .cell.done {
     background: rgba(148,163,184,.18);
     border-style: solid;
     border-color: rgba(148,163,184,.55);
   }
-  .zone-label {
-    font-size: 11px; font-weight: 700; letter-spacing: .03em;
-    color: rgba(255,255,255,.8); margin-bottom: 6px;
-  }
-  .slot {
-    flex: 1; width: 100%;
-    display: flex; align-items: center; justify-content: center;
-    min-height: 56px;
-  }
-  .chip {
-    display: none;
-    width: 92%;
-    max-width: 112px;
+  /* Done badge sits inside cell, no animation loop */
+  .done-badge {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    width: 88%; max-width: 112px;
     padding: 8px 6px;
     border-radius: 10px;
     text-align: center;
-    font-weight: 800;
-    font-size: 13px;
-    line-height: 1.15;
-    box-shadow: 0 4px 12px rgba(0,0,0,.3);
-  }
-  .chip small { display:block; font-weight:600; font-size:10px; opacity:.92; margin-top:2px; }
-  .chip.on { display: block; }
-  .chip.enter { display: block; animation: pop .28s ease; }
-  .chip.t1 { background: var(--t1); color:#fff; }
-  .chip.t2 { background: var(--t2); color:#1a1200; }
-  .chip.t3 { background: var(--t3); color:#fff; }
-  .chip.t4 { background: var(--t4); color:#fff; }
-  .chip.t5 { background: var(--t5); color:#fff; }
-  .chip.done-block {
-    display: block;
+    font-weight: 800; font-size: 13px;
     background: linear-gradient(180deg, #e2e8f0, #cbd5e1);
     color: #0f172a;
     border: 1px solid rgba(15,23,42,.12);
+    box-shadow: 0 4px 12px rgba(0,0,0,.2);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .35s ease;
   }
-  @keyframes pop {
-    from { transform: scale(.85); opacity: 0; }
-    to   { transform: scale(1); opacity: 1; }
+  .done-badge.on { opacity: 1; }
+
+  /* Teams layer — slide via left% */
+  .actors {
+    position: absolute;
+    left: 6px; right: 6px;
+    top: 28px; /* below labels */
+    height: 92px;
+    pointer-events: none;
   }
-  .meta {
-    display: flex; flex-wrap: wrap; gap: 8px 14px;
-    margin-top: 10px; font-size: 11.5px; opacity: .92;
-    align-items: center;
+  .team {
+    position: absolute;
+    top: 50%;
+    width: calc(20% - 10px);
+    max-width: 112px;
+    transform: translate(-50%, -50%);
+    padding: 8px 6px;
+    border-radius: 10px;
+    text-align: center;
+    font-weight: 800; font-size: 13px;
+    line-height: 1.15;
+    box-shadow: 0 4px 14px rgba(0,0,0,.32);
+    opacity: 0;
+    left: 10%;
+    transition:
+      left var(--slide) cubic-bezier(.4,.0,.2,1),
+      opacity .3s ease;
+    will-change: left, opacity;
   }
-  .period {
-    background: rgba(255,255,255,.1);
-    border-radius: 999px; padding: 3px 10px; font-weight: 700;
+  .team small {
+    display: block; font-weight: 600; font-size: 10px;
+    opacity: .92; margin-top: 2px;
   }
-  .hint { opacity: .85; }
+  .team.t1 { background: var(--t1); color:#fff; }
+  .team.t2 { background: var(--t2); color:#1a1200; }
+  .team.t3 { background: var(--t3); color:#fff; }
+  .team.t4 { background: var(--t4); color:#fff; }
+  .team.t5 { background: var(--t5); color:#fff; }
+  .team.visible { opacity: 1; }
+
   @media (max-width: 560px) {
-    .chip small { display: none; }
-    .zone { min-height: 78px; }
-    .title { font-size: 14px; }
+    .team small { display: none; }
+    .lanes, .actors { min-height: 76px; height: 76px; }
+    .cell { min-height: 76px; }
+    .team { font-size: 12px; }
   }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="grid" id="grid">
-    <!-- zones filled by JS -->
+  <div class="board" id="board">
+    <div class="labels">
+      <span>Zona 1</span><span>Zona 2</span><span>Zona 3</span>
+      <span>Zona 4</span><span>Zona 5</span>
+    </div>
+    <div class="lanes" id="lanes">
+      <div class="cell" data-z="1"><div class="done-badge" id="done-1">✓ Selesai</div></div>
+      <div class="cell" data-z="2"><div class="done-badge" id="done-2">✓ Selesai</div></div>
+      <div class="cell" data-z="3"><div class="done-badge" id="done-3">✓ Selesai</div></div>
+      <div class="cell" data-z="4"><div class="done-badge" id="done-4">✓ Selesai</div></div>
+      <div class="cell" data-z="5"><div class="done-badge" id="done-5">✓ Selesai</div></div>
+    </div>
+    <div class="actors" id="actors"></div>
   </div>
 </div>
 <script>
@@ -242,73 +278,99 @@ def _render_parade_sim_banner() -> None:
     { id: 5, name: "T5", job: "Finishing", cls: "t5" },
   ];
   const N = 5;
-  const STEP_MS = 900;
+  const STEP_MS = 1000;
   const HOLD_END_MS = 1600;
-  const grid = document.getElementById("grid");
+  // Center of each zone column (of actors width)
+  const ZONE_LEFT = { 1: "10%", 2: "30%", 3: "50%", 4: "70%", 5: "90%" };
+  const OFF_LEFT = "-12%";
+  const OFF_RIGHT = "112%";
 
-  // Build 5 zone columns
-  for (let z = 1; z <= N; z++) {
-    const zone = document.createElement("div");
-    zone.className = "zone";
-    zone.id = "zone-" + z;
-    zone.innerHTML =
-      '<div class="zone-label">Zona ' + z + '</div>' +
-      '<div class="slot" id="slot-' + z + '"></div>';
-    grid.appendChild(zone);
-  }
+  const actors = document.getElementById("actors");
+  const teamEls = {};
 
-  // Stable zone DOM: "Selesai" is not rebuilt each tick (no blink).
-  const zoneState = {};
+  TEAMS.forEach(function (t) {
+    const el = document.createElement("div");
+    el.className = "team " + t.cls;
+    el.id = "team-" + t.id;
+    el.innerHTML = "<span>" + t.name + "</span><small>" + t.job + "</small>";
+    el.style.left = OFF_LEFT;
+    actors.appendChild(el);
+    teamEls[t.id] = el;
+  });
 
-  function setSlot(zone, kind, key, html, clsList, animate) {
-    const prev = zoneState[zone];
-    if (prev && prev.kind === kind && prev.key === key) return;
-    const slot = document.getElementById("slot-" + zone);
-    const zoneEl = document.getElementById("zone-" + zone);
-    slot.innerHTML = "";
-    if (kind === "empty") {
-      zoneEl.classList.remove("done");
-      zoneState[zone] = { kind: "empty", key: "" };
+  function placeTeam(id, zone, visible) {
+    const el = teamEls[id];
+    if (!visible || zone < 1 || zone > N) {
+      // Leave to the right if had been on board past Z5, else stay off-left
+      if (el.dataset.zone && parseInt(el.dataset.zone, 10) === N) {
+        el.style.left = OFF_RIGHT;
+      } else if (!el.classList.contains("visible")) {
+        el.style.left = OFF_LEFT;
+      } else {
+        // finished mid/end: slide out right if was on last, else fade off
+        const z = parseInt(el.dataset.zone || "0", 10);
+        if (z >= N) el.style.left = OFF_RIGHT;
+        else if (z >= 1) {
+          // slide out right after last zone only; for T1 after Z5
+          el.style.left = OFF_RIGHT;
+        }
+      }
+      el.classList.remove("visible");
+      delete el.dataset.zone;
       return;
     }
-    const chip = document.createElement("div");
-    chip.className = clsList + (animate ? " enter" : " on");
-    chip.innerHTML = html;
-    slot.appendChild(chip);
-    if (kind === "done") zoneEl.classList.add("done");
-    else zoneEl.classList.remove("done");
-    zoneState[zone] = { kind: kind, key: key };
+    el.style.left = ZONE_LEFT[zone];
+    el.classList.add("visible");
+    el.dataset.zone = String(zone);
+  }
+
+  function setDone(z, on) {
+    const badge = document.getElementById("done-" + z);
+    const cell = document.querySelector('.cell[data-z="' + z + '"]');
+    if (on) {
+      badge.classList.add("on");
+      cell.classList.add("done");
+    } else {
+      badge.classList.remove("on");
+      cell.classList.remove("done");
+    }
   }
 
   /*
-    Period p: team t at zone (p - t + 1) if in 1..5.
-    Zone z done (hasil kerja) when p >= z + 5 (after T5 left).
+    Period p (0 empty):
+      team t in zone z = p - t + 1 (if 1..5)
+      zone z done when p >= z + 5
   */
-  function renderPeriodFixed(p) {
-    const occ = {};
-    if (p > 0) {
-      for (let t = 1; t <= N; t++) {
-        const z = p - t + 1;
-        if (z >= 1 && z <= N) occ[z] = t - 1;
+  function render(p) {
+    for (let t = 1; t <= N; t++) {
+      const z = p - t + 1;
+      if (p > 0 && z >= 1 && z <= N) {
+        placeTeam(t, z, true);
+      } else {
+        // hide: if previously active, slide out right when leaving after Z5
+        const el = teamEls[t];
+        const was = parseInt(el.dataset.zone || "0", 10);
+        if (was > 0) {
+          el.style.left = OFF_RIGHT;
+          el.classList.remove("visible");
+          // after transition, park off-left for next loop without flash
+          setTimeout(function () {
+            if (!el.classList.contains("visible")) {
+              el.style.transition = "none";
+              el.style.left = OFF_LEFT;
+              // force reflow
+              void el.offsetWidth;
+              el.style.transition = "";
+            }
+          }, 560);
+          delete el.dataset.zone;
+        } else {
+          placeTeam(t, 0, false);
+        }
       }
     }
     for (let z = 1; z <= N; z++) {
-      if (occ[z] !== undefined) {
-        const team = TEAMS[occ[z]];
-        setSlot(
-          z, "team", team.name + "-p" + p + "-z" + z,
-          "<span>" + team.name + "</span><small>" + team.job + "</small>",
-          "chip " + team.cls, true
-        );
-      } else if (p >= z + 5) {
-        setSlot(
-          z, "done", "done-" + z,
-          "<span>✓ Selesai</span>",
-          "chip done-block", false
-        );
-      } else {
-        setSlot(z, "empty", "", "", "", false);
-      }
+      setDone(z, p >= z + 5);
     }
   }
 
@@ -316,16 +378,26 @@ def _render_parade_sim_banner() -> None:
   const MAX_P = 10;
 
   function tick() {
-    renderPeriodFixed(p);
+    render(p);
     if (p >= MAX_P) {
       setTimeout(function () {
+        // reset teams quietly to off-left
+        for (let t = 1; t <= N; t++) {
+          const el = teamEls[t];
+          el.classList.remove("visible");
+          el.style.transition = "none";
+          el.style.left = OFF_LEFT;
+          void el.offsetWidth;
+          el.style.transition = "";
+          delete el.dataset.zone;
+        }
+        for (let z = 1; z <= N; z++) setDone(z, false);
         p = 0;
-        for (let z = 1; z <= N; z++) delete zoneState[z];
-        renderPeriodFixed(0);
+        render(0);
         setTimeout(function () {
           p = 1;
           schedule();
-        }, 700);
+        }, 500);
       }, HOLD_END_MS);
       return;
     }
@@ -337,12 +409,11 @@ def _render_parade_sim_banner() -> None:
     setTimeout(tick, STEP_MS);
   }
 
-  // start: brief empty, then period 1
-  renderPeriodFixed(0);
+  render(0);
   setTimeout(function () {
     p = 1;
     tick();
-  }, 600);
+  }, 500);
 })();
 </script>
 </body></html>
