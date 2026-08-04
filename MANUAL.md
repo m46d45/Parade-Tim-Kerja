@@ -261,7 +261,7 @@ Kolom penting:
 ### 7.2 Yang bisa diubah
 
 - **Jumlah lantai** (permintaan)
-- **Waktu tersedia** (hari, default **12**)
+- **Waktu tersedia** (hari, default **25**)
 - **TW** (jumlah tim / wagon)
 
 ### 7.3 Rumus
@@ -273,7 +273,7 @@ TD_lantai = (TW + 40 − 1) × 0,25
 TD_total  ≈ N_lantai × TD_lantai
 ```
 
-Default T_avail = **12 hari**. TW=5: TD/lantai = 11 hari; 2 lantai → 22 hari (perlu longgarkan hari / kurangi lantai / cek kapasitas).
+Default T_avail = **25 hari**. TW=5: TD/lantai = 11 hari; 2 lantai → 22 hari (perlu longgarkan hari / kurangi lantai / cek kapasitas).
 
 ### 7.4 Literatur
 
