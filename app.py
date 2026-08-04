@@ -66,7 +66,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-05-takt-25hari-v92"
+_APP_BUILD = "2026-08-05-takt-ui-v93"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1437,128 +1437,109 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
 
 
 def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
-    """Takt: bay 3×3 fix, TZ ÷4, kapasitas normal 4 bay/hari; lantai & hari bisa diubah."""
+    """Takt: n lantai, waktu per lantai, kapasitas bay/hari; TW=5 fix."""
     st.subheader("Takt plan")
 
-    # ---- Konstanta fix kasus ----
+    # Fix struktural
     BAY_M = 3.0
-    BAY_AREA = BAY_M * BAY_M  # 9 m²
-    TZ_FLOOR = 40  # genap, habis dibagi 4
-    AREA_FLOOR = TZ_FLOOR * BAY_AREA  # 360 m²
-    CAP_NORMAL = 4.0  # bay per hari per tim (Normal)
-    # tₑ normal = 1/4 hari/bay; T₀ = TZ/4 = 10 hari untuk 1 tim menyelesaikan 1 lantai
+    BAY_AREA = 9.0  # m²
+    TZ_FLOOR = 40  # bay per lantai (360/9)
+    AREA_FLOOR = 360.0
+    TW = 5
 
     st.caption(
-        f"Fix: bay **{BAY_M:g}×{BAY_M:g} m = {BAY_AREA:g} m²** · "
-        f"TZ/lantai **{TZ_FLOOR}** (÷4) · luas **{AREA_FLOOR:g} m²** · "
-        f"kapasitas Normal **{CAP_NORMAL:g} bay/hari**. "
-        "Jumlah lantai & waktu (hari) bisa diubah."
+        f"Kasus: proyek gedung bertingkat **n lantai** (dapat diubah), "
+        f"setiap lantai **{AREA_FLOOR:g} m²** dengan ukuran **bay {BAY_M:g}×{BAY_M:g} m** "
+        f"(={BAY_AREA:g} m²; {TZ_FLOOR} bay/lantai). "
+        f"Train **{TW} tim** (fix)."
     )
 
-    with st.expander("Setting fix (tidak diubah-ubah dulu)", expanded=True):
-        st.markdown(
-            f"""
-| Item | Nilai fix |
-|------|-----------|
-| Ukuran bay / zona | **{BAY_M:g} × {BAY_M:g} m = {BAY_AREA:g} m²** |
-| Zona per lantai (TZ) | **{TZ_FLOOR}** (genap, habis dibagi 4) |
-| Luas per lantai | {TZ_FLOOR} × {BAY_AREA:g} = **{AREA_FLOOR:g} m²** |
-| Kapasitas Normal | **{CAP_NORMAL:g} bay / hari** (satu tim) |
-| tₑ Normal | 1/{CAP_NORMAL:g} = **{1/CAP_NORMAL:g} hari/bay** |
-| T₀ Normal (1 tim, 1 lantai) | {TZ_FLOOR}/{CAP_NORMAL:g} = **{TZ_FLOOR/CAP_NORMAL:g} hari** |
-
-Permintaan = **jumlah lantai** (bukan TZ). Zona = cara memotong tiap lantai {AREA_FLOOR:g} m².
-"""
-        )
-
     # ------------------------------------------------------------------
-    # Variabel: lantai, waktu, TW
+    # Input yang bisa diubah
     # ------------------------------------------------------------------
-    st.markdown("##### Yang bisa diubah")
+    st.markdown("##### Pengaturan")
     c1, c2, c3 = st.columns(3)
     n_floors = int(c1.number_input(
-        "Jumlah lantai (permintaan)",
-        min_value=1, max_value=30, value=2, step=1,
+        "Jumlah lantai (n)",
+        min_value=1, max_value=50, value=2, step=1,
         key="takt_n_floors",
-        help="Unit permintaan owner = lantai selesai.",
+        help="Permintaan = n lantai selesai.",
     ))
-    t_avail = float(c2.number_input(
-        "Waktu tersedia (hari)",
-        min_value=1.0, max_value=10_000.0, value=25.0, step=1.0,
-        key="takt_avail_days",
-        help="Demand waktu owner — default 25 hari (semua lantai).",
+    t_per_floor = float(c2.number_input(
+        "Waktu tersedia per lantai (hari)",
+        min_value=0.5, max_value=1_000.0, value=12.0, step=0.5,
+        key="takt_days_per_floor",
+        help="Jendela hari yang disediakan owner untuk menyelesaikan satu lantai.",
     ))
-    tw = int(c3.number_input(
-        "TW — wagon (tim)",
-        min_value=2, max_value=12, value=int(n_trades), step=1,
-        key="takt_tw",
+    cap = float(c3.number_input(
+        "Kapasitas kerja (bay / hari / tim)",
+        min_value=0.25, max_value=20.0, value=4.0, step=0.25,
+        key="takt_cap_bay_day",
+        help="Default Normal = 4 bay per hari per tim.",
     ))
 
     tz = TZ_FLOOR
     area = AREA_FLOOR
-    cap = CAP_NORMAL
-    te = 1.0 / cap  # hari per bay
-    t0 = tz / cap   # hari untuk 1 tim × 1 lantai penuh
-    tt_floor = t_avail / max(n_floors, 1)  # LEI: hari per lantai
+    tw = TW
+    te = 1.0 / max(cap, 1e-9)  # hari per bay
+    t0 = tz / max(cap, 1e-9)   # hari 1 tim × 1 lantai
+    # LEI: if demand unit = 1 floor and available per floor = t_per_floor
+    tt_floor = t_per_floor  # already per demand unit (floor)
+    t_avail_total = t_per_floor * n_floors
     td_floor = float(littles_takt_duration(tw, tz, te))
     td_all = td_floor * n_floors
-    rate = cap  # bay/hari → zona/periode (1 hari = 1 periode)
+    rate = float(cap)
 
     # ------------------------------------------------------------------
     # Hasil
     # ------------------------------------------------------------------
-    st.markdown("##### Hasil hitung")
+    st.markdown("##### Hasil")
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Luas / lantai", f"{area:g} m²")
-    m2.metric("TZ / lantai", f"{tz}")
-    m3.metric("TT = hari ÷ lantai", f"{tt_floor:.2f} hari/lantai")
-    m4.metric("tₑ Normal", f"{te:g} hari/bay")
+    m1.metric("Bay / lantai", f"{tz}")
+    m2.metric("tₑ = 1/kapasitas", f"{te:.3g} hari/bay")
+    m3.metric("T₀ (1 tim, 1 lantai)", f"{t0:.2f} hari")
+    m4.metric("TT (per lantai)", f"{tt_floor:g} hari")
 
     n1, n2, n3, n4 = st.columns(4)
-    n1.metric("T₀ (1 tim, 1 lantai)", f"{t0:g} hari")
-    n2.metric("TD / lantai", f"{td_floor:.2f} hari")
-    n3.metric(f"TD × {n_floors} lantai", f"{td_all:.2f} hari")
-    n4.metric("T_avail", f"{t_avail:g} hari")
+    n1.metric("TD / lantai", f"{td_floor:.2f} hari")
+    n2.metric(f"TD × {n_floors} lantai", f"{td_all:.2f} hari")
+    n3.metric("T_avail total ≈", f"{t_avail_total:g} hari")
+    n4.metric("TW (fix)", f"{tw}")
 
     st.caption(
-        f"**TT pelanggan** = {t_avail:g} ÷ {n_floors} = **{tt_floor:.3g}** hari/lantai.  \n"
-        f"**tₑ** = 1/{cap:g} = **{te:g}** hari/bay · "
-        f"**TD/lantai** = (TW+TZ−1)×tₑ = ({tw}+{tz}−1)×{te:g} = **{td_floor:.2f}** hari.  \n"
-        f"**TD total** (lantai berurutan) = {n_floors}×{td_floor:.2f} = **{td_all:.2f}** hari."
+        f"**TD/lantai** = (TW + bay − 1) × tₑ = ({tw} + {tz} − 1) × {te:.4g} = **{td_floor:.2f}** hari.  \n"
+        f"**TD total** (lantai berurutan) = {n_floors} × {td_floor:.2f} = **{td_all:.2f}** hari · "
+        f"anggaran owner ≈ {n_floors} × {t_per_floor:g} = **{t_avail_total:g}** hari."
     )
 
-    if td_all <= t_avail + 1e-9:
+    if td_floor <= t_per_floor + 1e-9:
         st.success(
-            f"Feasible: TD total **{td_all:.1f}** hari ≤ T_avail **{t_avail:g}** hari."
+            f"Per lantai: TD **{td_floor:.2f}** ≤ waktu tersedia **{t_per_floor:g}** hari."
         )
     else:
         st.warning(
-            f"Belum feasible: TD **{td_all:.1f}** > T_avail **{t_avail:g}** hari. "
-            "Kurangi lantai, naikkan TW-path efficiency, atau longgarkan hari tersedia."
+            f"Per lantai: TD **{td_floor:.2f}** > waktu **{t_per_floor:g}** hari — "
+            "naikkan kapasitas (bay/hari) atau longgarkan waktu per lantai."
         )
 
-    # Ringkas tabel multi-lantai what-if
-    with st.expander("What-if jumlah lantai (setting fix sama)"):
-        rows = []
-        for nf in range(1, min(11, n_floors + 4)):
-            td_t = td_floor * nf
-            rows.append({
-                "Lantai": nf,
-                "TT (hari/lantai)": round(t_avail / nf, 2),
-                "TD total (hari)": round(td_t, 2),
-                f"vs {t_avail:g} hari": "OK" if td_t <= t_avail + 1e-9 else "telat",
-            })
-        st.dataframe(rows, use_container_width=True, hide_index=True)
+    if td_all <= t_avail_total + 1e-9:
+        st.success(
+            f"Total {n_floors} lantai: TD **{td_all:.2f}** ≤ anggaran **{t_avail_total:g}** hari."
+        )
+    else:
+        st.warning(
+            f"Total {n_floors} lantai: TD **{td_all:.2f}** > anggaran **{t_avail_total:g}** hari."
+        )
 
     # Wagon
-    st.markdown("##### Wagon chart (satu lantai, Normal 4 bay/hari)")
+    st.markdown("##### Wagon chart (satu lantai)")
     plan = build_takt_plan(tw, tz, 1, rate, 1, total_work=None)
     fig_w = max(5.5, min(9.0, 0.12 * max(td_floor, 1) + 3.0))
     fig_h = max(3.2, min(7.5, 0.10 * tz + 1.6))
     fig, ax = plt.subplots(figsize=(fig_w, fig_h))
     plot_takt_wagon_chart(
         plan, ax=ax, max_zones=None, compact=True,
-        title=f"1 lantai · TZ={tz} · 4 bay/hari · tₑ={te:g} · TD={td_floor:.1f} hari",
+        title=f"1 lantai · {tz} bay · {cap:g} bay/hari · TD={td_floor:.1f} hari",
     )
     fig.tight_layout()
     _fig_to_st(fig)
@@ -1577,7 +1558,6 @@ Permintaan = **jumlah lantai** (bukan TZ). Zona = cara memotong tiap lantai {ARE
         format_func=_batch_label,
         key="takt_batch",
     ))
-    # Periode simulasi = hari; kapasitas = 4 zona/periode
     if st.button("Jalankan simulasi 1 lantai", type="primary", use_container_width=True, key="takt_run_sim"):
         pairs = [_pair_from_base_and_var(float(rate), var_mode)] * tw
         try:
@@ -1587,8 +1567,8 @@ Permintaan = **jumlah lantai** (bukan TZ). Zona = cara memotong tiap lantai {ARE
             st.session_state["takt_sim_plan"] = plan
             st.session_state["takt_sim_meta"] = {
                 "tz": tz, "tw": tw, "te": te, "td": td_floor,
-                "td_all": td_all, "t_avail": t_avail, "n_floors": n_floors,
-                "cap": cap, "area": area,
+                "td_all": td_all, "t_per_floor": t_per_floor,
+                "n_floors": n_floors, "cap": cap,
             }
         except RuntimeError as exc:
             st.error(str(exc))
@@ -1601,11 +1581,11 @@ Permintaan = **jumlah lantai** (bukan TZ). Zona = cara memotong tiap lantai {ARE
         s1.metric("TD ideal / lantai", f"{float(meta.get('td', td_floor)):.1f} hari")
         s2.metric("Aktual 1 lantai", f"{sim_t.duration} hari")
         s3.metric(f"Aktual × {nf} ≈", f"{sim_t.duration * nf} hari")
-        s4.metric("T_avail", f"{float(meta.get('t_avail', t_avail)):g} hari")
+        s4.metric("Waktu / lantai", f"{float(meta.get('t_per_floor', t_per_floor)):g} hari")
         fig, ax = plt.subplots(figsize=(9.0, 4.2))
         plot_line_of_balance(
             sim_t, ax=ax,
-            title=f"LOB 1 lantai · TZ={meta.get('tz', tz)} · T={sim_t.duration} hari",
+            title=f"LOB 1 lantai · {meta.get('tz', tz)} bay · T={sim_t.duration} hari",
         )
         fig.tight_layout()
         _fig_to_st(fig)

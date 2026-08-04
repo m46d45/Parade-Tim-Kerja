@@ -247,37 +247,27 @@ Kolom penting:
 
 ## 7. Tab Takt plan
 
-### 7.1 Setting fix
+### 7.1 Kasus
 
-| Item | Nilai |
-|------|--------|
-| Bay / zona | **3 × 3 m = 9 m²** |
-| TZ per lantai | **40** (genap, habis ÷4) |
-| Luas per lantai | 40 × 9 = **360 m²** (fix) |
-| Kapasitas Normal | **4 bay / hari** per tim |
-| tₑ | **0,25 hari/bay** |
-| T₀ (1 tim, 1 lantai) | 40/4 = **10 hari** |
+Proyek gedung bertingkat **n lantai** (dapat diubah), setiap lantai **360 m²**, ukuran **bay 3×3 m** (= 9 m² → **40 bay/lantai**). Train **5 tim** (fix).
 
 ### 7.2 Yang bisa diubah
 
-- **Jumlah lantai** (permintaan)
-- **Waktu tersedia** (hari, default **25**)
-- **TW** (jumlah tim / wagon)
+| Input | Default |
+|-------|---------|
+| Jumlah lantai n | 2 |
+| Waktu tersedia **per lantai** | **12 hari** |
+| Kapasitas (bay/hari/tim) | **4** (Normal) |
 
 ### 7.3 Rumus
 
 ```text
-TT = T_avail_hari / N_lantai
-tₑ = 1/4 hari per bay          # Normal
-TD_lantai = (TW + 40 − 1) × 0,25
-TD_total  ≈ N_lantai × TD_lantai
+tₑ = 1 / kapasitas_bay_per_hari
+TD_lantai = (5 + 40 − 1) × tₑ
+TD_total  ≈ n × TD_lantai
 ```
 
-Default T_avail = **25 hari**. TW=5: TD/lantai = 11 hari; 2 lantai → 22 hari (perlu longgarkan hari / kurangi lantai / cek kapasitas).
-
-### 7.4 Literatur
-
-[LEI — Takt Time](https://www.lean.org/lexicon-terms/takt-time/): available time ÷ customer demand (di sini demand = lantai).
+Normal (4 bay/hari): tₑ=0,25 → TD/lantai = **11 hari** ≤ 12 hari.
 
 ## 8. Line of Balance (LOB)
 
