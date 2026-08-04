@@ -247,27 +247,35 @@ Kolom penting:
 
 ## 7. Tab Takt plan
 
-### 7.1 Kasus
+### 7.1 Bay ≠ zona
 
-Proyek gedung bertingkat **n lantai** (dapat diubah), setiap lantai **360 m²**, ukuran **bay 3×3 m** (= 9 m² → **40 bay/lantai**). Train **5 tim** (fix).
+| Item | Nilai |
+|------|--------|
+| Luas / lantai | **360 m²** |
+| Bay | **3×3 m = 9 m²** |
+| Bay / lantai | 360÷9 = **40 bay** |
+| **1 zona** | **4 bay** (sesuai Normal 4 bay/hari) |
+| **Zona / lantai (TZ)** | 40÷4 = **10 zona** (bukan 40) |
+| TW | **5** (fix) |
 
-### 7.2 Yang bisa diubah
+### 7.2 Kapasitas & rumus
 
-| Input | Default |
-|-------|---------|
-| Jumlah lantai n | 2 |
-| Waktu tersedia **per lantai** | **12 hari** |
-| Kapasitas (bay/hari/tim) | **4** (Normal) |
-
-### 7.3 Rumus
+- Input kapasitas: **bay/hari/tim** (default **4**)  
+- Zona/hari = (bay/hari) ÷ 4 → Normal = **1 zona/hari**  
+- tₑ = 1 / (zona/hari) → Normal **1 hari/zona**
 
 ```text
-tₑ = 1 / kapasitas_bay_per_hari
-TD_lantai = (5 + 40 − 1) × tₑ
-TD_total  ≈ n × TD_lantai
+TD = (TW + TZ − 1) × tₑ
+   = (5 + 10 − 1) × 1 = 14 hari / lantai
 ```
 
-Normal (4 bay/hari): tₑ=0,25 → TD/lantai = **11 hari** ≤ 12 hari.
+### 7.3 Input
+
+| | Default |
+|--|---------|
+| Jumlah lantai n | 2 |
+| Waktu tersedia **per lantai** | 12 hari |
+| Kapasitas bay/hari/tim | 4 |
 
 ## 8. Line of Balance (LOB)
 
