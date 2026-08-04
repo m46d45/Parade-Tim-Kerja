@@ -133,7 +133,7 @@ Proyek gedung bertingkat **n lantai**, setiap lantai **360 m²**, ukuran **bay 3
 
 | Input | Default | Keterangan |
 |-------|---------|------------|
-| Jumlah lantai n | **1** | Permintaan = lantai |
+| Jumlah lantai n | **1** | |
 | **TZ** (diskret) | **10** | Hanya **1, 5, 10, 20, 40** (bay/zona bulat) |
 | Waktu tersedia **per lantai** | **15 hari** | |
 | Kapasitas | **4 bay/hari/tim** | Normal |
@@ -153,7 +153,6 @@ bay_per_zona = 40 / TZ
 zona/hari    = (bay/hari) / bay_per_zona
 tₑ           = 1 / (zona/hari)
 TD_lantai    = (TW + TZ − 1) × tₑ     # TW = 5
-TD_total     ≈ n × TD_lantai
 ```
 
 **Contoh default:** TZ=10, 4 bay/hari → 1 zona/hari → tₑ=1  

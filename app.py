@@ -66,7 +66,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-05-takt-no-sim-v98"
+_APP_BUILD = "2026-08-05-no-anggaran-v99"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1490,7 +1490,6 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
     tw = TW
     td_floor = float(littles_takt_duration(tw, tz, te))
     td_all = td_floor * n_floors
-    t_avail_total = t_per_floor * n_floors
     rate = float(cap_zone)
 
     st.markdown("##### Mapping bay → zona")
@@ -1511,12 +1510,11 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
     m1.metric("tₑ (hari/zona)", f"{te:.3g}")
     m2.metric("T₀ (1 tim, 1 lantai)", f"{t0:.2f} hari")
     m3.metric("TD / lantai", f"{td_floor:.2f} hari")
-    m4.metric(f"TD × {n_floors} lantai", f"{td_all:.2f} hari")
+    m4.metric("Waktu / lantai", f"{t_per_floor:g} hari")
 
     st.caption(
         f"**TD = (TW + TZ − 1) × tₑ = ({tw} + {tz} − 1) × {te:.4g} = {td_floor:.2f}** hari/lantai.  \n"
-        f"Waktu tersedia / lantai = **{t_per_floor:g}** hari · "
-        f"anggaran total ≈ **{t_avail_total:g}** hari."
+        f"Waktu tersedia per lantai = **{t_per_floor:g}** hari."
     )
 
     if td_floor <= t_per_floor + 1e-9:
@@ -1526,10 +1524,6 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
             f"Per lantai: TD **{td_floor:.2f}** > **{t_per_floor:g}** hari — "
             "naikkan kapasitas, ubah TZ, atau longgarkan waktu."
         )
-    if td_all <= t_avail_total + 1e-9:
-        st.success(f"Total {n_floors} lantai: TD **{td_all:.2f}** ≤ **{t_avail_total:g}** hari.")
-    else:
-        st.warning(f"Total {n_floors} lantai: TD **{td_all:.2f}** > **{t_avail_total:g}** hari.")
 
     st.markdown("##### Wagon chart (satu lantai)")
     plan = build_takt_plan(tw, tz, 1, rate, 1, total_work=None)
