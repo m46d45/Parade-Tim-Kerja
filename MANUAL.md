@@ -1,3 +1,28 @@
+## 2b. Biaya aktif & idle — samakan persepsi
+
+Di **sidebar**, isi **tarif per periode** tiap tim (default 100).
+
+### Dua “jam” yang berbeda
+
+| Istilah | Arti | Contoh (tanpa var, 40 zona, 5 tim) |
+|---------|------|-------------------------------------|
+| **Durasi proyek** | Kalender dari p1 sampai tim **terakhir** selesai | Batch 1 → **44** p; batch 4 → **56** p |
+| **Periode aktif (satu tim)** | Periode tim itu **bekerja** (produksi > 0) | Tiap tim ≈ **40** (satu per zona) |
+| **Σ periode aktif** | Jumlah periode-aktif **semua** tim | ≈ **200** (= 5 × 40), bisa **lebih besar** dari durasi karena tim tumpang-tindih |
+| **Periode idle (satu tim)** | Sudah mulai, belum selesai kerja sendiri, **tidak** berproduksi (nunggu zona/handoff) | 0 jika aliran mulus tanpa var |
+| **Waktu di lapangan (tim)** | aktif + idle = selesai − mulai + 1 | |
+
+Jadi **durasi proyek ≠ periode aktif**. Durasi = panjang kalender proyek; periode aktif = volume kerja kru.
+
+### Rumus biaya
+
+- **Biaya aktif (tim)** = periode_aktif × tarif  
+- **Biaya idle (tim)** = periode_idle × tarif  
+- **Biaya total tim** = (aktif + idle) × tarif  
+- **Biaya total proyek** = jumlah 5 tim  
+
+Window per tim: **mulai kerja → selesai kerja sendiri** (bukan sampai akhir proyek).
+
 # Manual — Parade Tim Kerja
 
 **Simulasi parade tim kerja pekerjaan pengecoran lantai beton**

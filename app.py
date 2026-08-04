@@ -65,7 +65,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-04-cost-to-project-end-v80"
+_APP_BUILD = "2026-08-04-cost-definitions-v81"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -574,14 +574,27 @@ def _render_cost_block(result: ParadeResult, key: str = "cost") -> None:
 
 def _metrics_row(result: ParadeResult) -> None:
     cm = compute_cost_metrics(result, _trade_costs(result.config.n_trades))
-    cols = st.columns(7)
-    cols[0].metric("Durasi", f"{result.duration}")
-    cols[1].metric("vs Ideal", f"{result.duration - result.ideal_duration:+.1f}")
-    cols[2].metric("Throughput", f"{result.system_throughput:.3f}")
-    cols[3].metric("Idle cap.", f"{result.total_idle_capacity}")
-    cols[4].metric("Puncak WIP", f"{_peak_wip(result)}")
-    cols[5].metric("Biaya idle", f"{cm.total_idle:,.0f}")
-    cols[6].metric("Total biaya", f"{cm.total_cost:,.0f}")
+    p_act = sum(t.periods_active for t in cm.trades)
+    p_idle = sum(t.periods_idle for t in cm.trades)
+    cols = st.columns(6)
+    cols[0].metric(
+        "Durasi proyek",
+        f"{result.duration}",
+        help="Kalender sampai tim terakhir selesai. Bukan jumlah periode aktif semua tim.",
+    )
+    cols[1].metric("Throughput", f"{result.system_throughput:.3f}")
+    cols[2].metric(
+        "Σ periode aktif",
+        f"{p_act}",
+        help="Jumlah periode-tim saat berproduksi (bisa > durasi karena 5 tim tumpang-tindih).",
+    )
+    cols[3].metric(
+        "Σ periode idle",
+        f"{p_idle}",
+        help="Jumlah periode-tim menunggu zona (mulai…selesai kerja sendiri, prod=0).",
+    )
+    cols[4].metric("Biaya idle", f"{cm.total_idle:,.0f}")
+    cols[5].metric("Total biaya", f"{cm.total_cost:,.0f}")
 
 
 def _starts_caption(result: ParadeResult) -> str:
@@ -594,19 +607,20 @@ def _trade_table(result: ParadeResult) -> None:
     rows = []
     for i, m in enumerate(result.trade_metrics):
         tc = cm.trades[i]
+        tos = tc.periods_active + tc.periods_idle
         rows.append({
             "#": i + 1,
             "Tim": m.name,
             "Pace": result.config.trades[i].label(),
-            "Produksi": m.total_production,
-            "Idle cap.": m.total_idle,
+            "Mulai": m.start_period if m.start_period is not None else "—",
+            "Selesai kerja": m.periods_to_finish,
+            "Waktu lapangan": tos,
             "Periode aktif": tc.periods_active,
             "Periode idle": tc.periods_idle,
+            "Tarif": tc.cost_per_period,
             "Biaya aktif": round(tc.cost_active, 0),
             "Biaya idle": round(tc.cost_idle, 0),
             "Biaya total": round(tc.cost_total, 0),
-            "Mulai": m.start_period if m.start_period is not None else "—",
-            "Selesai": m.periods_to_finish,
         })
     st.dataframe(rows, use_container_width=True, hide_index=True)
 
@@ -977,7 +991,7 @@ def render_sidebar():
     )
     st.sidebar.divider()
     st.sidebar.markdown("##### Biaya per periode")
-    st.sidebar.caption("Tarif/periode · dihitung dari mulai tim sampai akhir proyek (aktif + idle).")
+    st.sidebar.caption("Tarif/periode · biaya = (periode aktif + periode idle) × tarif, per tim.")
     n_tr = 5
     names = list(DEFAULT_TRADE_NAMES[:n_tr]) if len(DEFAULT_TRADE_NAMES) >= n_tr else [f"Tim {i+1}" for i in range(n_tr)]
     costs = []
@@ -1156,18 +1170,15 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
             "Variability": m.get("var_label", "—"),
             "Batch": r.config.batch_size,
             "Pace": m.get("pace", r.config.trades[0].label()),
-            "Durasi": r.duration,
-            "vs Ideal": round(r.duration - r.ideal_duration, 1),
-            "Idle cap.": r.total_idle_capacity,
-            "Puncak WIP": _peak_wip(r),
-            "Periode aktif": sum(t.periods_active for t in cm.trades),
-            "Periode idle": sum(t.periods_idle for t in cm.trades),
+            "Durasi proyek": r.duration,
+            "Σ periode aktif": sum(t.periods_active for t in cm.trades),
+            "Σ periode idle": sum(t.periods_idle for t in cm.trades),
             "Biaya aktif": round(cm.total_active, 0),
             "Biaya idle": round(cm.total_idle, 0),
             "Total biaya": round(cm.total_cost, 0),
+            "Idle cap. (unit)": r.total_idle_capacity,
+            "Puncak WIP": _peak_wip(r),
             "TH": round(ll.throughput, 3),
-            "WIP⌀": round(ll.avg_pipeline_wip, 2),
-            "CT": round(ll.cycle_time_pipeline, 2),
             "T5 selesai": r.trade_metrics[-1].periods_to_finish,
         })
     st.divider()
@@ -1240,7 +1251,8 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
         fig.tight_layout()
         _fig_to_st(fig)
 
-        st.markdown("**Aktif + idle (stacked) = total**")
+        st.caption("Durasi proyek ≠ Σ periode aktif (tim tumpang-tindih). Biaya memakai periode aktif/idle per tim.")
+        st.markdown("**Aktif + idle (stacked) = total biaya**")
         fig, ax = plt.subplots(figsize=(9.0, 4.2))
         plot_comparison_costs(
             cost_map, ax=ax, mode="stacked",
