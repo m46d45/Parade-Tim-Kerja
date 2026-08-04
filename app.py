@@ -65,7 +65,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-04-cost-charts-v78"
+_APP_BUILD = "2026-08-04-cost-stack-fix-v79"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1217,22 +1217,47 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
         fig.tight_layout()
         _fig_to_st(fig)
     with tab_cost:
-        st.markdown("**Total vs idle (per skenario)**")
+        # verification table
+        vrows = []
+        for name, d in cost_map.items():
+            a, i_, t = d["active"], d["idle"], d["total"]
+            vrows.append({
+                "Skenario": name,
+                "Biaya aktif": round(a, 0),
+                "Biaya idle": round(i_, 0),
+                "Aktif+Idle": round(a + i_, 0),
+                "Total": round(t, 0),
+                "Cek": "OK" if abs((a + i_) - t) < 0.01 else "MISMATCH",
+            })
+        st.dataframe(vrows, use_container_width=True, hide_index=True)
+
+        st.markdown("**Aktif vs idle (berdampingan)**")
+        fig, ax = plt.subplots(figsize=(9.0, 4.0))
+        plot_comparison_costs(cost_map, ax=ax, mode="grouped", title="Biaya aktif vs idle per skenario")
+        fig.tight_layout()
+        _fig_to_st(fig)
+
+        st.markdown("**Aktif + idle (stacked) = total**")
+        fig, ax = plt.subplots(figsize=(9.0, 4.2))
+        plot_comparison_costs(
+            cost_map, ax=ax, mode="stacked",
+            title="Stacked: biru=aktif, oranye=idle · Σ = total biaya",
+        )
+        fig.tight_layout()
+        _fig_to_st(fig)
+
         c1, c2 = st.columns(2)
         with c1:
-            fig, ax = plt.subplots(figsize=(5.5, 3.8))
+            fig, ax = plt.subplots(figsize=(5.5, 3.6))
             plot_comparison_costs(cost_map, ax=ax, mode="total", title="Total biaya per skenario")
             fig.tight_layout()
             _fig_to_st(fig)
         with c2:
-            fig, ax = plt.subplots(figsize=(5.5, 3.8))
+            fig, ax = plt.subplots(figsize=(5.5, 3.6))
             plot_comparison_costs(cost_map, ax=ax, mode="idle", title="Biaya idle per skenario")
             fig.tight_layout()
             _fig_to_st(fig)
-        fig, ax = plt.subplots(figsize=(9.0, 4.0))
-        plot_comparison_costs(cost_map, ax=ax, mode="stacked", title="Biaya aktif + idle (stacked)")
-        fig.tight_layout()
-        _fig_to_st(fig)
+
         st.markdown("**Per tim**")
         c3, c4 = st.columns(2)
         with c3:

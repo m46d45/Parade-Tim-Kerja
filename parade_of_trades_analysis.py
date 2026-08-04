@@ -175,14 +175,14 @@ def compute_cost_metrics(
     cost_per_period: Sequence[float],
 ) -> CostMetrics:
     """
-    Biaya per tim (setelah mulai kerja sampai selesai):
+    Biaya per tim dari **mulai kerja sampai selesai** (inklusif).
 
-    - **Aktif**: periode di mana tim berproduksi (production > 0)
-    - **Idle**: periode setelah mulai & sebelum selesai di mana production = 0
-      (menunggu zona / starvation)
-
-    Biaya = periode × cost per periode (tarif sama untuk aktif & idle;
-    pemisahan untuk analisis pemborosan idle).
+    - **Periode aktif**: production > 0
+    - **Periode idle**: production = 0 (masih di rentang mulai…selesai)
+    - Jaminan: aktif + idle = waktu di lapangan (finish − start + 1)
+    - Biaya aktif = periode_aktif × tarif
+    - Biaya idle  = periode_idle × tarif
+    - Total tim  = aktif + idle  (= waktu_lapangan × tarif)
     """
     n = result.config.n_trades
     rates = list(cost_per_period)
@@ -190,51 +190,80 @@ def compute_cost_metrics(
         rates.append(float(rates[-1]) if rates else 100.0)
     rates = [max(0.0, float(r)) for r in rates[:n]]
 
-    # finish period per trade
-    finishes: List[Optional[int]] = []
-    for m in result.trade_metrics:
-        finishes.append(int(m.periods_to_finish) if m.periods_to_finish else None)
-
-    active = [0] * n
-    idle = [0] * n
+    # production series per period for each trade
+    # history may start at period 1
+    prod_by_period: List[Dict[int, int]] = []  # unused; use dict period->list
+    prod_map: Dict[int, List[int]] = {}
     for rec in result.history:
         p = int(rec.period)
-        for i in range(n):
-            start = result.trade_metrics[i].start_period
-            fin = finishes[i]
-            if start is None:
-                continue
-            if p < int(start):
-                continue
-            if fin is not None and p > int(fin):
-                continue
-            prod = int(rec.production[i]) if i < len(rec.production) else 0
-            if prod > 0:
-                active[i] += 1
-            else:
-                idle[i] += 1
+        prod_map[p] = [int(x) for x in rec.production]
 
     rows: List[TradeCostRow] = []
     for i in range(n):
-        ca = active[i] * rates[i]
-        ci = idle[i] * rates[i]
+        m = result.trade_metrics[i]
+        start_p = m.start_period
+        fin_p = int(m.periods_to_finish) if m.periods_to_finish else None
+        if start_p is None or fin_p is None:
+            rows.append(
+                TradeCostRow(
+                    trade_index=i,
+                    name=m.name,
+                    cost_per_period=rates[i],
+                    periods_active=0,
+                    periods_idle=0,
+                    cost_active=0.0,
+                    cost_idle=0.0,
+                    cost_total=0.0,
+                    start_period=start_p,
+                    finish_period=fin_p,
+                )
+            )
+            continue
+
+        start_p = int(start_p)
+        fin_p = int(fin_p)
+        if fin_p < start_p:
+            fin_p = start_p
+
+        n_active = 0
+        n_idle = 0
+        for p in range(start_p, fin_p + 1):
+            prod = 0
+            if p in prod_map and i < len(prod_map[p]):
+                prod = prod_map[p][i]
+            if prod > 0:
+                n_active += 1
+            else:
+                n_idle += 1
+
+        # consistency with time_on_site
+        tos = fin_p - start_p + 1
+        if n_active + n_idle != tos:
+            # repair: trust time range count
+            n_idle = max(0, tos - n_active)
+
+        ca = n_active * rates[i]
+        ci = n_idle * rates[i]
         rows.append(
             TradeCostRow(
                 trade_index=i,
-                name=result.trade_metrics[i].name,
+                name=m.name,
                 cost_per_period=rates[i],
-                periods_active=active[i],
-                periods_idle=idle[i],
+                periods_active=n_active,
+                periods_idle=n_idle,
                 cost_active=ca,
                 cost_idle=ci,
                 cost_total=ca + ci,
-                start_period=result.trade_metrics[i].start_period,
-                finish_period=finishes[i],
+                start_period=start_p,
+                finish_period=fin_p,
             )
         )
+
     ta = sum(r.cost_active for r in rows)
     ti = sum(r.cost_idle for r in rows)
     return CostMetrics(trades=rows, total_active=ta, total_idle=ti, total_cost=ta + ti)
+
+
 
 
 def littles_law_metrics(result: ParadeResult) -> LittlesLawMetrics:

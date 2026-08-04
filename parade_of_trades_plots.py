@@ -636,13 +636,43 @@ def plot_comparison_costs(
     x = np.arange(len(names))
 
     if mode == "stacked":
-        act = [float(cost_by_scenario[n].get("active", 0)) for n in names]
-        idle = [float(cost_by_scenario[n].get("idle", 0)) for n in names]
-        ax.bar(x, act, color="#2563eb", edgecolor="white", label="Biaya aktif", width=0.65)
-        ax.bar(x, idle, bottom=act, color="#f59e0b", edgecolor="white", label="Biaya idle", width=0.65)
-        for i, n in enumerate(names):
-            tot = act[i] + idle[i]
-            ax.text(i, tot, f"{tot:,.0f}", ha="center", va="bottom", fontsize=8)
+        act = [float(cost_by_scenario[n].get("active", 0) or 0) for n in names]
+        idle = [float(cost_by_scenario[n].get("idle", 0) or 0) for n in names]
+        # recompute total from parts (never trust a separate total field for stack)
+        totals = [a + b for a, b in zip(act, idle)]
+        bars_a = ax.bar(
+            x, act, color="#2563eb", edgecolor="white", linewidth=0.6,
+            label="Biaya aktif", width=0.62, zorder=2,
+        )
+        bars_i = ax.bar(
+            x, idle, bottom=act, color="#f59e0b", edgecolor="white", linewidth=0.6,
+            label="Biaya idle", width=0.62, zorder=2,
+        )
+        y_max = max(totals) if totals else 1.0
+        for i in range(len(names)):
+            # labels inside segments if large enough
+            if act[i] > 0.04 * y_max:
+                ax.text(i, act[i] / 2.0, f"{act[i]:,.0f}", ha="center", va="center",
+                        fontsize=7, color="white", fontweight="bold", zorder=3)
+            if idle[i] > 0.04 * y_max:
+                ax.text(i, act[i] + idle[i] / 2.0, f"{idle[i]:,.0f}", ha="center", va="center",
+                        fontsize=7, color="#1f2937", fontweight="bold", zorder=3)
+            ax.text(i, totals[i], f"Σ {totals[i]:,.0f}", ha="center", va="bottom",
+                    fontsize=8, color="#111827", zorder=3)
+        ax.legend(loc="upper right", fontsize=8, framealpha=0.92)
+        ax.set_ylabel("Biaya (aktif + idle)")
+        ax.set_ylim(0, y_max * 1.18 if y_max > 0 else 1)
+    elif mode == "grouped":
+        act = [float(cost_by_scenario[n].get("active", 0) or 0) for n in names]
+        idle = [float(cost_by_scenario[n].get("idle", 0) or 0) for n in names]
+        w = 0.35
+        ax.bar(x - w / 2, act, width=w, color="#2563eb", edgecolor="white", label="Aktif", zorder=2)
+        ax.bar(x + w / 2, idle, width=w, color="#f59e0b", edgecolor="white", label="Idle", zorder=2)
+        for i in range(len(names)):
+            if act[i] > 0:
+                ax.text(i - w / 2, act[i], f"{act[i]:,.0f}", ha="center", va="bottom", fontsize=6.5)
+            if idle[i] > 0:
+                ax.text(i + w / 2, idle[i], f"{idle[i]:,.0f}", ha="center", va="bottom", fontsize=6.5)
         ax.legend(loc="upper right", fontsize=8, framealpha=0.92)
         ax.set_ylabel("Biaya")
     elif mode == "idle":
