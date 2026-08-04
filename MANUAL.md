@@ -245,35 +245,36 @@ Kolom penting:
 
 ---
 
-## 7. Tab Takt plan
+## 7. Tab Takt plan — kasus 2 lantai × 441 m²
 
-### 7.1 Permintaan ≠ jumlah zona
+### 7.1 Kasus default
 
-| Konsep | Arti | Contoh |
-|--------|------|--------|
-| **Permintaan / lingkup** | Yang diminta owner | **1 lantai** 20×20 m = **400 m²** |
-| **Waktu tersedia** | Deadline owner | mis. 160 periode |
-| **TT (pelanggan)** | T_avail ÷ permintaan | 160 ÷ 1 = **160 p per lantai** |
-| **TZ (zona)** | **Keputusan** memecah luasan | 40 zona → **10 m²**/zona |
-| **T₀** | Waktu 1 tim menyelesaikan **seluruh** lantai | mis. 40 periode |
-| **tₑ** | Waktu 1 tim per zona | T₀/TZ = 40/40 = **1** p/zona |
+| Item | Nilai |
+|------|--------|
+| Permintaan | **2 lantai** |
+| Luas / lantai | **441 m²** (21×21 m) |
+| Waktu owner | **100 periode** |
+| TT pelanggan | 100÷2 = **50 p/lantai** |
+| Jarak kolom | **3 m** |
+| Zona min | bay **3×3 = 9 m²** (4 kolom) |
+| TZ max / lantai | **7×7 = 49** |
 
-Zona **bukan** permintaan. Zona = cara memotong lantai agar parade mengalir.
+Permintaan = **lantai**, bukan jumlah zona. Zona = keputusan memotong tiap 441 m².
 
 ### 7.2 Rumus
 
 ```text
-TT_pelanggan = T_avail / N_permintaan     # LEI
-tₑ           = T₀ / TZ                    # proses per zona
-TD           = (TW + TZ − 1) × tₑ         # train 1 lantai
+TT_pelanggan = T_avail / N_lantai
+tₑ           = T₀ / TZ
+TD_lantai    = (TW + TZ − 1) × tₑ
+TD_total     ≈ N_lantai × TD_lantai   # berurutan
 ```
 
-Naikkan TZ → luas/zona turun → tₑ turun → **TD lebih pendek** (mendekati T₀).
+T₀ default ≈ 49 (1 periode per zona struktural bila TZ=49).
 
-### 7.3 Literatur TT
+### 7.3 Literatur
 
-[Lean Enterprise Institute — Takt Time](https://www.lean.org/lexicon-terms/takt-time/):  
-**TT = available production time ÷ customer demand.**
+[LEI — Takt Time](https://www.lean.org/lexicon-terms/takt-time/): available time ÷ customer demand.
 
 ## 8. Line of Balance (LOB)
 

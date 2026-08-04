@@ -65,7 +65,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-05-takt-floor-scope-v88"
+_APP_BUILD = "2026-08-05-takt-441-v89"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1436,185 +1436,228 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
 
 
 def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
-    """Takt: permintaan = lingkup lantai; zona = keputusan memecah luasan."""
+    """Takt: kasus realistis lantai cor — lingkup ≠ zona; grid kolom 3 m."""
     st.subheader("Takt plan")
     st.caption(
-        "Permintaan = **lingkup pekerjaan** (mis. satu lantai). "
-        "Jumlah zona = **keputusan perencanaan**, bukan permintaan. · "
-        "TT = waktu tersedia ÷ permintaan "
-        "([LEI](https://www.lean.org/lexicon-terms/takt-time/))"
+        "Kasus default: **2 lantai × 441 m²**, owner **100 periode**. "
+        "Permintaan = lantai; zona = pecahan grid kolom 3 m. · "
+        "[LEI Takt Time](https://www.lean.org/lexicon-terms/takt-time/)"
     )
 
-    with st.expander("Konsep: permintaan ≠ jumlah zona", expanded=True):
+    # ------------------------------------------------------------------
+    # Konstanta kasus default (boleh diubah user)
+    # ------------------------------------------------------------------
+    # 441 m² = 21×21 m; bay 3×3 → 7×7 = 49 zona max; 9 m²/zona
+    COL_SPACING = 3.0
+
+    with st.expander("Konsep kasus (baca dulu)", expanded=False):
         st.markdown(
-            """
-### Apa yang diminta owner?
-Misalnya **satu lantai cor beton** — luasan **20 m × 20 m = 400 m²**.  
-Itu **permintaan / lingkup** (customer demand = 1 lantai, atau 400 m²).
+            f"""
+| Item | Nilai default |
+|------|----------------|
+| Lantai | **2** (permintaan = 2 unit selesai) |
+| Luas / lantai | **441 m²** (21×21 m) |
+| Total lingkup | **882 m²** |
+| Waktu owner | **100 periode** |
+| TT pelanggan | 100 ÷ 2 = **50 p / lantai** |
+| Jarak kolom | **3 m** (dapat diubah) |
+| Zona min (1 bay, 4 kolom) | **3×3 = 9 m²** (ikut jarak kolom) |
+| TZ max / lantai | **7×7 = 49** |
 
-### Apa itu zona?
-**Keputusan kita** memecah luasan agar parade mengalir:
-
-| TZ | Luas per zona (contoh 400 m²) | Arti |
-|----|-------------------------------|------|
-| 1 | 400 m² | Satu zona = seluruh lantai |
-| 10 | 40 m² | 10 potong |
-| **40** | **10 m²** | Pecahan lebih halus |
-| 50 | 8 m² | Lebih halus lagi |
-
-### Dua hitungan
-1. **TT (pelanggan)** = waktu tersedia ÷ **permintaan**  
-   - Permintaan = 1 lantai (atau N unit serupa), **bukan** TZ.  
-2. **tₑ (proses per zona)** = waktu satu tim menyelesaikan **satu zona**  
-   - Semakin banyak zona → zona lebih kecil → **tₑ mengecil** (lingkup total tetap).
-
-```text
-tₑ(z) = T₀ / TZ
-TD    = (TW + TZ − 1) × tₑ = (TW + TZ − 1) × T₀ / TZ
-```
-
-T₀ = waktu satu tim menyelesaikan **seluruh** lingkup lantai (seolah TZ=1).
+Permintaan **bukan** jumlah zona. Zona = keputusan memotong tiap lantai mengikuti grid kolom.
 """
         )
 
     # ------------------------------------------------------------------
-    # 1) Lingkup & permintaan pelanggan
+    # 1) Lingkup & owner
     # ------------------------------------------------------------------
-    st.markdown("##### 1. Lingkup & permintaan")
-    c1, c2, c3 = st.columns(3)
-    area = float(c1.number_input(
-        "Luasan lantai (m²)",
-        min_value=1.0, max_value=100_000.0, value=400.0, step=10.0,
-        key="takt_area",
-        help="Contoh: 20×20 m = 400 m².",
+    st.markdown("##### 1. Lingkup & waktu owner")
+    c1, c2, c3, c4 = st.columns(4)
+    n_floors = int(c1.number_input(
+        "Jumlah lantai (permintaan)",
+        min_value=1, max_value=20, value=2, step=1,
+        key="takt_n_floors",
+        help="Unit permintaan pelanggan = lantai selesai.",
     ))
-    n_demand = int(c2.number_input(
-        "Permintaan (unit selesai)",
-        min_value=1, max_value=100, value=1, step=1,
-        key="takt_demand_units",
-        help="Berapa unit lingkup diminta (default 1 = satu lantai).",
+    area = float(c2.number_input(
+        "Luas per lantai (m²)",
+        min_value=9.0, max_value=100_000.0, value=441.0, step=1.0,
+        key="takt_area",
+        help="Default 441 agar pas grid 3 m (21×21).",
     ))
     t_avail = float(c3.number_input(
-        "Waktu tersedia T_avail (periode)",
-        min_value=1.0, max_value=10_000.0, value=160.0, step=1.0,
+        "Waktu tersedia (periode)",
+        min_value=1.0, max_value=10_000.0, value=100.0, step=1.0,
         key="takt_avail",
-        help="Jangka waktu yang diminta owner sampai selesai.",
+        help="Semua lantai harus selesai dalam jendela ini.",
+    ))
+    col_s = float(c4.number_input(
+        "Jarak kolom (m)",
+        min_value=1.0, max_value=12.0, value=COL_SPACING, step=0.5,
+        key="takt_col",
+        help="1 zona terkecil ≈ 1 bay = 4 kolom.",
     ))
 
-    # TT pelanggan: available / demand units (LEI) — demand is floors not zones
-    tt_customer = t_avail / max(n_demand, 1)
+    # Geometri
+    side = math.sqrt(max(area, 1e-9))
+    bay_area = col_s * col_s
+    # bays along side (exact if side divisible by col_s)
+    n_bay_side = max(1, int(round(side / col_s)))
+    # prefer exact division when close
+    if abs(side / col_s - round(side / col_s)) < 1e-6:
+        n_bay_side = int(round(side / col_s))
+    else:
+        n_bay_side = max(1, int(math.floor(side / col_s + 1e-9)))
+        if n_bay_side < 1:
+            n_bay_side = 1
+    # For 21/3=7 exact
+    if abs(side - n_bay_side * col_s) > 0.05 * col_s:
+        # recalc from area/bay
+        tz_max_area = max(1, int(math.floor(area / bay_area + 1e-9)))
+    else:
+        tz_max_area = n_bay_side * n_bay_side
+    tz_max = max(1, tz_max_area)
+    area_per_min_zone = area / tz_max
 
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Lingkup", f"{area:g} m² × {n_demand} unit")
-    m2.metric("T_avail", f"{t_avail:g} p")
-    m3.metric("TT pelanggan = T_avail/permintaan", f"{tt_customer:.3g} p/unit")
+    tt_floor = t_avail / max(n_floors, 1)  # LEI: time per demand unit (floor)
+
+    g1, g2, g3, g4 = st.columns(4)
+    g1.metric("Sisi denah ≈", f"{side:.2f} m")
+    g2.metric("Bay min", f"{col_s:g}×{col_s:g} m ({bay_area:g} m²)")
+    g3.metric("TZ max / lantai", f"{tz_max}")
+    g4.metric("TT = T_avail / lantai", f"{tt_floor:.3g} p/lantai")
+
     st.caption(
-        f"**TT = {t_avail:g} ÷ {n_demand} = {tt_customer:.4g}** periode per unit permintaan "
-        f"(satu unit = seluruh lingkup {area:g} m²). "
-        "Ini **bukan** TT per zona."
+        f"Total lingkup **{n_floors} × {area:g} = {n_floors * area:g} m²**.  \n"
+        f"**TT pelanggan = {t_avail:g} ÷ {n_floors} = {tt_floor:.4g}** periode per lantai "
+        f"(permintaan = lantai, **bukan** zona)."
     )
 
     # ------------------------------------------------------------------
     # 2) Keputusan zonasi + train
     # ------------------------------------------------------------------
-    st.markdown("##### 2. Keputusan zonasi & train")
+    st.markdown("##### 2. Zonasi & train parade")
     d1, d2, d3 = st.columns(3)
+    # default TZ: min(40, tz_max) or 49 for default case
+    default_tz = min(40, tz_max) if tz_max >= 40 else tz_max
+    if abs(area - 441) < 0.5 and abs(col_s - 3) < 0.1:
+        default_tz = min(49, tz_max)  # full structural for demo? use 49 or mid
+        default_tz = 49 if tz_max >= 49 else tz_max
+    # Actually user case often uses intermediate; 49 is max. Default 49 to show structure,
+    # or 7*7=49. Let me use 49 for the realistic default.
     tz = int(d1.number_input(
-        "TZ — jumlah zona (keputusan)",
-        min_value=1, max_value=200, value=min(40, max(1, int(total_units))),
+        "TZ — zona per lantai",
+        min_value=1, max_value=int(max(tz_max, 1)),
+        value=int(min(default_tz, tz_max)),
         step=1,
         key="takt_tz",
-        help="Memecah luasan. Bukan permintaan.",
+        help=f"Keputusan perencanaan. Maksimum struktural ≈ {tz_max} (grid kolom).",
     ))
+    if tz > tz_max:
+        tz = tz_max
     tw = int(d2.number_input(
-        "TW — wagon (jumlah tim)",
+        "TW — wagon (tim)",
         min_value=2, max_value=12, value=int(n_trades), step=1,
         key="takt_tw",
     ))
-    # T0: waktu satu tim untuk seluruh lingkup (satu unit). Default:
-    # Normal capacity 1 zona/periode when TZ=40 and area split equal → T0 = 40 periods for full floor
-    # Or: user sets T0 directly. Default T0 = 40 (full floor work content for one trade)
+    # T0: one trade full floor. With Normal 1 p/zona when TZ=49 → T0=49
+    # Educational: T0=49 matches 1 period per min zone
+    default_t0 = float(tz_max)  # one period per structural bay if fully zoned
     t0 = float(d3.number_input(
-        "T₀ — waktu 1 tim untuk seluruh lantai (periode)",
-        min_value=0.5, max_value=5_000.0, value=40.0, step=1.0,
+        "T₀ — 1 tim untuk 1 lantai penuh (periode)",
+        min_value=0.5, max_value=5_000.0, value=float(default_t0), step=1.0,
         key="takt_t0",
-        help="Konten kerja satu trade untuk 100% luasan (seolah satu zona besar). "
-             "Default 40: setara Normal 1 zona/periode bila dipecah 40 zona.",
+        help="Konten kerja satu trade untuk 100% luas satu lantai. "
+             f"Default {default_t0:g} ≈ 1 periode per zona struktural max.",
     ))
 
-    area_per_zone = area / max(tz, 1)
-    te = t0 / max(tz, 1)  # process time per zone per wagon
-    # For n_demand units of full floors, scale
-    te_all = te  # per zone still te if each unit is one floor split the same way
-    # Train for one unit (one floor):
-    td_one = float(littles_takt_duration(tw, tz, te))
-    td_all = td_one * n_demand  # sequential units; simple model
-    # rate for simulation engine (zones per period)
+    area_z = area / max(tz, 1)
+    te = t0 / max(tz, 1)
+    td_floor = float(littles_takt_duration(tw, tz, te))
+    td_all = td_floor * n_floors  # sequential floors
     rate = 1.0 / max(te, 1e-9)
 
     e1, e2, e3, e4 = st.columns(4)
-    e1.metric("Luas / zona", f"{area_per_zone:.2f} m²")
-    e2.metric("tₑ = T₀/TZ", f"{te:.3g} p/zona")
-    e3.metric("TD per lantai", f"{td_one:.2f} p")
-    e4.metric("TD × permintaan", f"{td_all:.2f} p")
+    e1.metric("m² / zona", f"{area_z:.2f}")
+    e2.metric("tₑ = T₀/TZ", f"{te:.3g} p")
+    e3.metric("TD / lantai", f"{td_floor:.2f} p")
+    e4.metric(f"TD × {n_floors} lantai", f"{td_all:.2f} p")
 
     st.caption(
-        f"Zona {tz}: tiap zona **{area_per_zone:.2f} m²** (= {area:g}/{tz}).  \n"
-        f"**tₑ = T₀/TZ = {t0:g}/{tz} = {te:.4g}** periode per zona per tim.  \n"
-        f"**TD = (TW+TZ−1)×tₑ = ({tw}+{tz}−1)×{te:.4g} = {td_one:.2f}** per lantai."
+        f"Zona **{tz}**/lantai → **{area_z:.2f} m²/zona** "
+        f"(max struktural {tz_max} × {area_per_min_zone:.2f} m²).  \n"
+        f"**tₑ = {t0:g}/{tz} = {te:.4g}** · "
+        f"**TD/lantai = ({tw}+{tz}−1)×{te:.4g} = {td_floor:.2f}** · "
+        f"**TD total (berurutan) = {n_floors}×{td_floor:.2f} = {td_all:.2f}**"
     )
 
-    # Kelayakan vs owner
-    st.markdown("##### 3. Kelayakan vs waktu owner")
-    k1, k2, k3 = st.columns(3)
-    k1.metric("TD total", f"{td_all:.2f}")
+    # ------------------------------------------------------------------
+    # 3) Kelayakan
+    # ------------------------------------------------------------------
+    st.markdown("##### 3. Kelayakan vs owner (100 p default)")
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("TD total", f"{td_all:.1f}")
     k2.metric("T_avail", f"{t_avail:g}")
     k3.metric("TD − T_avail", f"{td_all - t_avail:+.1f}")
+    k4.metric("TT / lantai", f"{tt_floor:.1f}")
 
     if td_all <= t_avail + 1e-9:
         st.success(
-            f"Rencana **muat**: TD ({td_all:.2f}) ≤ waktu owner ({t_avail:g}). "
-            f"Zonasi TZ={tz} dengan T₀={t0:g} feasible."
+            f"Feasible: TD total **{td_all:.1f}** ≤ T_avail **{t_avail:g}**. "
+            f"Rata-rata detak lantai (TT) = **{tt_floor:.1f}** p."
         )
     else:
         st.warning(
-            f"Rencana **melebihi** waktu owner. Coba **naikkan TZ** (zona lebih kecil → tₑ↓ → TD↓), "
-            f"turunkan T₀ (produktivitas naik), kurangi TW-path, atau longgarkan T_avail."
+            f"Belum feasible: TD **{td_all:.1f}** > T_avail **{t_avail:g}**. "
+            "Coba **naikkan TZ** (hingga max grid), turunkan T₀ (produktivitas), "
+            "atau longgarkan waktu owner."
         )
 
-    # Mini insight: more zones → shorter TD (fixed T0)
-    with st.expander("Jika zona diubah (lingkup & T₀ tetap)"):
-        zs = sorted(set([1, 5, 10, 20, 30, 40, 50, 60, max(tz, 2), tz]))
-        zs = [z for z in zs if 1 <= z <= 200]
+    # Table what-if TZ
+    with st.expander("Tabel what-if: TZ vs TD (T₀ & lantai tetap)"):
+        candidates = sorted(set(
+            [1, 7, 14, 21, 28, 35, 42, 49, tz, tz_max]
+            + list(range(7, tz_max + 1, 7))
+        ))
+        candidates = [z for z in candidates if 1 <= z <= tz_max]
         rows = []
-        for z in zs:
+        for z in candidates:
             te_z = t0 / z
-            td_z = (tw + z - 1) * te_z * n_demand
+            td_f = (tw + z - 1) * te_z
+            td_t = td_f * n_floors
             rows.append({
-                "TZ": z,
+                "TZ/lantai": z,
                 "m²/zona": round(area / z, 2),
                 "tₑ": round(te_z, 3),
-                "TD": round(td_z, 2),
-                "vs T_avail": "OK" if td_z <= t_avail + 1e-9 else "telat",
+                "TD/lantai": round(td_f, 2),
+                "TD total": round(td_t, 2),
+                "vs 100p": "OK" if td_t <= t_avail + 1e-9 else "telat",
             })
         st.dataframe(rows, use_container_width=True, hide_index=True)
-        st.caption("Semakin banyak zona → tₑ kecil → TD pendek (diminishing returns, mendekati T₀×permintaan).")
+        st.caption(
+            "Zona ↑ → tₑ ↓ → TD ↓ (mendekati n_floors×T₀). "
+            f"Batas TZ = {tz_max} (grid {n_bay_side}×{n_bay_side})."
+        )
 
-    # Wagon for one floor
+    # ------------------------------------------------------------------
+    # 4) Wagon satu lantai
+    # ------------------------------------------------------------------
     st.markdown("##### 4. Wagon chart (satu lantai)")
     plan = build_takt_plan(tw, tz, 1, rate, 1, total_work=None)
-    fig_w = max(5.5, min(9.0, 0.1 * max(td_one, 1) / max(te, 0.2) + 3.0))
-    fig_h = max(3.0, min(7.5, 0.11 * tz + 1.6))
+    fig_w = max(5.5, min(9.0, 0.09 * max(td_floor, 1) / max(te, 0.2) + 3.0))
+    fig_h = max(3.2, min(8.0, 0.10 * tz + 1.8))
     fig, ax = plt.subplots(figsize=(fig_w, fig_h))
     plot_takt_wagon_chart(
         plan, ax=ax, max_zones=None, compact=True,
-        title=f"TZ={tz} · {area_per_zone:.1f} m²/zona · tₑ={te:.3g} · TD={td_one:.1f}",
+        title=f"1 lantai · TZ={tz} · {area_z:.1f} m²/z · tₑ={te:.3g} · TD={td_floor:.1f}",
     )
     fig.tight_layout()
     _fig_to_st(fig)
 
-    # Optional sim
-    st.markdown("##### 5. Simulasi parade (opsional)")
+    # ------------------------------------------------------------------
+    # 5) Simulasi opsional (satu lantai sebagai parade zona)
+    # ------------------------------------------------------------------
+    st.markdown("##### 5. Simulasi parade satu lantai (opsional)")
     var_mode = st.selectbox(
         "Variability",
         ["no_variability", "low", "medium", "high", "very_high"],
@@ -1627,7 +1670,7 @@ T₀ = waktu satu tim menyelesaikan **seluruh** lingkup lantai (seolah TZ=1).
         format_func=_batch_label,
         key="takt_batch",
     ))
-    if st.button("Jalankan simulasi", type="primary", use_container_width=True, key="takt_run_sim"):
+    if st.button("Jalankan simulasi 1 lantai", type="primary", use_container_width=True, key="takt_run_sim"):
         pairs = [_pair_from_base_and_var(float(rate), var_mode)] * tw
         try:
             cfg = _build_config_from_pairs(pairs, tz, seed, batch_size=batch_t)
@@ -1635,8 +1678,9 @@ T₀ = waktu satu tim menyelesaikan **seluruh** lingkup lantai (seolah TZ=1).
             st.session_state["takt_sim_result"] = res
             st.session_state["takt_sim_plan"] = plan
             st.session_state["takt_sim_meta"] = {
-                "tz": tz, "tw": tw, "te": te, "td": td_one, "t_avail": t_avail,
-                "area": area, "t0": t0,
+                "tz": tz, "tw": tw, "te": te, "td": td_floor,
+                "td_all": td_all, "t_avail": t_avail, "n_floors": n_floors,
+                "area": area, "t0": t0, "tz_max": tz_max,
             }
         except RuntimeError as exc:
             st.error(str(exc))
@@ -1644,21 +1688,23 @@ T₀ = waktu satu tim menyelesaikan **seluruh** lingkup lantai (seolah TZ=1).
     sim_t = st.session_state.get("takt_sim_result")
     if sim_t is not None:
         meta = st.session_state.get("takt_sim_meta") or {}
-        s1, s2, s3 = st.columns(3)
-        s1.metric("TD ideal (1 lantai)", f"{float(meta.get('td', td_one)):.1f}")
-        s2.metric("Durasi aktual", f"{sim_t.duration}")
-        s3.metric("T_avail", f"{float(meta.get('t_avail', t_avail)):g}")
+        nf = int(meta.get("n_floors", n_floors))
+        s1, s2, s3, s4 = st.columns(4)
+        s1.metric("TD ideal / lantai", f"{float(meta.get('td', td_floor)):.1f}")
+        s2.metric("Aktual 1 lantai", f"{sim_t.duration}")
+        s3.metric(f"Aktual × {nf} lantai ≈", f"{sim_t.duration * nf}")
+        s4.metric("T_avail", f"{float(meta.get('t_avail', t_avail)):g}")
         fig, ax = plt.subplots(figsize=(9.0, 4.2))
         plot_line_of_balance(
             sim_t, ax=ax,
-            title=f"LOB · TZ={meta.get('tz', tz)} · T={sim_t.duration}p",
+            title=f"LOB 1 lantai · TZ={meta.get('tz', tz)} · T={sim_t.duration}p",
         )
         fig.tight_layout()
         _fig_to_st(fig)
         _export_takt_block(
             sim_t, plan,
             takt_plan_reliability(sim_t, plan),
-            duration_plan=int(round(float(meta.get("td", td_one)))),
+            duration_plan=int(round(float(meta.get("td", td_floor)))),
             key="takt_main",
         )
 
