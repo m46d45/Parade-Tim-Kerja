@@ -207,7 +207,22 @@ Teori tiap grafik: bab 7–12.
 
 ## 6. Tab Takt plan
 
-### 6.1 Peran edukasi
+### 6.1 Little's Takt Law
+
+Sumber: [Is Takt Really Magic? (Lean Built)](https://leanbuilt.us/is-takt-really-magic/)
+
+\[ TD = (TW + TZ - 1) \\times TT \]
+
+| Simbol | Arti | Default app |
+|--------|------|-------------|
+| **TW** | Takt wagons (tim dalam train) | 5 |
+| **TZ** | Takt zones | 40 |
+| **TT** | Takt time (periode / zona) | 1 (Normal) |
+| **TD** | Total duration | (5+40−1)×1 = **44** |
+
+Zona ↑ dengan lingkup tetap → TT mengecil → TD sedikit turun (diminishing returns).
+
+### 6.1b Peran edukasi
 
 Tab ini adalah **kelanjutan parade tim kerja** dengan kebijakan tetap:
 

@@ -32,6 +32,7 @@ export_takt_csv,
     evaluate_at_wip,
     build_takt_plan,
     zone_rate_for_work,
+    littles_takt_duration,
     takt_plan_from_lob_result,
     required_rate_for_duration,
     takt_design_table,
@@ -61,7 +62,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-04-zone-size-v74"
+_APP_BUILD = "2026-08-04-littles-takt-v75"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1300,7 +1301,7 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
 def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
     """Takt plan: (1) baseline LOB+wagon, (2) bandingan zonasi LOB+wagon."""
     st.subheader("Takt plan")
-    st.caption("One-piece flow · Takt plan = wagon chart · LOB = kemajuan kumulatif")
+    st.caption("Little's Takt Law: TD = (TW + TZ − 1) × TT  ·  TW=wagon/tim · TZ=zona · TT=takt time")
 
     # Shared capacity / variability
     c1, c2 = st.columns(2)
@@ -1359,10 +1360,15 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
     base_res = st.session_state.get("takt_base_result")
     base_plan = st.session_state.get("takt_base_plan")
     if base_res is not None and base_plan is not None:
-        m1, m2, m3 = st.columns(3)
-        m1.metric("Zona", f"{z_base}")
-        m2.metric("Durasi", f"{base_res.duration} p")
-        m3.metric("TH", f"{base_res.system_throughput:.3f}")
+        tw, tz, tt = n_trades, int(z_base), float(base_plan.takt_time)
+        td = float(base_plan.duration)
+        m1, m2, m3, m4, m5 = st.columns(5)
+        m1.metric("TW (wagon)", f"{tw}")
+        m2.metric("TZ (zona)", f"{tz}")
+        m3.metric("TT (takt time)", f"{tt:g} p")
+        m4.metric("TD (durasi)", f"{td:g} p")
+        m5.metric("Simulasi", f"{base_res.duration} p")
+        st.caption(f"TD = (TW + TZ − 1) × TT = ({tw} + {tz} − 1) × {tt:g} = **{td:g}** periode")
 
         fig, ax = plt.subplots(figsize=(10, 4.8))
         plot_line_of_balance(
@@ -1379,7 +1385,7 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
         fig, ax = plt.subplots(figsize=(fig_w, fig_h))
         plot_takt_wagon_chart(
             base_plan, ax=ax, max_zones=None, compact=True,
-            title=f"Takt plan (wagon) — baseline · {n_z} zona · {max(c.period_end for c in base_plan.cells):.1f} p",
+            title=f"Takt plan · TW={n_trades} · TZ={n_z} · TT={base_plan.takt_time:g} · TD={base_plan.duration:g}",
         )
         fig.tight_layout()
         _fig_to_st(fig)
@@ -1468,64 +1474,65 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
         )
         return
 
-    # Ringkasan singkat
-    tw = float(st.session_state.get("takt_total_work") or z_base)
+    # Ringkasan — Little's Takt Law
+    tw_work = float(st.session_state.get("takt_total_work") or z_base)
     rows = []
     for label, r in results.items():
         plan_i = plans[label]
         z_n = int(meta.get(label, {}).get("zona", r.config.total_units))
-        t_end = max(float(c.period_end) for c in plan_i.cells)
+        tt = float(plan_i.takt_time)
+        td = float(plan_i.duration)
         rows.append({
             "Skenario": label,
-            "Zona": z_n,
-            "Ukuran zona (kerja)": round(tw / z_n, 3),
-            "t / zona (p)": round(float(plan_i.takt_time), 3),
-            "Durasi takt (p)": round(t_end, 2),
-            "Durasi sim (p)": r.duration,
+            "TW": n_trades,
+            "TZ": z_n,
+            "TT": round(tt, 4),
+            "TD=(TW+TZ-1)×TT": round(td, 3),
+            "Cek akhir wagon": round(max(float(c.period_end) for c in plan_i.cells), 3),
+            "Simulasi": r.duration,
         })
     st.dataframe(rows, use_container_width=True, hide_index=True)
     st.caption(
-        f"Lingkup tetap = {tw:g} unit kerja (baseline). "
-        "Zona ↑ → unit lebih kecil → t/zona ↓ → durasi total ↓."
+        f"Lingkup tetap W={tw_work:g} · TT = (1/kapasitas)×(W/TZ). "
+        f"Default: TW={n_trades}, TT=1, TZ=40 → TD=({n_trades}+40−1)×1=44. "
+        "TZ ↑ → TT ↓ → TD ↓ (diminishing returns)."
     )
 
-    # Gabungan akurat: X = jumlah zona, Y = durasi
-    st.markdown("**Durasi total vs jumlah zonasi**")
+    # TD vs TZ — Little's Takt Law points
+    st.markdown("**TD vs TZ** — Little's Takt Law")
     fig, ax = plt.subplots(figsize=(7.0, 3.8))
     points = []
     for label, r in results.items():
         plan_i = plans[label]
         z_n = int(meta.get(label, {}).get("zona", r.config.total_units))
-        t_end = max(float(c.period_end) for c in plan_i.cells)
-        points.append((z_n, t_end, float(r.duration), label))
+        td = float(plan_i.duration)
+        points.append((z_n, td, float(r.duration), float(plan_i.takt_time), label))
     points.sort(key=lambda t: t[0])
     zs = [p[0] for p in points]
     d_plan = [p[1] for p in points]
     d_sim = [p[2] for p in points]
-    labs = [p[3] for p in points]
-    ax.plot(zs, d_plan, "o-", color="#2563eb", linewidth=2.2, markersize=10, label="Takt plan (wagon)")
-    ax.plot(zs, d_sim, "s--", color="#ea580c", linewidth=1.8, markersize=8, label="Simulasi aktual")
-    for x, y, lab in zip(zs, d_plan, labs):
-        short = lab.split("·")[-1].strip() if "·" in lab else lab
+    ax.plot(zs, d_plan, "o-", color="#2563eb", linewidth=2.2, markersize=10, label="TD takt = (TW+TZ−1)×TT")
+    ax.plot(zs, d_sim, "s--", color="#ea580c", linewidth=1.8, markersize=8, label="Durasi simulasi")
+    for x, y, tt, lab in [(p[0], p[1], p[3], p[4]) for p in points]:
         ax.annotate(
-            f"{x} zona\n{y:.1f} p",
+            f"TZ={x}\nTT={tt:.2f}\nTD={y:.1f}",
             (x, y),
             textcoords="offset points",
-            xytext=(0, 12),
+            xytext=(0, 14),
             ha="center",
-            fontsize=8,
+            fontsize=7.5,
             color="#1e3a8a",
         )
-    ax.set_xticks(zs)
-    ax.set_xticklabels([str(z) for z in zs])
-    ax.set_xlim(min(zs) - 5, max(zs) + 5)
+    ax.set_xticks(list(zs))
+    ax.set_xticklabels([f"TZ={z}" for z in zs])
+    ax.set_xlim(min(zs) - max(5, (max(zs)-min(zs))*0.15), max(zs) + max(5, (max(zs)-min(zs))*0.15))
     y_min = min(min(d_plan), min(d_sim))
     y_max = max(max(d_plan), max(d_sim))
-    pad = max(1.0, (y_max - y_min) * 0.25)
-    ax.set_ylim(y_min - pad, y_max + pad)
-    ax.set_xlabel("Jumlah zonasi")
-    ax.set_ylabel("Durasi total (periode)")
-    ax.set_title("Semakin banyak zona (unit lebih kecil) → durasi total lebih pendek")
+    pad = max(1.0, (y_max - y_min) * 0.35 + 1)
+    ax.set_ylim(y_min - pad * 0.3, y_max + pad)
+    ax.set_xlabel("TZ — jumlah takt zone")
+    ax.set_ylabel("TD — durasi total (periode)")
+    ax.set_title(f"TW={n_trades} wagon · lingkup tetap · TT mengecil jika TZ naik")
     ax.legend(loc="best", fontsize=8)
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
@@ -1541,7 +1548,7 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
         fig, ax = plt.subplots(figsize=(fig_w, fig_h))
         plot_takt_wagon_chart(
             plan_i, ax=ax, max_zones=None, compact=True,
-            title=f"{label} · {z_n} zona · {max(c.period_end for c in plan_i.cells):.1f} p",
+            title=f"{label} · TW={n_trades} TZ={z_n} TT={plan_i.takt_time:g} TD={plan_i.duration:g}",
         )
         fig.tight_layout()
         _fig_to_st(fig)

@@ -792,92 +792,93 @@ class TaktPlan:
 
 
 def zone_rate_for_work(base_rate: float, n_zones: int, total_work: float) -> float:
-    """Kapasitas zona/periode agar total kerja tetap: base_rate * n_zones / total_work."""
+    """
+    Kapasitas zona/periode agar **total kerja tetap**.
+
+    base_rate = zona baseline / periode ( = 1/TT_base pada ukuran baseline).
+    total_work = TZ_base (unit kerja proyek).
+    n_zones = TZ aktual → rate = base_rate * n_zones / total_work
+             (TT_eff = TT_base * total_work / n_zones).
+    """
     return max(float(base_rate), 1e-9) * max(1, int(n_zones)) / max(float(total_work), 1e-9)
+
+
+def littles_takt_duration(n_wagons: int, n_zones: int, takt_time: float) -> float:
+    """Little's Takt Law: TD = (TW + TZ - 1) × TT  (leanbuilt.us / Dlouhy & Binninger)."""
+    return (max(1, int(n_wagons)) + max(1, int(n_zones)) - 1) * max(float(takt_time), 1e-12)
 
 
 def build_takt_plan(
     n_trades: int = 5,
     n_zones: int = 20,
-    batch_size: int = 4,
+    batch_size: int = 1,
     rate: float = 1.0,
     handoff_lag: int = 1,
     total_work: Optional[float] = None,
 ) -> TaktPlan:
     """
-    Ideal OPF takt train (period 0-based, continuous time).
+    Ideal OPF takt train from **Little's Takt Law**:
 
-    **Fixed total work (educational zoning):**
-    - ``total_work`` = lingkup proyek tetap (default = n_zones → unit size 1)
-    - Kapasitas ``rate`` = unit kerja / periode
-    - Zona lebih banyak → ukuran zona = total_work/n_zones lebih kecil
-      → waktu per zona lebih pendek → **durasi total lebih cepat**
-      (pipeline fill (n_trades-1)×t_zona mengecil)
+        TD = (TW + TZ - 1) × TT
 
-    Example: total_work=40, rate=1, 5 trades:
-      30 zona → t_zona=40/30, T≈45.3 p
-      40 zona → t_zona=1,     T≈44 p
-      50 zona → t_zona=0.8,   T≈43.2 p
+    - TW = n_trades (takt wagons / tim)
+    - TZ = n_zones  (takt zones)
+    - TT = takt time per zona
+    - rate = 1/TT when total_work is None (unit size 1)
+    - If total_work is set (lingkup tetap = TZ_baseline), then
+        TT = (1/rate) * (total_work / TZ)
+      so more zones → smaller TT → shorter TD (diminishing returns).
+
+    Cell for trade i (0-based), zone z (0-based)::
+
+        start = (i + z) * TT
+        end   = start + TT
+
+    T1·Z1 starts at 0; train diagonal; last cell ends at TD.
     """
-    rate = max(float(rate), 1e-9)
-    batch_size = max(1, int(batch_size))
-    n_zones = max(1, int(n_zones))
+    _ = handoff_lag  # OPF finish-to-start train; lag absorbed in (TW+TZ-1)
+    _ = batch_size
     n_trades = max(1, int(n_trades))
-    W = float(total_work) if total_work is not None else float(n_zones)
-    W = max(W, 1e-9)
-    # time to complete one zone (work units / (work per period))
-    t_zone = W / (rate * n_zones)
-    # handoff: continuous — next trade starts when upstream finishes this zone
-    # (lag periods from discrete engine mapped as 0 extra wait beyond finish)
-    _ = handoff_lag  # kept for API compat; train uses finish-to-start
+    n_zones = max(1, int(n_zones))
+    rate = max(float(rate), 1e-9)
 
-    start: List[List[float]] = [[0.0] * n_zones for _ in range(n_trades)]
-    finish: List[List[float]] = [[0.0] * n_zones for _ in range(n_trades)]
-
-    for z in range(n_zones):
-        for i in range(n_trades):
-            cand = [0.0]
-            if z > 0:
-                cand.append(finish[i][z - 1])
-            if i > 0:
-                cand.append(finish[i - 1][z])
-            # batch: only release every batch_size zones to downstream
-            # for OPF batch=1, same as zone-by-zone above
-            if batch_size > 1 and i > 0:
-                # downstream may start zone z only after upstream finished
-                # the batch containing z (last zone of batch)
-                batch_end = min(n_zones - 1, ((z // batch_size) + 1) * batch_size - 1)
-                # still use same-zone upstream for wagon clarity of OPF;
-                # batch>1 would delay — keep simple OPF train for takt education
-                pass
-            ps = max(cand)
-            pe = ps + t_zone
-            start[i][z] = ps
-            finish[i][z] = pe
+    if total_work is not None:
+        W = max(float(total_work), 1e-9)
+        # TT_base = 1/rate for a zone of size 1 work-unit;
+        # zone size = W/n_zones → TT = (1/rate) * (W/n_zones)
+        tt = (1.0 / rate) * (W / n_zones)
+        zone_rate = rate * n_zones / W
+    else:
+        W = float(n_zones)
+        tt = 1.0 / rate
+        zone_rate = rate
 
     cells: List[TaktPlanCell] = []
     for i in range(n_trades):
         for z in range(n_zones):
+            # start = (wagon_index + zone_index) * TT
+            ps = (i + z) * tt
+            pe = ps + tt
             cells.append(
                 TaktPlanCell(
                     trade_index=i,
                     zone=z + 1,
-                    period_start=float(start[i][z]),
-                    period_end=float(finish[i][z]),
-                    planned_rate=rate * n_zones / W,  # zona/periode efektif
+                    period_start=float(ps),
+                    period_end=float(pe),
+                    planned_rate=float(zone_rate),
                 )
             )
 
-    duration = float(max(finish[i][n_zones - 1] for i in range(n_trades)))
+    td = littles_takt_duration(n_trades, n_zones, tt)
     return TaktPlan(
         n_trades=n_trades,
         n_zones=n_zones,
-        batch_size=batch_size,
-        rate=rate * n_zones / W,
+        batch_size=1,
+        rate=float(zone_rate),
         cells=cells,
-        duration=float(round(duration, 4)),
-        takt_time=t_zone,
-        handoff_lag=max(0, int(handoff_lag)),
+        duration=float(round(td, 6)),
+        takt_time=float(tt),
+        handoff_lag=1,
     )
 
 
