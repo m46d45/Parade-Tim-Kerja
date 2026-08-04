@@ -1420,23 +1420,11 @@ def plot_takt_wagon_chart(
                 zorder=3,
             )
 
-    # --- exact unit scales (1 by 1) ---
+    # bounds on integer cells; locators set to MultipleLocator(1) below
     ax.set_xlim(0, max_end)
-    ax.set_xticks(list(range(0, max_end + 1)))
-    ax.set_xticklabels([str(i) for i in range(0, max_end + 1)], fontsize=6 if max_end > 40 else 7)
+    ax.set_ylim(n_show + 0.5, 0.5)  # zona 1 at top
     ax.set_xlabel("Periode")
-
-    ax.set_ylim(n_show + 0.5, 0.5)  # zona 1 at top; integer centers
-    ax.set_yticks(list(range(1, n_show + 1)))
-    ax.set_yticklabels([str(i) for i in range(1, n_show + 1)], fontsize=6 if n_show > 40 else 7)
     ax.set_ylabel("Zona")
-
-    # minor grid every 1 — major already unit
-    ax.set_xticks(list(range(0, max_end + 1)), minor=False)
-    ax.set_yticks(list(range(1, n_show + 1)), minor=False)
-    ax.grid(True, which="major", axis="both", alpha=0.28, linewidth=0.5, zorder=0)
-    # snap spines so bars sit on integer grid
-    ax.set_axisbelow(True)
 
     ax.set_title(
         title
@@ -1451,7 +1439,20 @@ def plot_takt_wagon_chart(
             loc="lower right", fontsize=7, framealpha=0.9,
             ncol=min(plan.n_trades, 5),
         )
-    _apply_axes_style(ax)
+    # style without MaxNLocator override — force unit grid 1-by-1
+    ax.grid(True, which="major", linestyle="-", alpha=0.22, linewidth=0.45, zorder=0)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.xaxis.set_major_locator(mticker.MultipleLocator(1))
+    ax.yaxis.set_major_locator(mticker.MultipleLocator(1))
+    ax.xaxis.set_major_formatter(mticker.FormatStrFormatter("%d"))
+    ax.yaxis.set_major_formatter(mticker.FormatStrFormatter("%d"))
+    # small tick labels when dense
+    for lab in ax.get_xticklabels():
+        lab.set_fontsize(5 if max_end > 50 else (6 if max_end > 30 else 7))
+    for lab in ax.get_yticklabels():
+        lab.set_fontsize(5 if n_show > 50 else (6 if n_show > 30 else 7))
+    ax.set_axisbelow(True)
     return ax
 
 
