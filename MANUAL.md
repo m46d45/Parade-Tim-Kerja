@@ -258,11 +258,11 @@ Kolom penting:
 | Dapat diubah | Default |
 |--------------|---------|
 | Jumlah lantai n | 2 |
-| **Jumlah zona TZ** (membagi 40 bay) | **10** |
+| **Jumlah zona TZ** (diskret) | **1 / 5 / 10 / 20 / 40** (default 10) |
 | Waktu tersedia / lantai | **15 hari** |
 | Kapasitas bay/hari/tim | **4** |
 
-Bay ≠ zona. TZ=10 → 4 bay/zona. TZ boleh lebih besar/kecil (1…40).
+Bay ≠ zona. TZ=10 → 4 bay/zona. Hanya opsi agar bay/zona bulat: **1, 5, 10, 20, 40**.
 
 ### 7.2 Rumus
 

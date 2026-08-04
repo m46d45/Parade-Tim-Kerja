@@ -66,7 +66,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-05-tz-variable-v95"
+_APP_BUILD = "2026-08-05-tz-discrete-v96"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1460,12 +1460,14 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
         min_value=1, max_value=50, value=2, step=1,
         key="takt_n_floors",
     ))
-    tz = int(c2.number_input(
+    _tz_opts = [d for d in (1, 5, 10, 20, 40) if N_BAY % d == 0]
+    tz = int(c2.selectbox(
         "Jumlah zona / lantai (TZ)",
-        min_value=1, max_value=int(N_BAY), value=10, step=1,
+        options=_tz_opts,
+        index=_tz_opts.index(10) if 10 in _tz_opts else 0,
+        format_func=lambda z: f"{z} zona · {N_BAY // z} bay/zona · {AREA_FLOOR / z:.0f} m²/zona",
         key="takt_tz",
-        help=f"Membagi {N_BAY} bay menjadi TZ zona. Default 10 "
-             f"(1 zona = {N_BAY // 10} bay). Bisa lebih besar/kecil.",
+        help=f"Hanya pembagi {N_BAY} bay agar bay/zona bilangan bulat: {_tz_opts}.",
     ))
     t_per_floor = float(c3.number_input(
         "Waktu tersedia per lantai (hari)",
@@ -1495,21 +1497,14 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
     g1, g2, g3, g4 = st.columns(4)
     g1.metric("Bay / lantai", f"{N_BAY}")
     g2.metric("Zona (TZ)", f"{tz}")
-    g3.metric("Bay / zona", f"{bays_per_zone:.2f}")
+    g3.metric("Bay / zona", f"{int(round(bays_per_zone))}")
     g4.metric("m² / zona", f"{area_per_zone:.1f}")
 
-    if abs(bays_per_zone - round(bays_per_zone)) > 1e-6:
-        st.caption(
-            f"Catatan: {N_BAY} bay ÷ {tz} zona = **{bays_per_zone:.2f} bay/zona** "
-            f"(tidak bulat; OK untuk eksperimen). Pembagi bulat: "
-            + ", ".join(str(d) for d in range(1, N_BAY + 1) if N_BAY % d == 0)
-        )
-    else:
-        st.caption(
-            f"{N_BAY} bay ÷ {tz} zona = **{int(round(bays_per_zone))} bay/zona** "
-            f"(**{area_per_zone:.0f} m²**/zona). "
-            f"Kapasitas {cap_bay:g} bay/hari = **{cap_zone:.3g} zona/hari**."
-        )
+    st.caption(
+        f"{N_BAY} bay ÷ {tz} zona = **{int(round(bays_per_zone))} bay/zona** "
+        f"(**{area_per_zone:.0f} m²**/zona). "
+        f"Kapasitas {cap_bay:g} bay/hari = **{cap_zone:.3g} zona/hari**."
+    )
 
     st.markdown("##### Hasil (Little's Takt Law)")
     m1, m2, m3, m4 = st.columns(4)
