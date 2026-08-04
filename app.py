@@ -1489,7 +1489,6 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
     t0 = tz * te
     tw = TW
     td_floor = float(littles_takt_duration(tw, tz, te))
-    td_all = td_floor * n_floors
     rate = float(cap_zone)
 
     st.markdown("##### Mapping bay → zona")

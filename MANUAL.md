@@ -168,7 +168,7 @@ Di sini permintaan = **lantai** (bukan jumlah zona). Waktu diisi **per lantai**.
 ### 7.5 Keluaran
 
 - Mapping bay → zona  
-- tₑ, T₀, TD/lantai, TD total, kelayakan  
+- tₑ, T₀, TD/lantai, kelayakan vs waktu per lantai  
 - **Wagon chart** satu lantai  
 
 *(Tidak ada simulasi opsional di tab ini — gunakan tab Simulasi / Perbandingan dengan Total zona = TZ.)*
@@ -226,7 +226,6 @@ Excel/CSV di Simulasi, Perbandingan, dan (rencana) Takt.
 | 3 | 5× variability | Idle & biaya naik |
 | 4 | Takt: TZ=10, 4 bay/hari, 15 hari | TD=14 ≤ 15 |
 | 5 | Takt: TZ=20 vs 10 | tₑ & TD berubah |
-| 6 | Takt: 2 lantai | TD total ≈ 2× TD/lantai |
 
 ---
 
