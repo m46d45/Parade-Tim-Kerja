@@ -51,6 +51,8 @@ from parade_of_trades_plots import (
     plot_comparison_buffers,
     plot_comparison_lob,
     plot_comparison_utilization,
+    plot_comparison_costs,
+    plot_comparison_costs_by_trade,
     plot_kingman_stations,
     plot_inventory_fill_rate,
     plot_kingman_vut_curve,
@@ -63,7 +65,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-04-cost-v77"
+_APP_BUILD = "2026-08-04-cost-charts-v78"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1170,8 +1172,21 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
     st.dataframe(sorted(rows, key=lambda x: x["Durasi"]), use_container_width=True, hide_index=True)
     _export_comparison_block(results, meta, key="cmp")
 
-    tab_lob, tab_buf, tab_util, tab_ll, tab_kg, tab_fr = st.tabs(
-        ["Line of Balance", "Buffer / WIP", "Utilisasi", "Little's Law", "Kingman", "Inventory / FR"]
+    # Precompute costs for charts
+    cost_map = {}
+    cost_rows_map = {}
+    rates = _trade_costs(n_trades)
+    for name, r in results.items():
+        cm = compute_cost_metrics(r, rates)
+        cost_map[name] = {
+            "active": cm.total_active,
+            "idle": cm.total_idle,
+            "total": cm.total_cost,
+        }
+        cost_rows_map[name] = cm.trades
+
+    tab_lob, tab_buf, tab_util, tab_cost, tab_ll, tab_kg, tab_fr = st.tabs(
+        ["Line of Balance", "Buffer / WIP", "Utilisasi", "Biaya", "Little's Law", "Kingman", "Inventory / FR"]
     )
     with tab_lob:
         fig, ax = plt.subplots(figsize=(10, 5.5))
@@ -1201,6 +1216,35 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
         )
         fig.tight_layout()
         _fig_to_st(fig)
+    with tab_cost:
+        st.markdown("**Total vs idle (per skenario)**")
+        c1, c2 = st.columns(2)
+        with c1:
+            fig, ax = plt.subplots(figsize=(5.5, 3.8))
+            plot_comparison_costs(cost_map, ax=ax, mode="total", title="Total biaya per skenario")
+            fig.tight_layout()
+            _fig_to_st(fig)
+        with c2:
+            fig, ax = plt.subplots(figsize=(5.5, 3.8))
+            plot_comparison_costs(cost_map, ax=ax, mode="idle", title="Biaya idle per skenario")
+            fig.tight_layout()
+            _fig_to_st(fig)
+        fig, ax = plt.subplots(figsize=(9.0, 4.0))
+        plot_comparison_costs(cost_map, ax=ax, mode="stacked", title="Biaya aktif + idle (stacked)")
+        fig.tight_layout()
+        _fig_to_st(fig)
+        st.markdown("**Per tim**")
+        c3, c4 = st.columns(2)
+        with c3:
+            fig, ax = plt.subplots(figsize=(5.5, 3.8))
+            plot_comparison_costs_by_trade(cost_rows_map, ax=ax, which="total", title="Biaya total per tim")
+            fig.tight_layout()
+            _fig_to_st(fig)
+        with c4:
+            fig, ax = plt.subplots(figsize=(5.5, 3.8))
+            plot_comparison_costs_by_trade(cost_rows_map, ax=ax, which="idle", title="Biaya idle per tim")
+            fig.tight_layout()
+            _fig_to_st(fig)
     with tab_ll:
         from parade_of_trades_analysis import littles_operations_curve as _loc
         ll_rows = []

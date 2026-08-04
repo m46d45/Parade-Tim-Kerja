@@ -612,6 +612,125 @@ def plot_comparison_utilization(
     return ax
 
 
+
+def plot_comparison_costs(
+    cost_by_scenario: Dict[str, dict],
+    ax: Optional[Axes] = None,
+    title: Optional[str] = None,
+    *,
+    mode: str = "total",
+) -> Axes:
+    """
+    Bar chart biaya antar skenario.
+
+    ``cost_by_scenario[name] = {"active": float, "idle": float, "total": float}``
+    mode: "total" | "idle" | "stacked" (aktif+idle)
+    """
+    if ax is None:
+        _, ax = plt.subplots(figsize=(9.0, 4.2))
+    names = list(cost_by_scenario.keys())
+    if not names:
+        return ax
+    fallback = ["#2563eb", "#ea580c", "#16a34a", "#dc2626", "#7c3aed", "#0891b2"]
+    import numpy as np
+    x = np.arange(len(names))
+
+    if mode == "stacked":
+        act = [float(cost_by_scenario[n].get("active", 0)) for n in names]
+        idle = [float(cost_by_scenario[n].get("idle", 0)) for n in names]
+        ax.bar(x, act, color="#2563eb", edgecolor="white", label="Biaya aktif", width=0.65)
+        ax.bar(x, idle, bottom=act, color="#f59e0b", edgecolor="white", label="Biaya idle", width=0.65)
+        for i, n in enumerate(names):
+            tot = act[i] + idle[i]
+            ax.text(i, tot, f"{tot:,.0f}", ha="center", va="bottom", fontsize=8)
+        ax.legend(loc="upper right", fontsize=8, framealpha=0.92)
+        ax.set_ylabel("Biaya")
+    elif mode == "idle":
+        vals = [float(cost_by_scenario[n].get("idle", 0)) for n in names]
+        colors = [fallback[i % len(fallback)] for i in range(len(names))]
+        bars = ax.bar(x, vals, color=colors, edgecolor="white", width=0.65)
+        for i, v in enumerate(vals):
+            ax.text(i, v, f"{v:,.0f}", ha="center", va="bottom", fontsize=8)
+        ax.set_ylabel("Biaya idle")
+    else:
+        vals = [float(cost_by_scenario[n].get("total", 0)) for n in names]
+        colors = [fallback[i % len(fallback)] for i in range(len(names))]
+        ax.bar(x, vals, color=colors, edgecolor="white", width=0.65)
+        for i, v in enumerate(vals):
+            ax.text(i, v, f"{v:,.0f}", ha="center", va="bottom", fontsize=8)
+        ax.set_ylabel("Total biaya")
+
+    ax.set_xticks(x)
+    labels = [PRESET_DISPLAY.get(n, n) if "PRESET_DISPLAY" in dir() else n for n in names]
+    try:
+        labels = [PRESET_DISPLAY.get(n, n) for n in names]
+    except Exception:
+        labels = list(names)
+    ax.set_xticklabels(labels, rotation=15, ha="right", fontsize=8)
+    ax.set_xlabel("Skenario")
+    ax.set_title(title or "Perbandingan biaya")
+    ax.set_ylim(bottom=0)
+    _apply_axes_style(ax)
+    return ax
+
+
+def plot_comparison_costs_by_trade(
+    cost_rows_by_scenario: Dict[str, list],
+    ax: Optional[Axes] = None,
+    title: Optional[str] = None,
+    *,
+    which: str = "total",
+) -> Axes:
+    """
+    Grouped bars: biaya per tim, satu grup per skenario.
+    cost_rows_by_scenario[name] = list of TradeCostRow or dicts with cost_total/cost_idle.
+    which: "total" | "idle" | "active"
+    """
+    if ax is None:
+        _, ax = plt.subplots(figsize=(10, 4.5))
+    names = list(cost_rows_by_scenario.keys())
+    if not names:
+        return ax
+    first = cost_rows_by_scenario[names[0]]
+    n_trades = len(first)
+    import numpy as np
+    x = np.arange(n_trades)
+    n_scen = len(names)
+    width = min(0.8 / max(n_scen, 1), 0.18)
+    offsets = (np.arange(n_scen) - (n_scen - 1) / 2.0) * width
+    fallback = ["#2563eb", "#ea580c", "#16a34a", "#dc2626", "#7c3aed", "#0891b2"]
+    key = {"total": "cost_total", "idle": "cost_idle", "active": "cost_active"}.get(which, "cost_total")
+
+    for i, name in enumerate(names):
+        rows = cost_rows_by_scenario[name]
+        vals = []
+        for row in rows:
+            if hasattr(row, key):
+                vals.append(float(getattr(row, key)))
+            elif isinstance(row, dict):
+                vals.append(float(row.get(key, row.get(which, 0))))
+            else:
+                vals.append(0.0)
+        color = fallback[i % len(fallback)]
+        try:
+            label = PRESET_DISPLAY.get(name, name)
+        except Exception:
+            label = name
+        ax.bar(x + offsets[i], vals, width=width * 0.92, color=color, edgecolor="white",
+               linewidth=0.5, label=label)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([f"T{i+1}" for i in range(n_trades)])
+    ylab = {"total": "Biaya total", "idle": "Biaya idle", "active": "Biaya aktif"}.get(which, "Biaya")
+    ax.set_ylabel(ylab)
+    ax.set_xlabel("Tim")
+    ax.set_title(title or f"Biaya per tim — {which}")
+    ax.legend(loc="upper right", fontsize=8, framealpha=0.92, ncol=min(n_scen, 3))
+    ax.set_ylim(bottom=0)
+    _apply_axes_style(ax)
+    return ax
+
+
 def plot_comparison_metrics(
     results: Dict[str, ParadeResult],
     axes: Optional[Sequence[Axes]] = None,
