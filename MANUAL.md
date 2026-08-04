@@ -247,46 +247,34 @@ Kolom penting:
 
 ## 7. Tab Takt plan
 
-### 7.1 Little's Takt Law + lingkup tetap
-
-Sumber: [Is Takt Really Magic? (Lean Built)](https://leanbuilt.us/is-takt-really-magic/)
+### 7.1 Rumus
 
 ```
-TD = (TW + TZ - 1) × TT
-TT = T₀ / TZ
+TD = (TW + TZ − 1) × TT
 ```
 
-| Simbol | Arti | Default |
-|--------|------|---------|
-| **TW** | Takt wagons (tim) | **5** |
-| **T₀** | Lingkup kerja total (**tetap**) | **40** |
-| **TZ** | Jumlah zona (memecah T₀) | **40** |
-| **TT** | Takt time = T₀/TZ | **1** (saat TZ=40) |
-| **TD** | Durasi total | **44** saat default |
+| Parameter | Arti | Default |
+|-----------|------|---------|
+| **TW** | Wagon / jumlah tim dalam train | **5** (bisa dikurangi/ditambah) |
+| **TZ** | Jumlah zona | **40** |
+| **TT** | Takt time = periode per zona per wagon | **4** |
+| **TD** | Durasi total (dihitung otomatis) | (5+40−1)×4 = **176** |
 
-**Pesan inti:** lingkup proyek tetap. Zona **lebih banyak** → unit lebih kecil → TT mengecil → **TD lebih pendek** (mendekati T₀; diminishing returns).
+Ubah salah satu parameter → TD & wagon chart langsung berubah. Tidak perlu mode “lingkup tetap” terpisah: Anda sendiri yang menentukan TW, TZ, TT.
 
-| TZ | TT = 40/TZ | TD = (5+TZ−1)×TT |
-|----|------------|------------------|
-| 30 | 1,333 | **45,33** |
-| 40 | 1,000 | **44,00** |
-| 50 | 0,800 | **43,20** |
+### 7.2 Cara main
 
-Angka **5** = **TW**, bukan TT.
+1. Set **TW**, **TZ**, **TT** di panel atas.  
+2. Baca **TD** dan wagon (Y=zona, X=periode dari 0).  
+3. Opsional: simulasi aktual + variability.  
+4. Opsional: bandingkan 2–3 **set parameter** (mis. TT=4 vs TT=5, atau TW=5 vs TW=4).
 
-### 7.2 Parameter interaktif
+### 7.3 Intuisi
 
-- **TW**, **T₀ (lingkup)**, **TZ** → TT & TD & wagon langsung dihitung.
-- Expander: kurva TD vs TZ (lingkup tetap).
-- Wagon: Y = zona, X = periode dari 0.
-
-### 7.3 Simulasi aktual
-
-Kapasitas zona diskalakan (rate ∝ TZ/T₀). LOB aktual vs TD rencana.
-
-### 7.4 Bandingan head-to-head
-
-Selalu lingkup tetap. Bandingkan TZ 30/40/50 → TD harus **menurun**.
+- TW ↓ → train lebih pendek → TD ↓  
+- TZ ↓ → lebih sedikit zona → TD ↓  
+- TT ↓ → tiap zona lebih cepat → TD ↓  
+- TT default **4** (bukan 1): satu wagon butuh 4 periode per zona pada setup awal.
 
 ## 8. Line of Balance (LOB)
 
