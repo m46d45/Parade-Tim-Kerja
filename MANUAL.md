@@ -247,35 +247,33 @@ Kolom penting:
 
 ## 7. Tab Takt plan
 
-### 7.1 Bay ≠ zona
+### 7.1 Fix vs dapat diubah
 
-| Item | Nilai |
-|------|--------|
+| Fix | |
+|-----|--|
 | Luas / lantai | **360 m²** |
-| Bay | **3×3 m = 9 m²** |
-| Bay / lantai | 360÷9 = **40 bay** |
-| **1 zona** | **4 bay** (sesuai Normal 4 bay/hari) |
-| **Zona / lantai (TZ)** | 40÷4 = **10 zona** (bukan 40) |
-| TW | **5** (fix) |
+| Bay | **3×3 = 9 m²** → **40 bay**/lantai |
+| TW | **5** |
 
-### 7.2 Kapasitas & rumus
+| Dapat diubah | Default |
+|--------------|---------|
+| Jumlah lantai n | 2 |
+| **Jumlah zona TZ** (membagi 40 bay) | **10** |
+| Waktu tersedia / lantai | **15 hari** |
+| Kapasitas bay/hari/tim | **4** |
 
-- Input kapasitas: **bay/hari/tim** (default **4**)  
-- Zona/hari = (bay/hari) ÷ 4 → Normal = **1 zona/hari**  
-- tₑ = 1 / (zona/hari) → Normal **1 hari/zona**
+Bay ≠ zona. TZ=10 → 4 bay/zona. TZ boleh lebih besar/kecil (1…40).
+
+### 7.2 Rumus
 
 ```text
-TD = (TW + TZ − 1) × tₑ
-   = (5 + 10 − 1) × 1 = 14 hari / lantai
+bay_per_zona = 40 / TZ
+zona/hari    = (bay/hari) / bay_per_zona
+tₑ           = 1 / (zona/hari)
+TD           = (TW + TZ − 1) × tₑ
 ```
 
-### 7.3 Input
-
-| | Default |
-|--|---------|
-| Jumlah lantai n | 2 |
-| Waktu tersedia **per lantai** | 12 hari |
-| Kapasitas bay/hari/tim | 4 |
+Default Normal: TZ=10, 4 bay/hari → 1 zona/hari → TD = (5+10−1)×1 = **14 hari** ≤ 15.
 
 ## 8. Line of Balance (LOB)
 
