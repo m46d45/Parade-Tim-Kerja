@@ -245,45 +245,35 @@ Kolom penting:
 
 ---
 
-## 7. Tab Takt plan — konversi dari parade
+## 7. Tab Takt plan
 
-### 7.1 Ide besar
+### 7.1 Permintaan ≠ jumlah zona
 
-Tab **Simulasi** dan **Perbandingan** memainkan **mesin zone-flow** yang sama (5 tim, zona, kapasitas, batch, variability).  
-Tab **Takt plan** **mengonversi** paradigma itu ke bahasa takt:
+| Konsep | Arti | Contoh |
+|--------|------|--------|
+| **Permintaan / lingkup** | Yang diminta owner | **1 lantai** 20×20 m = **400 m²** |
+| **Waktu tersedia** | Deadline owner | mis. 160 periode |
+| **TT (pelanggan)** | T_avail ÷ permintaan | 160 ÷ 1 = **160 p per lantai** |
+| **TZ (zona)** | **Keputusan** memecah luasan | 40 zona → **10 m²**/zona |
+| **T₀** | Waktu 1 tim menyelesaikan **seluruh** lantai | mis. 40 periode |
+| **tₑ** | Waktu 1 tim per zona | T₀/TZ = 40/40 = **1** p/zona |
 
-| Parade | Takt |
-|--------|------|
-| 5 tim | TW (wagon) |
-| Total zona | Permintaan D |
-| Kapasitas (zona/periode) | tₑ = 1/kapasitas (periode/zona) |
-| Durasi hasil run | Aktual (bandingkan ke TD ideal) |
+Zona **bukan** permintaan. Zona = cara memotong lantai agar parade mengalir.
 
-### 7.2 Dua detak
-
-1. **tₑ** — detak **proses** (berapa lama satu tim menyelesaikan satu zona).  
-2. **TT** — detak **pelanggan** (LEI): **TT = T_avail ÷ D**.
-
-Sumber LEI: [lean.org — Takt Time](https://www.lean.org/lexicon-terms/takt-time/)
-
-### 7.3 Rumus rencana
+### 7.2 Rumus
 
 ```text
-TD_ideal = (TW + D − 1) × tₑ     # train OPF, tanpa var
-TT       = T_avail ÷ D           # takt pelanggan
+TT_pelanggan = T_avail / N_permintaan     # LEI
+tₑ           = T₀ / TZ                    # proses per zona
+TD           = (TW + TZ − 1) × tₑ         # train 1 lantai
 ```
 
-- Layak proses: **tₑ ≤ TT**  
-- Layak jadwal: **TD_ideal ≤ T_avail**  
-- Aktual dari Simulasi/Perbandingan biasanya **≥ TD_ideal** (batch & variability).
+Naikkan TZ → luas/zona turun → tₑ turun → **TD lebih pendek** (mendekati T₀).
 
-### 7.4 Alur di app
+### 7.3 Literatur TT
 
-1. Isi D (default = Total zona sidebar), TW, kapasitas (sama seperti simulasi).  
-2. Baca tₑ dan TD ideal.  
-3. Opsional: tautkan hasil **Simulasi** atau skenario **Perbandingan**.  
-4. Set **T_avail** → dapat **TT**.  
-5. Lihat wagon ideal + (opsional) jalankan parade di detak yang sama.
+[Lean Enterprise Institute — Takt Time](https://www.lean.org/lexicon-terms/takt-time/):  
+**TT = available production time ÷ customer demand.**
 
 ## 8. Line of Balance (LOB)
 
