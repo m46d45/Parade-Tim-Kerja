@@ -1360,45 +1360,42 @@ def plot_takt_wagon_chart(
     """
     Takt train / wagon chart (period 0-based).
 
-    Axis ticks are **every 1 unit** (periode 0,1,2,… and zona 1,2,3,…)
-    so cell alignment is visually accurate. ``compact=True`` keeps the figure small.
+    Bars use continuous time: width = period_end - period_start.
+    Axis ticks every 1 unit for readability.
     """
     n_all = int(plan.n_zones)
     n_show = n_all if max_zones is None else min(n_all, int(max_zones))
-    max_end = 0
+
+    tmax = 0.0
     for c in plan.cells:
         if 1 <= c.zone <= n_show:
-            max_end = max(max_end, int(c.period_end) + 1)
-    dur = int(getattr(plan, "duration", max_end) or max_end)
-    max_end = max(max_end, dur, 1)
+            tmax = max(tmax, float(c.period_end))
+    tmax = max(tmax, float(getattr(plan, "duration", 0) or 0), 1e-6)
 
     if ax is None:
-        # compact: small pixels-per-cell
         if compact:
-            w = max(5.5, min(9.0, 0.14 * max_end + 2.5))
+            w = max(5.5, min(9.0, 0.14 * tmax + 2.5))
             h = max(3.2, min(8.5, 0.12 * n_show + 1.6))
         else:
-            w = max(8.0, min(12.0, 0.22 * max_end + 3.0))
-            h = max(4.0, min(14.0, 0.22 * n_show + 2.0))
+            w, h = 10.0, max(4.0, min(12.0, 0.2 * n_show + 2))
         _, ax = plt.subplots(figsize=(w, h))
 
     colors = [_trade_color(i) for i in range(plan.n_trades)]
     labeled: set = set()
-    bar_h = 0.92
-    show_text = n_show <= 16 and max_end <= 30
+    show_text = n_show <= 16 and tmax <= 30
     fs = 5.5 if compact else 7
 
     for c in plan.cells:
         if c.zone < 1 or c.zone > n_show:
             continue
-        wcell = max(1, int(c.period_end) - int(c.period_start) + 1)
         left = float(c.period_start)
+        width = max(float(c.period_end) - left, 1e-6)
         lab = f"T{c.trade_index + 1}"
         ax.barh(
             y=float(c.zone),
-            width=float(wcell),
+            width=width,
             left=left,
-            height=bar_h,
+            height=0.92,
             color=colors[c.trade_index % len(colors)],
             edgecolor="white",
             linewidth=0.35,
@@ -1409,49 +1406,35 @@ def plot_takt_wagon_chart(
         labeled.add(lab)
         if show_text:
             ax.text(
-                left + wcell / 2.0,
-                float(c.zone),
-                lab,
-                ha="center",
-                va="center",
-                fontsize=fs,
-                color="white",
-                fontweight="bold",
-                zorder=3,
+                left + width / 2.0, float(c.zone), lab,
+                ha="center", va="center", fontsize=fs,
+                color="white", fontweight="bold", zorder=3,
             )
 
-    # bounds on integer cells; locators set to MultipleLocator(1) below
-    ax.set_xlim(0, max_end)
-    ax.set_ylim(n_show + 0.5, 0.5)  # zona 1 at top
+    ax.set_xlim(0, tmax)
+    ax.set_ylim(n_show + 0.5, 0.5)
     ax.set_xlabel("Periode")
     ax.set_ylabel("Zona")
-
+    ax.xaxis.set_major_locator(mticker.MultipleLocator(1))
+    ax.yaxis.set_major_locator(mticker.MultipleLocator(1))
+    ax.xaxis.set_major_formatter(mticker.FormatStrFormatter("%d"))
+    ax.yaxis.set_major_formatter(mticker.FormatStrFormatter("%d"))
+    ax.grid(True, which="major", linestyle="-", alpha=0.22, linewidth=0.45, zorder=0)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    for lab in ax.get_xticklabels():
+        lab.set_fontsize(5 if tmax > 50 else (6 if tmax > 30 else 7))
+    for lab in ax.get_yticklabels():
+        lab.set_fontsize(5 if n_show > 50 else (6 if n_show > 30 else 7))
     ax.set_title(
-        title
-        or f"Takt plan (wagon) · {n_show} zona · rate={plan.rate:g} · {dur} p",
+        title or f"Takt plan (wagon) · {n_show} zona · {tmax:.1f} p",
         fontsize=10 if compact else 11,
     )
     handles, labels = ax.get_legend_handles_labels()
     if handles:
         uniq = dict(zip(labels, handles))
-        ax.legend(
-            uniq.values(), uniq.keys(),
-            loc="lower right", fontsize=7, framealpha=0.9,
-            ncol=min(plan.n_trades, 5),
-        )
-    # style without MaxNLocator override — force unit grid 1-by-1
-    ax.grid(True, which="major", linestyle="-", alpha=0.22, linewidth=0.45, zorder=0)
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    ax.xaxis.set_major_locator(mticker.MultipleLocator(1))
-    ax.yaxis.set_major_locator(mticker.MultipleLocator(1))
-    ax.xaxis.set_major_formatter(mticker.FormatStrFormatter("%d"))
-    ax.yaxis.set_major_formatter(mticker.FormatStrFormatter("%d"))
-    # small tick labels when dense
-    for lab in ax.get_xticklabels():
-        lab.set_fontsize(5 if max_end > 50 else (6 if max_end > 30 else 7))
-    for lab in ax.get_yticklabels():
-        lab.set_fontsize(5 if n_show > 50 else (6 if n_show > 30 else 7))
+        ax.legend(uniq.values(), uniq.keys(), loc="lower right", fontsize=7, framealpha=0.9,
+                  ncol=min(plan.n_trades, 5))
     ax.set_axisbelow(True)
     return ax
 

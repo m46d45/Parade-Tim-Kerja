@@ -31,6 +31,7 @@ export_takt_csv,
     littles_law_metrics,
     evaluate_at_wip,
     build_takt_plan,
+    zone_rate_for_work,
     takt_plan_from_lob_result,
     required_rate_for_duration,
     takt_design_table,
@@ -60,7 +61,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-04-wagon-scale1-v73"
+_APP_BUILD = "2026-08-04-zone-size-v74"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1349,7 +1350,9 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
             # Ideal wagon (period 0) from rate — educational takt train
             st.session_state["takt_base_plan"] = build_takt_plan(
                 n_trades, int(z_base), batch_size=1, rate=float(rate), handoff_lag=1,
+                total_work=float(z_base),
             )
+            st.session_state["takt_total_work"] = float(z_base)
         except RuntimeError as exc:
             st.error(str(exc))
 
@@ -1376,7 +1379,7 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
         fig, ax = plt.subplots(figsize=(fig_w, fig_h))
         plot_takt_wagon_chart(
             base_plan, ax=ax, max_zones=None, compact=True,
-            title=f"Takt plan (wagon) — baseline · {n_z} zona · {base_plan.duration} p",
+            title=f"Takt plan (wagon) — baseline · {n_z} zona · {max(c.period_end for c in base_plan.cells):.1f} p",
         )
         fig.tight_layout()
         _fig_to_st(fig)
@@ -1419,28 +1422,38 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
         st.session_state.pop("takt_zone_plans", None)
         st.session_state.pop("takt_zone_meta", None)
 
+    # Lingkup proyek tetap = baseline (zona baseline = unit kerja total)
+    total_work = float(z_base)
+
     if run_cmp:
         results = {}
         plans = {}
         meta = {}
-        pairs = [_pair_from_base_and_var(float(rate), var_mode)] * n_trades
         try:
             for label, z in scenarios:
-                cfg = _build_config_from_pairs(pairs, int(z), seed, batch_size=1)
+                z = int(z)
+                # zona lebih banyak → unit lebih kecil → kapasitas zona/periode naik
+                zrate = zone_rate_for_work(float(rate), z, total_work)
+                pairs = [_pair_from_base_and_var(float(zrate), var_mode)] * n_trades
+                cfg = _build_config_from_pairs(pairs, z, seed, batch_size=1)
                 r = ParadeOfTrades(cfg).run()
                 results[label] = r
                 plans[label] = build_takt_plan(
-                    n_trades, int(z), batch_size=1, rate=float(rate), handoff_lag=1,
+                    n_trades, z, batch_size=1, rate=float(rate), handoff_lag=1,
+                    total_work=total_work,
                 )
                 meta[label] = {
-                    "zona": int(z),
+                    "zona": z,
                     "var_label": VAR_LABELS.get(var_mode, var_mode),
-                    "pace": f"{rate:g}/p",
-                    "plan_duration": plans[label].duration,
+                    "pace": f"{zrate:.3g} zona/p",
+                    "plan_duration": float(plans[label].duration),
+                    "t_zone": float(plans[label].takt_time),
+                    "total_work": total_work,
                 }
             st.session_state["takt_zone_results"] = results
             st.session_state["takt_zone_plans"] = plans
             st.session_state["takt_zone_meta"] = meta
+            st.session_state["takt_total_work"] = total_work
         except RuntimeError as exc:
             st.error(str(exc))
 
@@ -1456,37 +1469,63 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
         return
 
     # Ringkasan singkat
+    tw = float(st.session_state.get("takt_total_work") or z_base)
     rows = []
     for label, r in results.items():
         plan_i = plans[label]
         z_n = int(meta.get(label, {}).get("zona", r.config.total_units))
+        t_end = max(float(c.period_end) for c in plan_i.cells)
         rows.append({
             "Skenario": label,
             "Zona": z_n,
-            "Durasi takt (p)": plan_i.duration,
+            "Ukuran zona (kerja)": round(tw / z_n, 3),
+            "t / zona (p)": round(float(plan_i.takt_time), 3),
+            "Durasi takt (p)": round(t_end, 2),
             "Durasi sim (p)": r.duration,
         })
     st.dataframe(rows, use_container_width=True, hide_index=True)
+    st.caption(
+        f"Lingkup tetap = {tw:g} unit kerja (baseline). "
+        "Zona ↑ → unit lebih kecil → t/zona ↓ → durasi total ↓."
+    )
 
-    # Gabungan: durasi vs jumlah zona (3 skenario)
+    # Gabungan akurat: X = jumlah zona, Y = durasi
     st.markdown("**Durasi total vs jumlah zonasi**")
-    fig, ax = plt.subplots(figsize=(7.2, 3.6))
-    zs, d_plan, d_sim, labs = [], [], [], []
+    fig, ax = plt.subplots(figsize=(7.0, 3.8))
+    points = []
     for label, r in results.items():
-        z_n = int(meta.get(label, {}).get("zona", r.config.total_units))
         plan_i = plans[label]
-        zs.append(z_n)
-        d_plan.append(plan_i.duration)
-        d_sim.append(r.duration)
-        labs.append(label)
-    ax.plot(zs, d_plan, "o-", color="#2563eb", linewidth=2.2, markersize=9, label="Durasi takt plan (wagon)")
-    ax.plot(zs, d_sim, "s--", color="#ea580c", linewidth=1.8, markersize=8, label="Durasi simulasi aktual")
+        z_n = int(meta.get(label, {}).get("zona", r.config.total_units))
+        t_end = max(float(c.period_end) for c in plan_i.cells)
+        points.append((z_n, t_end, float(r.duration), label))
+    points.sort(key=lambda t: t[0])
+    zs = [p[0] for p in points]
+    d_plan = [p[1] for p in points]
+    d_sim = [p[2] for p in points]
+    labs = [p[3] for p in points]
+    ax.plot(zs, d_plan, "o-", color="#2563eb", linewidth=2.2, markersize=10, label="Takt plan (wagon)")
+    ax.plot(zs, d_sim, "s--", color="#ea580c", linewidth=1.8, markersize=8, label="Simulasi aktual")
     for x, y, lab in zip(zs, d_plan, labs):
-        ax.annotate(f"{lab}\n{y} p", (x, y), textcoords="offset points", xytext=(0, 10),
-                    ha="center", fontsize=8, color="#2563eb")
+        short = lab.split("·")[-1].strip() if "·" in lab else lab
+        ax.annotate(
+            f"{x} zona\n{y:.1f} p",
+            (x, y),
+            textcoords="offset points",
+            xytext=(0, 12),
+            ha="center",
+            fontsize=8,
+            color="#1e3a8a",
+        )
+    ax.set_xticks(zs)
+    ax.set_xticklabels([str(z) for z in zs])
+    ax.set_xlim(min(zs) - 5, max(zs) + 5)
+    y_min = min(min(d_plan), min(d_sim))
+    y_max = max(max(d_plan), max(d_sim))
+    pad = max(1.0, (y_max - y_min) * 0.25)
+    ax.set_ylim(y_min - pad, y_max + pad)
     ax.set_xlabel("Jumlah zonasi")
     ax.set_ylabel("Durasi total (periode)")
-    ax.set_title("Perbandingan: semakin banyak zona → train lebih panjang (durasi naik)")
+    ax.set_title("Semakin banyak zona (unit lebih kecil) → durasi total lebih pendek")
     ax.legend(loc="best", fontsize=8)
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
@@ -1502,7 +1541,7 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
         fig, ax = plt.subplots(figsize=(fig_w, fig_h))
         plot_takt_wagon_chart(
             plan_i, ax=ax, max_zones=None, compact=True,
-            title=f"{label} · {z_n} zona · {plan_i.duration} p",
+            title=f"{label} · {z_n} zona · {max(c.period_end for c in plan_i.cells):.1f} p",
         )
         fig.tight_layout()
         _fig_to_st(fig)

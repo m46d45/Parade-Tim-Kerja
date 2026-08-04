@@ -773,7 +773,7 @@ class TaktPlan:
     batch_size: int
     rate: float  # zones per period per trade (capacity)
     cells: List[TaktPlanCell]
-    duration: int
+    duration: float
     takt_time: float
     """Periods to complete one zone at one station (= 1/rate)."""
     handoff_lag: int = 1  # next-period release
@@ -786,9 +786,14 @@ class TaktPlan:
                 "Zona": c.zone,
                 "Mulai": c.period_start,
                 "Selesai": c.period_end,
-                "Durasi": c.period_end - c.period_start + 1,
+                "Durasi": round(float(c.period_end) - float(c.period_start), 4),
             })
         return rows
+
+
+def zone_rate_for_work(base_rate: float, n_zones: int, total_work: float) -> float:
+    """Kapasitas zona/periode agar total kerja tetap: base_rate * n_zones / total_work."""
+    return max(float(base_rate), 1e-9) * max(1, int(n_zones)) / max(float(total_work), 1e-9)
 
 
 def build_takt_plan(
@@ -797,48 +802,56 @@ def build_takt_plan(
     batch_size: int = 4,
     rate: float = 1.0,
     handoff_lag: int = 1,
+    total_work: Optional[float] = None,
 ) -> TaktPlan:
     """
-    Ideal one-piece (or batched) takt train — **period 0-based**.
+    Ideal OPF takt train (period 0-based, continuous time).
 
-    Educational wagon logic (OPF, batch=1, rate = zona/periode):
-    - T1 wagon-zona 1 starts at period **0**
-    - Work duration per zona = ceil(1/rate) periods (Normal → 1)
-    - T2 may start the same zona only after T1 finishes it + handoff_lag
-      (default lag=1 → next period), matching zone-flow handoff
+    **Fixed total work (educational zoning):**
+    - ``total_work`` = lingkup proyek tetap (default = n_zones → unit size 1)
+    - Kapasitas ``rate`` = unit kerja / periode
+    - Zona lebih banyak → ukuran zona = total_work/n_zones lebih kecil
+      → waktu per zona lebih pendek → **durasi total lebih cepat**
+      (pipeline fill (n_trades-1)×t_zona mengecil)
 
-    Example Normal (rate=1), lag=1:
-      T1 Z1 @ p0 · T1 Z2 & T2 Z1 @ p1 · T1 Z3 & T2 Z2 & T3 Z1 @ p2 · …
+    Example: total_work=40, rate=1, 5 trades:
+      30 zona → t_zona=40/30, T≈45.3 p
+      40 zona → t_zona=1,     T≈44 p
+      50 zona → t_zona=0.8,   T≈43.2 p
     """
     rate = max(float(rate), 1e-9)
     batch_size = max(1, int(batch_size))
     n_zones = max(1, int(n_zones))
     n_trades = max(1, int(n_trades))
-    lag = max(0, int(handoff_lag))
-    # periods of pure work for one zone at this rate
-    work_p = max(1, int(math.ceil(1.0 / rate - 1e-12)))
-    tt = 1.0 / rate
+    W = float(total_work) if total_work is not None else float(n_zones)
+    W = max(W, 1e-9)
+    # time to complete one zone (work units / (work per period))
+    t_zone = W / (rate * n_zones)
+    # handoff: continuous — next trade starts when upstream finishes this zone
+    # (lag periods from discrete engine mapped as 0 extra wait beyond finish)
+    _ = handoff_lag  # kept for API compat; train uses finish-to-start
 
-    # finish_end[i][z] = last period index (inclusive) trade i works on zone z
-    # start[i][z] = first period index (inclusive)
-    start: List[List[int]] = [[0] * n_zones for _ in range(n_trades)]
-    finish: List[List[int]] = [[0] * n_zones for _ in range(n_trades)]
+    start: List[List[float]] = [[0.0] * n_zones for _ in range(n_trades)]
+    finish: List[List[float]] = [[0.0] * n_zones for _ in range(n_trades)]
 
     for z in range(n_zones):
         for i in range(n_trades):
-            candidates = [0]
-            # after own previous zone
+            cand = [0.0]
             if z > 0:
-                candidates.append(finish[i][z - 1] + 1)
-            # after upstream releases this zone (+ lag periods)
+                cand.append(finish[i][z - 1])
             if i > 0:
-                candidates.append(finish[i - 1][z] + lag)
-            # batch constraint: trade may only start zone z after batch boundary
-            # for OPF batch=1 no extra wait beyond zone sequence
-            if batch_size > 1 and z > 0 and (z % batch_size) != 0:
-                pass  # within open batch — still sequential zone by zone for wagon clarity
-            ps = max(candidates)
-            pe = ps + work_p - 1
+                cand.append(finish[i - 1][z])
+            # batch: only release every batch_size zones to downstream
+            # for OPF batch=1, same as zone-by-zone above
+            if batch_size > 1 and i > 0:
+                # downstream may start zone z only after upstream finished
+                # the batch containing z (last zone of batch)
+                batch_end = min(n_zones - 1, ((z // batch_size) + 1) * batch_size - 1)
+                # still use same-zone upstream for wagon clarity of OPF;
+                # batch>1 would delay — keep simple OPF train for takt education
+                pass
+            ps = max(cand)
+            pe = ps + t_zone
             start[i][z] = ps
             finish[i][z] = pe
 
@@ -849,46 +862,25 @@ def build_takt_plan(
                 TaktPlanCell(
                     trade_index=i,
                     zone=z + 1,
-                    period_start=int(start[i][z]),
-                    period_end=int(finish[i][z]),
-                    planned_rate=rate,
+                    period_start=float(start[i][z]),
+                    period_end=float(finish[i][z]),
+                    planned_rate=rate * n_zones / W,  # zona/periode efektif
                 )
             )
 
-    duration = max(finish[i][n_zones - 1] for i in range(n_trades)) + 1  # count of periods 0..last
+    duration = float(max(finish[i][n_zones - 1] for i in range(n_trades)))
     return TaktPlan(
         n_trades=n_trades,
         n_zones=n_zones,
         batch_size=batch_size,
-        rate=rate,
+        rate=rate * n_zones / W,
         cells=cells,
-        duration=int(duration),
-        takt_time=tt,
-        handoff_lag=lag if lag > 0 else 1,
+        duration=float(round(duration, 4)),
+        takt_time=t_zone,
+        handoff_lag=max(0, int(handoff_lag)),
     )
 
 
-
-
-
-@dataclass
-class TaktBufferConfig:
-    """
-    Buffers in takt planning (Takt Production Institute taxonomy).
-
-    - **vertical**: non-working periods (calendar / holidays / rain) — pad timeline
-    - **diagonal_wagon**: breathing room *inside* each zone wagon (extra periods/zona)
-    - **diagonal_sequence**: extra lag between trades at handoff (train friction)
-    - **diagonal_buffer_wagon**: empty wagon count inserted in train (extra lag waves)
-    - **horizontal_end**: milestone buffer at project end (periods)
-    - **independent_capacity**: fraction extra capacity (standby / surge) on crews
-    """
-    vertical: int = 0
-    diagonal_wagon: int = 0
-    diagonal_sequence: int = 0
-    diagonal_buffer_wagon: int = 0
-    horizontal_end: int = 0
-    independent_capacity: float = 0.0  # 0..1
 
 
 def apply_takt_buffers(
