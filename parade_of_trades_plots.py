@@ -1354,89 +1354,103 @@ def plot_takt_wagon_chart(
     ax: Optional[Axes] = None,
     title: Optional[str] = None,
     max_zones: Optional[int] = None,
+    *,
+    compact: bool = True,
 ) -> Axes:
     """
     Takt train / wagon chart (period 0-based).
 
-    Shows **all zones** by default (max_zones=None) so full duration is visible.
-    - Y = zona 1 … N
-    - X = periode mulai 0 … duration
+    Axis ticks are **every 1 unit** (periode 0,1,2,… and zona 1,2,3,…)
+    so cell alignment is visually accurate. ``compact=True`` keeps the figure small.
     """
-    if ax is None:
-        n_z = int(plan.n_zones)
-        h = max(4.2, min(14.0, 0.22 * n_z + 2.0))
-        _, ax = plt.subplots(figsize=(10.5, h))
-    colors = [_trade_color(i) for i in range(plan.n_trades)]
     n_all = int(plan.n_zones)
     n_show = n_all if max_zones is None else min(n_all, int(max_zones))
     max_end = 0
-    labeled = set()
-    # thinner bars when many zones
-    bar_h = 0.85 if n_show <= 20 else (0.9 if n_show <= 60 else 0.95)
-    show_text = n_show <= 20
+    for c in plan.cells:
+        if 1 <= c.zone <= n_show:
+            max_end = max(max_end, int(c.period_end) + 1)
+    dur = int(getattr(plan, "duration", max_end) or max_end)
+    max_end = max(max_end, dur, 1)
+
+    if ax is None:
+        # compact: small pixels-per-cell
+        if compact:
+            w = max(5.5, min(9.0, 0.14 * max_end + 2.5))
+            h = max(3.2, min(8.5, 0.12 * n_show + 1.6))
+        else:
+            w = max(8.0, min(12.0, 0.22 * max_end + 3.0))
+            h = max(4.0, min(14.0, 0.22 * n_show + 2.0))
+        _, ax = plt.subplots(figsize=(w, h))
+
+    colors = [_trade_color(i) for i in range(plan.n_trades)]
+    labeled: set = set()
+    bar_h = 0.92
+    show_text = n_show <= 16 and max_end <= 30
+    fs = 5.5 if compact else 7
+
     for c in plan.cells:
         if c.zone < 1 or c.zone > n_show:
             continue
-        w = max(1, int(c.period_end) - int(c.period_start) + 1)
+        wcell = max(1, int(c.period_end) - int(c.period_start) + 1)
         left = float(c.period_start)
-        max_end = max(max_end, int(c.period_end) + 1)
         lab = f"T{c.trade_index + 1}"
         ax.barh(
-            y=c.zone,
-            width=w,
+            y=float(c.zone),
+            width=float(wcell),
             left=left,
             height=bar_h,
             color=colors[c.trade_index % len(colors)],
             edgecolor="white",
-            linewidth=0.3 if n_show > 30 else 0.5,
+            linewidth=0.35,
             align="center",
             label=lab if lab not in labeled else None,
             zorder=2,
         )
         labeled.add(lab)
-        if show_text and w >= 1:
+        if show_text:
             ax.text(
-                left + w / 2.0,
-                c.zone,
+                left + wcell / 2.0,
+                float(c.zone),
                 lab,
                 ha="center",
                 va="center",
-                fontsize=6 if n_show > 12 else 7,
+                fontsize=fs,
                 color="white",
                 fontweight="bold",
                 zorder=3,
             )
 
-    if max_end <= 0:
-        max_end = int(getattr(plan, "duration", 1) or 1)
-    # ensure axis shows full planned duration
-    dur = int(getattr(plan, "duration", max_end) or max_end)
-    max_end = max(max_end, dur)
-    ax.set_xlim(0, max(max_end, 1))
-    step = max(1, max_end // 15)
-    ax.set_xticks(list(range(0, max_end + 1, step)))
-    ax.set_xlabel("Periode (mulai 0)")
+    # --- exact unit scales (1 by 1) ---
+    ax.set_xlim(0, max_end)
+    ax.set_xticks(list(range(0, max_end + 1)))
+    ax.set_xticklabels([str(i) for i in range(0, max_end + 1)], fontsize=6 if max_end > 40 else 7)
+    ax.set_xlabel("Periode")
+
+    ax.set_ylim(n_show + 0.5, 0.5)  # zona 1 at top; integer centers
+    ax.set_yticks(list(range(1, n_show + 1)))
+    ax.set_yticklabels([str(i) for i in range(1, n_show + 1)], fontsize=6 if n_show > 40 else 7)
     ax.set_ylabel("Zona")
-    # y ticks: all if few, else every k
-    if n_show <= 40:
-        ax.set_yticks(list(range(1, n_show + 1)))
-    else:
-        step_y = max(1, n_show // 20)
-        ax.set_yticks(list(range(1, n_show + 1, step_y)) + ([n_show] if n_show % step_y else []))
-    ax.set_ylim(n_show + 0.6, 0.4)
+
+    # minor grid every 1 — major already unit
+    ax.set_xticks(list(range(0, max_end + 1)), minor=False)
+    ax.set_yticks(list(range(1, n_show + 1)), minor=False)
+    ax.grid(True, which="major", axis="both", alpha=0.28, linewidth=0.5, zorder=0)
+    # snap spines so bars sit on integer grid
+    ax.set_axisbelow(True)
+
     ax.set_title(
         title
-        or f"Takt plan (wagon) · {n_show} zona · rate={plan.rate:g} · durasi={dur} p"
+        or f"Takt plan (wagon) · {n_show} zona · rate={plan.rate:g} · {dur} p",
+        fontsize=10 if compact else 11,
     )
     handles, labels = ax.get_legend_handles_labels()
     if handles:
         uniq = dict(zip(labels, handles))
         ax.legend(
             uniq.values(), uniq.keys(),
-            loc="lower right", fontsize=8, framealpha=0.92,
+            loc="lower right", fontsize=7, framealpha=0.9,
             ncol=min(plan.n_trades, 5),
         )
-    ax.grid(True, axis="x", alpha=0.25, zorder=0)
     _apply_axes_style(ax)
     return ax
 

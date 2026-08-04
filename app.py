@@ -60,7 +60,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-04-wagon-full-v72"
+_APP_BUILD = "2026-08-04-wagon-scale1-v73"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1370,11 +1370,13 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
         _fig_to_st(fig)
 
         n_z = int(base_plan.n_zones)
-        fig_h = max(4.5, min(14.0, 0.22 * n_z + 2.2))
-        fig, ax = plt.subplots(figsize=(10.5, fig_h))
+        # ukuran ringkas; scale sumbu 1 per unit di plot
+        fig_w = max(5.5, min(8.5, 0.13 * base_plan.duration + 2.8))
+        fig_h = max(3.2, min(7.5, 0.11 * n_z + 1.8))
+        fig, ax = plt.subplots(figsize=(fig_w, fig_h))
         plot_takt_wagon_chart(
-            base_plan, ax=ax, max_zones=None,
-            title=f"Takt plan (wagon) — baseline · {n_z} zona · durasi {base_plan.duration} p",
+            base_plan, ax=ax, max_zones=None, compact=True,
+            title=f"Takt plan (wagon) — baseline · {n_z} zona · {base_plan.duration} p",
         )
         fig.tight_layout()
         _fig_to_st(fig)
@@ -1468,7 +1470,7 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
 
     # Gabungan: durasi vs jumlah zona (3 skenario)
     st.markdown("**Durasi total vs jumlah zonasi**")
-    fig, ax = plt.subplots(figsize=(8.5, 4.2))
+    fig, ax = plt.subplots(figsize=(7.2, 3.6))
     zs, d_plan, d_sim, labs = [], [], [], []
     for label, r in results.items():
         z_n = int(meta.get(label, {}).get("zona", r.config.total_units))
@@ -1495,11 +1497,12 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
     for label, r in results.items():
         plan_i = plans[label]
         z_n = int(plan_i.n_zones)
-        fig_h = max(4.0, min(12.0, 0.18 * z_n + 2.0))
-        fig, ax = plt.subplots(figsize=(10.5, fig_h))
+        fig_w = max(5.5, min(8.5, 0.13 * plan_i.duration + 2.8))
+        fig_h = max(3.0, min(7.0, 0.11 * z_n + 1.6))
+        fig, ax = plt.subplots(figsize=(fig_w, fig_h))
         plot_takt_wagon_chart(
-            plan_i, ax=ax, max_zones=None,
-            title=f"{label} · {z_n} zona · durasi {plan_i.duration} p",
+            plan_i, ax=ax, max_zones=None, compact=True,
+            title=f"{label} · {z_n} zona · {plan_i.duration} p",
         )
         fig.tight_layout()
         _fig_to_st(fig)
