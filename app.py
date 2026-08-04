@@ -66,7 +66,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-05-defaults-tz10-v97"
+_APP_BUILD = "2026-08-05-takt-no-sim-v98"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1542,57 +1542,6 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
     )
     fig.tight_layout()
     _fig_to_st(fig)
-
-    st.markdown("##### Simulasi parade 1 lantai (opsional)")
-    var_mode = st.selectbox(
-        "Variability",
-        ["no_variability", "low", "medium", "high", "very_high"],
-        format_func=lambda x: VAR_LABELS.get(x, x),
-        key="takt_var_main",
-    )
-    batch_t = int(st.selectbox(
-        "Batch handoff",
-        options=_BATCH_OPTIONS,
-        format_func=_batch_label,
-        key="takt_batch",
-    ))
-    if st.button("Jalankan simulasi 1 lantai", type="primary", use_container_width=True, key="takt_run_sim"):
-        pairs = [_pair_from_base_and_var(float(rate), var_mode)] * tw
-        try:
-            cfg = _build_config_from_pairs(pairs, tz, seed, batch_size=batch_t)
-            res = ParadeOfTrades(cfg).run()
-            st.session_state["takt_sim_result"] = res
-            st.session_state["takt_sim_plan"] = plan
-            st.session_state["takt_sim_meta"] = {
-                "tz": tz, "tw": tw, "te": te, "td": td_floor,
-                "td_all": td_all, "t_per_floor": t_per_floor,
-                "n_floors": n_floors, "cap_bay": cap_bay, "cap_zone": cap_zone,
-            }
-        except RuntimeError as exc:
-            st.error(str(exc))
-
-    sim_t = st.session_state.get("takt_sim_result")
-    if sim_t is not None:
-        meta = st.session_state.get("takt_sim_meta") or {}
-        nf = int(meta.get("n_floors", n_floors))
-        s1, s2, s3, s4 = st.columns(4)
-        s1.metric("TD ideal / lantai", f"{float(meta.get('td', td_floor)):.1f} hari")
-        s2.metric("Aktual 1 lantai", f"{sim_t.duration} hari")
-        s3.metric(f"Aktual × {nf} ≈", f"{sim_t.duration * nf} hari")
-        s4.metric("Waktu / lantai", f"{float(meta.get('t_per_floor', t_per_floor)):g} hari")
-        fig, ax = plt.subplots(figsize=(9.0, 4.2))
-        plot_line_of_balance(
-            sim_t, ax=ax,
-            title=f"LOB · TZ={meta.get('tz', tz)} · T={sim_t.duration} hari",
-        )
-        fig.tight_layout()
-        _fig_to_st(fig)
-        _export_takt_block(
-            sim_t, plan,
-            takt_plan_reliability(sim_t, plan),
-            duration_plan=int(round(float(meta.get("td", td_floor)))),
-            key="takt_main",
-        )
 
 
 
