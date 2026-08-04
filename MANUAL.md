@@ -247,62 +247,46 @@ Kolom penting:
 
 ## 7. Tab Takt plan
 
-### 7.1 Little's Takt Law
+### 7.1 Little's Takt Law + lingkup tetap
 
 Sumber: [Is Takt Really Magic? (Lean Built)](https://leanbuilt.us/is-takt-really-magic/)
 
-\[
-TD = (TW + TZ - 1) \times TT
-\]
+```
+TD = (TW + TZ - 1) × TT
+TT = T₀ / TZ
+```
 
 | Simbol | Arti | Default |
 |--------|------|---------|
-| **TW** | Takt wagons (jumlah tim / wagon) | **5** |
-| **TZ** | Takt zones | **40** |
-| **TT** | Takt time (periode / zona) | **1** |
-| **TD** | Total duration | **(5+40−1)×1 = 44** |
+| **TW** | Takt wagons (tim) | **5** |
+| **T₀** | Lingkup kerja total (**tetap**) | **40** |
+| **TZ** | Jumlah zona (memecah T₀) | **40** |
+| **TT** | Takt time = T₀/TZ | **1** (saat TZ=40) |
+| **TD** | Durasi total | **44** saat default |
 
-- **TT = 1** artinya **satu wagon mengerjakan satu zona dalam satu periode** — bukan “5 karena ada 5 tim”.  
-- Angka **5** adalah **TW**, bukan TT.  
-- Zona 1: T1 di p0, T2 di p1, … T5 di p4 → lima wagon bergantian, masing-masing **TT = 1**.
+**Pesan inti:** lingkup proyek tetap. Zona **lebih banyak** → unit lebih kecil → TT mengecil → **TD lebih pendek** (mendekati T₀; diminishing returns).
+
+| TZ | TT = 40/TZ | TD = (5+TZ−1)×TT |
+|----|------------|------------------|
+| 30 | 1,333 | **45,33** |
+| 40 | 1,000 | **44,00** |
+| 50 | 0,800 | **43,20** |
+
+Angka **5** = **TW**, bukan TT.
 
 ### 7.2 Parameter interaktif
 
-Ubah **TW**, **TZ**, **TT** → **TD** dan **wagon chart** langsung dihitung (tanpa tombol).
+- **TW**, **T₀ (lingkup)**, **TZ** → TT & TD & wagon langsung dihitung.
+- Expander: kurva TD vs TZ (lingkup tetap).
+- Wagon: Y = zona, X = periode dari 0.
 
-Wagon chart:
+### 7.3 Simulasi aktual
 
-- Sumbu Y = zona 1…TZ (semua zona)  
-- Sumbu X = periode mulai 0  
-- Skala tick **1 per unit**  
-- Warna = T1…TW; diagonal train  
+Kapasitas zona diskalakan (rate ∝ TZ/T₀). LOB aktual vs TD rencana.
 
-### 7.3 Simulasi aktual (opsional)
+### 7.4 Bandingan head-to-head
 
-Pilih variability → **Jalankan simulasi** → LOB aktual + unduh, bandingkan ke TD rencana.
-
-### 7.4 Bandingan head-to-head (opsional)
-
-2–3 nilai TZ:
-
-- **TT sama** (default), atau  
-- **Lingkup tetap** (TT mengecil jika TZ naik → diminishing returns, seperti kurva Lean Built).
-
-Keluaran: tabel TD, grafik TD vs TZ, wagon per skenario.
-
-### 7.5 Cara cek kurva Lean Built (TD vs TZ)
-
-Contoh spreadsheet: TW=7, TT=5, TZ acuan=2 → \(T_0 = TT \times TZ = 10\).
-
-Untuk setiap \(tz\):
-
-1. \(TT(tz) = T_0 / tz\)  
-2. **TD teoritis** = \((TW + tz - 1) \times TT(tz)\) → kurva biru  
-3. **TD rounded** = pakai \(\lceil TT \rceil\) → kurva oranye  
-
-Titik: tz=1 → TD=70; tz=2 → 40; tz=4 → 25; tz=10 → 16.
-
----
+Selalu lingkup tetap. Bandingkan TZ 30/40/50 → TD harus **menurun**.
 
 ## 8. Line of Balance (LOB)
 
