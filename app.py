@@ -65,7 +65,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-04-cost-definitions-v81"
+_APP_BUILD = "2026-08-04-fix-durasi-key-v82"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1183,7 +1183,7 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
         })
     st.divider()
     st.markdown("##### Ringkasan")
-    st.dataframe(sorted(rows, key=lambda x: x["Durasi"]), use_container_width=True, hide_index=True)
+    st.dataframe(sorted(rows, key=lambda x: x["Durasi proyek"]), use_container_width=True, hide_index=True)
     _export_comparison_block(results, meta, key="cmp")
 
     # Precompute costs for charts
