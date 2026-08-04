@@ -1530,7 +1530,7 @@ def plot_takt_wagon_chart(
         _, ax = plt.subplots(figsize=(w, h))
 
     colors = [_trade_color(i) for i in range(plan.n_trades)]
-    labeled: set = set()
+    # Label T1..Tn on each wagon; no separate legend
     show_text = n_show <= 16 and tmax <= 30
     fs = 5.5 if compact else 7
 
@@ -1549,10 +1549,8 @@ def plot_takt_wagon_chart(
             edgecolor="white",
             linewidth=0.35,
             align="center",
-            label=lab if lab not in labeled else None,
             zorder=2,
         )
-        labeled.add(lab)
         if show_text:
             ax.text(
                 left + width / 2.0, float(c.zone), lab,
@@ -1579,11 +1577,6 @@ def plot_takt_wagon_chart(
         title or f"Takt plan (wagon) · {n_show} zona · {tmax:.1f} p",
         fontsize=10 if compact else 11,
     )
-    handles, labels = ax.get_legend_handles_labels()
-    if handles:
-        uniq = dict(zip(labels, handles))
-        ax.legend(uniq.values(), uniq.keys(), loc="lower right", fontsize=7, framealpha=0.9,
-                  ncol=min(plan.n_trades, 5))
     ax.set_axisbelow(True)
     return ax
 
