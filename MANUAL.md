@@ -245,36 +245,39 @@ Kolom penting:
 
 ---
 
-## 7. Tab Takt plan — kasus 2 lantai × 441 m²
+## 7. Tab Takt plan
 
-### 7.1 Kasus default
+### 7.1 Setting fix
 
 | Item | Nilai |
 |------|--------|
-| Permintaan | **2 lantai** |
-| Luas / lantai | **441 m²** (21×21 m) |
-| Waktu owner | **100 periode** |
-| TT pelanggan | 100÷2 = **50 p/lantai** |
-| Jarak kolom | **3 m** |
-| Zona min | bay **3×3 = 9 m²** (4 kolom) |
-| TZ max / lantai | **7×7 = 49** |
+| Bay / zona | **3 × 3 m = 9 m²** |
+| TZ per lantai | **40** (genap, habis ÷4) |
+| Luas per lantai | 40 × 9 = **360 m²** (fix) |
+| Kapasitas Normal | **4 bay / hari** per tim |
+| tₑ | **0,25 hari/bay** |
+| T₀ (1 tim, 1 lantai) | 40/4 = **10 hari** |
 
-Permintaan = **lantai**, bukan jumlah zona. Zona = keputusan memotong tiap 441 m².
+### 7.2 Yang bisa diubah
 
-### 7.2 Rumus
+- **Jumlah lantai** (permintaan)
+- **Waktu tersedia** (hari)
+- **TW** (jumlah tim / wagon)
+
+### 7.3 Rumus
 
 ```text
-TT_pelanggan = T_avail / N_lantai
-tₑ           = T₀ / TZ
-TD_lantai    = (TW + TZ − 1) × tₑ
-TD_total     ≈ N_lantai × TD_lantai   # berurutan
+TT = T_avail_hari / N_lantai
+tₑ = 1/4 hari per bay          # Normal
+TD_lantai = (TW + 40 − 1) × 0,25
+TD_total  ≈ N_lantai × TD_lantai
 ```
 
-T₀ default ≈ 49 (1 periode per zona struktural bila TZ=49).
+Contoh TW=5: TD/lantai = 44×0,25 = **11 hari**; 2 lantai → **22 hari**.
 
-### 7.3 Literatur
+### 7.4 Literatur
 
-[LEI — Takt Time](https://www.lean.org/lexicon-terms/takt-time/): available time ÷ customer demand.
+[LEI — Takt Time](https://www.lean.org/lexicon-terms/takt-time/): available time ÷ customer demand (di sini demand = lantai).
 
 ## 8. Line of Balance (LOB)
 
