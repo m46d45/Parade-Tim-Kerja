@@ -8,7 +8,7 @@ Panduan lengkap untuk mahasiswa, dosen, dan peserta workshop Lean Construction /
 |---|---|
 | Aplikasi | **Parade Tim Kerja** (Streamlit) |
 | Model | Zone-flow (zona demi zona, batch handoff) |
-| Default | Total zona **40** · Seed **12345** · Batch **4** · 5 tim (tetap) · Tarif **100**/periode |
+| Default | Total zona **10** · Seed **12345** · Batch **4** · 5 tim (tetap) · Tarif **100**/periode |
 | Bahasa UI | Indonesia (istilah teknis: batch, WIP, takt, CONWIP, dll. dipertahankan) |
 
 ---
@@ -118,7 +118,7 @@ Durasi = panjang kalender. Σ aktif = volume kru; lima tim bisa kerja **tumpang-
 
 | Kontrol | Default | Fungsi |
 |---------|---------|--------|
-| Total zona | **40** | Lingkup unit kerja (TZ) |
+| Total zona | **10** | Lingkup unit kerja (TZ) |
 | Kunci seed / Seed | **12345** | Reproduktibilitas undi variability |
 | Ukuran batch handoff | **4** | Kebijakan serah-terima zona |
 | **Biaya per periode T1…T5** | **100** masing-masing | Tarif kru per periode (aktif & idle) |
@@ -257,7 +257,7 @@ Kolom penting:
 
 | Dapat diubah | Default |
 |--------------|---------|
-| Jumlah lantai n | 2 |
+| Jumlah lantai n | **1** |
 | **Jumlah zona TZ** (diskret) | **1 / 5 / 10 / 20 / 40** (default 10) |
 | Waktu tersedia / lantai | **15 hari** |
 | Kapasitas bay/hari/tim | **4** |

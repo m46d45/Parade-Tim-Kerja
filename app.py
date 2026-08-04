@@ -66,7 +66,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-05-tz-discrete-v96"
+_APP_BUILD = "2026-08-05-defaults-tz10-v97"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -973,7 +973,7 @@ def render_sidebar():
         st.sidebar.title("Parade Tim Kerja")
         st.sidebar.caption("Simulasi parade tim kerja konstruksi")
     st.sidebar.divider()
-    total_units = st.sidebar.number_input("Total zona", 1, 1000, 40, 5)
+    total_units = st.sidebar.number_input("Total zona", 1, 1000, 10, 1)
     use_seed = st.sidebar.checkbox("Kunci seed acak", True)
     seed = int(st.sidebar.number_input("Seed", 0, 10_000_000, 12345, 1)) if use_seed else None
     st.sidebar.divider()
@@ -1457,7 +1457,7 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
     c1, c2, c3, c4 = st.columns(4)
     n_floors = int(c1.number_input(
         "Jumlah lantai (n)",
-        min_value=1, max_value=50, value=2, step=1,
+        min_value=1, max_value=50, value=1, step=1,
         key="takt_n_floors",
     ))
     _tz_opts = [d for d in (1, 5, 10, 20, 40) if N_BAY % d == 0]
