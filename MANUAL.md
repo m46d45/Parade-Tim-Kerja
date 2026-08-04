@@ -245,55 +245,45 @@ Kolom penting:
 
 ---
 
-## 7. Tab Takt plan
+## 7. Tab Takt plan — konversi dari parade
 
-### 7.1 Definisi (literatur)
+### 7.1 Ide besar
 
-Menurut **Lean Enterprise Institute**:
+Tab **Simulasi** dan **Perbandingan** memainkan **mesin zone-flow** yang sama (5 tim, zona, kapasitas, batch, variability).  
+Tab **Takt plan** **mengonversi** paradigma itu ke bahasa takt:
 
-> **Takt time** = *available production time* ÷ *customer demand*
+| Parade | Takt |
+|--------|------|
+| 5 tim | TW (wagon) |
+| Total zona | Permintaan D |
+| Kapasitas (zona/periode) | tₑ = 1/kapasitas (periode/zona) |
+| Durasi hasil run | Aktual (bandingkan ke TD ideal) |
 
-Tujuan: menyelaraskan laju produksi dengan permintaan — tanpa overproduction.
+### 7.2 Dua detak
 
-Sumber: [lean.org — Takt Time](https://www.lean.org/lexicon-terms/takt-time/)
+1. **tₑ** — detak **proses** (berapa lama satu tim menyelesaikan satu zona).  
+2. **TT** — detak **pelanggan** (LEI): **TT = T_avail ÷ D**.
 
-Contoh klasik: 480 menit tersedia / 240 unit diminta → **TT = 2 menit per unit**.
+Sumber LEI: [lean.org — Takt Time](https://www.lean.org/lexicon-terms/takt-time/)
 
-### 7.2 Di aplikasi (satu panel)
+### 7.3 Rumus rencana
 
-| Input | Arti | Default |
-|-------|------|---------|
-| **Waktu produksi tersedia** | Jendela periode sampai serah terima | **160** |
-| **Permintaan pelanggan** | Jumlah unit/zona | **40** |
-| **TW** | Wagon / jumlah tim train | **5** |
-
-**TT dihitung otomatis:**
-
-```
-TT = waktu tersedia ÷ permintaan
-   = 160 ÷ 40 = 4 periode per zona
-```
-
-### 7.3 Dari TT ke train parade
-
-Setelah TT diketahui, rencana multi-wagon:
-
-```
-TD = (TW + TZ − 1) × TT
+```text
+TD_ideal = (TW + D − 1) × tₑ     # train OPF, tanpa var
+TT       = T_avail ÷ D           # takt pelanggan
 ```
 
-(TZ = permintaan dalam model zone-flow.)
+- Layak proses: **tₑ ≤ TT**  
+- Layak jadwal: **TD_ideal ≤ T_avail**  
+- Aktual dari Simulasi/Perbandingan biasanya **≥ TD_ideal** (batch & variability).
 
-Default: TD = (5+40−1)×4 = **176**.  
-Bandingkan **TD** vs **waktu tersedia**:
+### 7.4 Alur di app
 
-- TD ≤ tersedia → train **muat** dalam permintaan  
-- TD > tersedia → terlambat; perlu kapasitas / penyesuaian
-
-### 7.4 Wagon chart & simulasi
-
-- Satu wagon chart (bukan multi-set parameter).  
-- Opsional: simulasi aktual + variability vs TD rencana.
+1. Isi D (default = Total zona sidebar), TW, kapasitas (sama seperti simulasi).  
+2. Baca tₑ dan TD ideal.  
+3. Opsional: tautkan hasil **Simulasi** atau skenario **Perbandingan**.  
+4. Set **T_avail** → dapat **TT**.  
+5. Lihat wagon ideal + (opsional) jalankan parade di detak yang sama.
 
 ## 8. Line of Balance (LOB)
 

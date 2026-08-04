@@ -65,7 +65,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-05-takt-definition-v86"
+_APP_BUILD = "2026-08-05-takt-bridge-v87"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1436,149 +1436,236 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
 
 
 def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
-    """Takt plan — satu panel: TT = waktu tersedia ÷ permintaan pelanggan."""
+    """Konversi paradigma parade (simulasi) → takt plan."""
     st.subheader("Takt plan")
     st.caption(
-        "**Takt time** = waktu produksi tersedia ÷ permintaan pelanggan "
-        "([Lean Enterprise Institute](https://www.lean.org/lexicon-terms/takt-time/))"
+        "Dari **parade zone-flow** (Simulasi / Perbandingan) ke **takt** — "
+        "TT = waktu tersedia ÷ permintaan "
+        "([LEI](https://www.lean.org/lexicon-terms/takt-time/))"
     )
 
     # ------------------------------------------------------------------
-    # Definisi LEI
+    # Peta konversi
     # ------------------------------------------------------------------
-    st.markdown("##### Definisi")
-    st.info(
-        "**Takt time** adalah laju yang harus dicapai agar produksi **tepat** "
-        "mengikuti permintaan — tidak lebih cepat (overproduction), tidak lebih lambat.\n\n"
-        "**TT = Waktu produksi tersedia ÷ Permintaan pelanggan**\n\n"
-        "Contoh LEI: 480 menit tersedia / 240 unit diminta → **TT = 2 menit/unit**."
-    )
+    with st.expander("Bagaimana konversinya? (parade → takt)", expanded=True):
+        st.markdown(
+            """
+| Dunia **Simulasi / Perbandingan** | Dunia **Takt plan** | Hubungan |
+|-----------------------------------|---------------------|----------|
+| Jumlah **tim** (tetap 5) | **TW** — wagon | TW = 5 (train) |
+| **Total zona** (sidebar) | **Permintaan** D (unit/zona) | D = total zona |
+| **Kapasitas** (zona/periode) | Waktu proses per zona **tₑ** | tₑ = 1 / kapasitas |
+| **Batch / variability** | Mempengaruhi **aktual** | Ideal OPF: batch 1, tanpa var |
+| **Durasi proyek** (hasil run) | Dibandingkan ke **TD rencana** | Aktual ≥ ideal |
+| — | **Waktu tersedia** T_avail | Jendela serah terima (input) |
+| — | **TT** (takt time) | **TT = T_avail ÷ D** |
+
+**Dua “detak” yang berbeda (jangan dicampur):**
+
+1. **tₑ** — berapa lama **satu tim** mengerjakan **satu zona** (dari kapasitas parade).  
+2. **TT** — berapa lama **sistem** boleh menyelesaikan **satu unit permintaan** (dari pelanggan / jadwal).
+
+Rencana train ideal (OPF, tanpa var):
+
+```text
+TD = (TW + D − 1) × tₑ
+```
+
+Layak jika **TD ≤ T_avail**. Idealnya tₑ ≤ TT (kerja per zona tidak lebih lambat dari detak pelanggan).
+"""
+        )
 
     # ------------------------------------------------------------------
-    # Satu set parameter
+    # Sumber dari parade
     # ------------------------------------------------------------------
-    st.markdown("##### Input")
+    st.markdown("##### Dari sistem parade")
     c1, c2, c3 = st.columns(3)
-    t_avail = float(c1.number_input(
-        "Waktu produksi tersedia (periode)",
-        min_value=1.0, max_value=10_000.0, value=160.0, step=1.0,
-        key="takt_avail",
-        help="Available production time — jendela waktu sampai serah terima / shift tersedia.",
-    ))
-    demand = int(c2.number_input(
-        "Permintaan pelanggan (unit / zona)",
-        min_value=1, max_value=500, value=40, step=1,
+    d = int(c1.number_input(
+        "Permintaan D (= total zona)",
+        min_value=1, max_value=500, value=int(total_units), step=1,
         key="takt_demand",
-        help="Customer demand — jumlah unit/zona yang harus diselesaikan.",
+        help="Ambil dari sidebar Total zona — unit yang diminta pelanggan.",
     ))
-    tw = int(c3.number_input(
-        "TW — wagon (jumlah tim)",
-        min_value=2, max_value=12, value=5, step=1,
+    tw = int(c2.number_input(
+        "TW — wagon (= jumlah tim)",
+        min_value=2, max_value=12, value=int(n_trades), step=1,
         key="takt_tw",
-        help="Jumlah trade dalam train parade (default 5).",
+    ))
+    base = float(c3.selectbox(
+        "Kapasitas parade (zona/periode)",
+        options=[1 / 3, 0.5, 1.0, 2.0, 3.0],
+        index=2,
+        format_func=lambda x: {
+            1 / 3: "Sangat lambat (1/3)",
+            0.5: "Lambat (0,5)",
+            1.0: "Normal (1)",
+            2.0: "Cepat (2)",
+            3.0: "Sangat cepat (3)",
+        }.get(float(x), str(x)),
+        key="takt_cap",
+        help="Sama seperti kapasitas di Simulasi → tₑ = 1/kapasitas.",
     ))
 
-    # TT dari definisi klasik
-    tt = t_avail / max(demand, 1)
-    tz = demand  # di parade: unit = zona
-    td_train = float(littles_takt_duration(tw, tz, tt))
-    rate = 1.0 / max(tt, 1e-9)
-    plan = build_takt_plan(tw, tz, 1, rate, 1, total_work=None)
+    te = 1.0 / max(base, 1e-9)  # period per zona per wagon
+    td_ideal = float(littles_takt_duration(tw, d, te))
 
-    st.markdown("##### Hasil hitung")
+    p1, p2, p3 = st.columns(3)
+    p1.metric("tₑ = 1/kapasitas", f"{te:.3g} p/zona")
+    p2.metric("TD ideal OPF", f"{td_ideal:.2f} p")
+    p3.metric("Rumus", f"(TW+D−1)×tₑ")
+
+    # Ambil hasil simulasi terakhir jika ada
+    sim = st.session_state.get("single_result")
+    cmp_multi = st.session_state.get("cmp_multi")
+    src = st.radio(
+        "Bandingkan ke hasil",
+        ["Tidak ada / hanya rencana", "Hasil tab Simulasi", "Skenario tab Perbandingan"],
+        horizontal=True,
+        key="takt_src",
+    )
+    actual_duration = None
+    actual_label = None
+    if src.startswith("Hasil") and sim is not None:
+        actual_duration = int(sim.duration)
+        actual_label = "Simulasi terakhir"
+    elif src.startswith("Skenario") and cmp_multi:
+        names = list(cmp_multi.keys())
+        pick = st.selectbox("Skenario", names, key="takt_cmp_pick")
+        actual_duration = int(cmp_multi[pick].duration)
+        actual_label = pick
+    elif src.startswith("Hasil") and sim is None:
+        st.caption("Belum ada hasil di tab Simulasi — jalankan dulu, lalu kembali ke sini.")
+    elif src.startswith("Skenario") and not cmp_multi:
+        st.caption("Belum ada hasil Perbandingan — jalankan dulu, lalu kembali ke sini.")
+
+    # ------------------------------------------------------------------
+    # Takt pelanggan (LEI)
+    # ------------------------------------------------------------------
+    st.markdown("##### Takt time (permintaan pelanggan)")
+    st.caption("TT = waktu produksi tersedia ÷ permintaan  ·  LEI")
+
+    # default available = ideal train (rencana ketat) atau dari actual
+    default_avail = td_ideal
+    t_avail = float(st.number_input(
+        "Waktu produksi tersedia T_avail (periode)",
+        min_value=1.0, max_value=10_000.0,
+        value=float(default_avail),
+        step=1.0,
+        key="takt_avail",
+        help="Jendela sampai serah terima. Default = TD ideal OPF (rencana ketat).",
+    ))
+    tt = t_avail / max(d, 1)
+
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Waktu tersedia", f"{t_avail:g}")
-    m2.metric("Permintaan (zona)", f"{demand}")
-    m3.metric("TT = tersedia ÷ permintaan", f"{tt:.3f}")
-    m4.metric("TW", f"{tw}")
+    m1.metric("T_avail", f"{t_avail:g}")
+    m2.metric("D (permintaan)", f"{d}")
+    m3.metric("TT = T_avail/D", f"{tt:.3g}")
+    m4.metric("tₑ (proses)", f"{te:.3g}")
 
-    st.success(
-        f"**TT = {t_avail:g} ÷ {demand} = {tt:.4g}** periode per unit/zona"
-    )
-
-    # Durasi train parade vs jendela tersedia
-    st.markdown("##### Rencana train (parade)")
-    st.caption(
-        "Setelah TT diketahui, train multi-wagon direncanakan dengan "
-        "**TD = (TW + TZ − 1) × TT** (Little's Takt Law / Lean Built)."
-    )
-    r1, r2, r3 = st.columns(3)
-    r1.metric("TZ (= permintaan)", f"{tz}")
-    r2.metric("TD train", f"{td_train:.2f}")
-    r3.metric(
-        "vs waktu tersedia",
-        f"{td_train - t_avail:+.1f}",
-        help="Negatif/nol = train muat dalam jendela; positif = terlambat vs permintaan.",
-    )
-
-    if td_train <= t_avail + 1e-9:
+    if te <= tt + 1e-9:
         st.success(
-            f"Train **muat** dalam waktu tersedia: TD ({td_train:.2f}) ≤ tersedia ({t_avail:g})."
+            f"tₑ ({te:.3g}) ≤ TT ({tt:.3g}) — waktu proses per zona **muat** dalam detak pelanggan."
         )
     else:
         st.warning(
-            f"Train **melebihi** waktu tersedia: TD ({td_train:.2f}) > tersedia ({t_avail:g}). "
-            "Perlu lebih banyak kapasitas, wagon lebih sedikit di jalur kritis, "
-            "atau negosiasi permintaan/waktu."
+            f"tₑ ({te:.3g}) > TT ({tt:.3g}) — proses lebih lambat dari takt; "
+            "perlu kapasitas lebih tinggi, overtime, atau longgarkan T_avail / kurangi D."
         )
 
+    # ------------------------------------------------------------------
+    # Rencana train + wagon (pakai tₑ sebagai beat wagon)
+    # ------------------------------------------------------------------
+    st.markdown("##### Rencana train parade")
     st.caption(
-        f"**TD = (TW + TZ − 1) × TT = ({tw} + {tz} − 1) × {tt:.4g} = {td_train:.2f}**"
+        "Wagon memakai **tₑ** (detak proses dari kapasitas). "
+        "TD ideal = (TW+D−1)×tₑ. Kelayakan: TD ≤ T_avail."
     )
+    rate = base  # zona/periode
+    plan = build_takt_plan(tw, d, 1, rate, 1, total_work=None)
 
-    st.markdown("##### Wagon chart")
-    fig_w = max(5.5, min(9.0, 0.1 * max(td_train, 1) / max(tt, 0.5) + 3.0))
-    fig_h = max(3.0, min(7.5, 0.11 * tz + 1.6))
+    q1, q2, q3 = st.columns(3)
+    q1.metric("TD ideal", f"{td_ideal:.2f}")
+    q2.metric("T_avail", f"{t_avail:g}")
+    gap = td_ideal - t_avail
+    q3.metric("TD − T_avail", f"{gap:+.1f}")
+
+    if td_ideal <= t_avail + 1e-9:
+        st.success("Rencana train **muat** dalam waktu tersedia.")
+    else:
+        st.error("Rencana train **melebihi** waktu tersedia — tidak feasible tanpa ubah parameter.")
+
+    if actual_duration is not None:
+        st.markdown("##### Aktual (dari simulasi/perbandingan)")
+        a1, a2, a3 = st.columns(3)
+        a1.metric("Sumber", actual_label or "—")
+        a2.metric("Durasi aktual", f"{actual_duration}")
+        a3.metric("Aktual − TD ideal", f"{actual_duration - td_ideal:+.0f}")
+        if actual_duration > td_ideal + 0.5:
+            st.info(
+                "Aktual lebih panjang dari ideal OPF — biasanya karena **batch > 1** "
+                "dan/atau **variability** (seperti di tab Simulasi/Perbandingan)."
+            )
+
+    st.markdown("##### Wagon chart (ideal OPF, beat = tₑ)")
+    fig_w = max(5.5, min(9.0, 0.1 * max(td_ideal, 1) / max(te, 0.25) + 3.0))
+    fig_h = max(3.0, min(7.5, 0.11 * d + 1.6))
     fig, ax = plt.subplots(figsize=(fig_w, fig_h))
     plot_takt_wagon_chart(
         plan, ax=ax, max_zones=None, compact=True,
-        title=f"TT={tt:.3f} · TW={tw} · TZ={tz} · TD={td_train:.1f}",
+        title=f"TW={tw} · D={d} · tₑ={te:.3g} · TD={td_ideal:.1f}",
     )
     fig.tight_layout()
     _fig_to_st(fig)
 
     # ------------------------------------------------------------------
-    # Simulasi aktual opsional — satu tombol
+    # Simulasi singkat di takt (opsional) — samakan engine dengan tab Simulasi
     # ------------------------------------------------------------------
-    st.markdown("##### Simulasi aktual (opsional)")
+    st.markdown("##### Jalankan parade di detak ini (opsional)")
     var_mode = st.selectbox(
         "Variability",
         ["no_variability", "low", "medium", "high", "very_high"],
         format_func=lambda x: VAR_LABELS.get(x, x),
         key="takt_var_main",
     )
-    if st.button("Jalankan simulasi", type="primary", use_container_width=True, key="takt_run_sim"):
-        pairs = [_pair_from_base_and_var(float(rate), var_mode)] * tw
+    batch_t = int(st.selectbox(
+        "Batch handoff",
+        options=_BATCH_OPTIONS,
+        format_func=_batch_label,
+        key="takt_batch",
+    ))
+    if st.button("Jalankan simulasi parade", type="primary", use_container_width=True, key="takt_run_sim"):
+        pairs = [_pair_from_base_and_var(float(base), var_mode)] * tw
         try:
-            cfg = _build_config_from_pairs(pairs, tz, seed, batch_size=1)
+            cfg = _build_config_from_pairs(pairs, d, seed, batch_size=batch_t)
             res = ParadeOfTrades(cfg).run()
             st.session_state["takt_sim_result"] = res
             st.session_state["takt_sim_plan"] = plan
             st.session_state["takt_sim_meta"] = {
-                "tw": tw, "tz": tz, "tt": tt, "td": td_train,
-                "t_avail": t_avail, "demand": demand,
+                "tw": tw, "d": d, "te": te, "td": td_ideal,
+                "t_avail": t_avail, "tt": tt, "base": base,
             }
         except RuntimeError as exc:
             st.error(str(exc))
 
-    sim = st.session_state.get("takt_sim_result")
-    if sim is not None:
+    sim_t = st.session_state.get("takt_sim_result")
+    if sim_t is not None:
         meta = st.session_state.get("takt_sim_meta") or {}
-        s1, s2, s3 = st.columns(3)
-        s1.metric("TD rencana", f"{float(meta.get('td', td_train)):.1f}")
-        s2.metric("Durasi aktual", f"{sim.duration}")
-        s3.metric("Waktu tersedia", f"{float(meta.get('t_avail', t_avail)):g}")
+        s1, s2, s3, s4 = st.columns(4)
+        s1.metric("TD ideal", f"{float(meta.get('td', td_ideal)):.1f}")
+        s2.metric("Durasi aktual", f"{sim_t.duration}")
+        s3.metric("T_avail", f"{float(meta.get('t_avail', t_avail)):g}")
+        s4.metric("Δ ke ideal", f"{sim_t.duration - float(meta.get('td', td_ideal)):+.0f}")
         fig, ax = plt.subplots(figsize=(9.0, 4.2))
         plot_line_of_balance(
-            sim, ax=ax,
-            title=f"LOB aktual · TZ={meta.get('tz', tz)} · T={sim.duration}p",
+            sim_t, ax=ax,
+            title=f"LOB aktual · D={meta.get('d', d)} · T={sim_t.duration}p",
         )
         fig.tight_layout()
         _fig_to_st(fig)
         _export_takt_block(
-            sim, plan,
-            takt_plan_reliability(sim, plan),
-            duration_plan=int(round(float(meta.get("td", td_train)))),
+            sim_t, plan,
+            takt_plan_reliability(sim_t, plan),
+            duration_plan=int(round(float(meta.get("td", td_ideal)))),
             key="takt_main",
         )
 
