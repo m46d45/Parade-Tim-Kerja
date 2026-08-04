@@ -132,6 +132,111 @@ class LittlesLawMetrics:
         ]
 
 
+
+@dataclass
+class TradeCostRow:
+    trade_index: int
+    name: str
+    cost_per_period: float
+    periods_active: int
+    periods_idle: int
+    cost_active: float
+    cost_idle: float
+    cost_total: float
+    start_period: Optional[int]
+    finish_period: Optional[int]
+
+
+@dataclass
+class CostMetrics:
+    """Biaya aktif + idle setelah tim mulai bekerja (hingga selesai)."""
+    trades: List[TradeCostRow]
+    total_active: float
+    total_idle: float
+    total_cost: float
+
+    def as_rows(self) -> List[dict]:
+        rows = []
+        for t in self.trades:
+            rows.append({
+                "Tim": t.name,
+                "Cost/periode": t.cost_per_period,
+                "Periode aktif": t.periods_active,
+                "Periode idle": t.periods_idle,
+                "Biaya aktif": round(t.cost_active, 2),
+                "Biaya idle": round(t.cost_idle, 2),
+                "Biaya total": round(t.cost_total, 2),
+            })
+        return rows
+
+
+def compute_cost_metrics(
+    result: ParadeResult,
+    cost_per_period: Sequence[float],
+) -> CostMetrics:
+    """
+    Biaya per tim (setelah mulai kerja sampai selesai):
+
+    - **Aktif**: periode di mana tim berproduksi (production > 0)
+    - **Idle**: periode setelah mulai & sebelum selesai di mana production = 0
+      (menunggu zona / starvation)
+
+    Biaya = periode × cost per periode (tarif sama untuk aktif & idle;
+    pemisahan untuk analisis pemborosan idle).
+    """
+    n = result.config.n_trades
+    rates = list(cost_per_period)
+    while len(rates) < n:
+        rates.append(float(rates[-1]) if rates else 100.0)
+    rates = [max(0.0, float(r)) for r in rates[:n]]
+
+    # finish period per trade
+    finishes: List[Optional[int]] = []
+    for m in result.trade_metrics:
+        finishes.append(int(m.periods_to_finish) if m.periods_to_finish else None)
+
+    active = [0] * n
+    idle = [0] * n
+    for rec in result.history:
+        p = int(rec.period)
+        for i in range(n):
+            start = result.trade_metrics[i].start_period
+            fin = finishes[i]
+            if start is None:
+                continue
+            if p < int(start):
+                continue
+            if fin is not None and p > int(fin):
+                continue
+            prod = int(rec.production[i]) if i < len(rec.production) else 0
+            if prod > 0:
+                active[i] += 1
+            else:
+                idle[i] += 1
+
+    rows: List[TradeCostRow] = []
+    for i in range(n):
+        ca = active[i] * rates[i]
+        ci = idle[i] * rates[i]
+        rows.append(
+            TradeCostRow(
+                trade_index=i,
+                name=result.trade_metrics[i].name,
+                cost_per_period=rates[i],
+                periods_active=active[i],
+                periods_idle=idle[i],
+                cost_active=ca,
+                cost_idle=ci,
+                cost_total=ca + ci,
+                start_period=result.trade_metrics[i].start_period,
+                finish_period=finishes[i],
+            )
+        )
+    ta = sum(r.cost_active for r in rows)
+    ti = sum(r.cost_idle for r in rows)
+    return CostMetrics(trades=rows, total_active=ta, total_idle=ti, total_cost=ta + ti)
+
+
 def littles_law_metrics(result: ParadeResult) -> LittlesLawMetrics:
     """
     Compute Little's Law metrics from a parade result.

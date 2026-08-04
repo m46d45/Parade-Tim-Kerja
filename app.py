@@ -19,6 +19,7 @@ _p = importlib.reload(_p)
 _a = importlib.reload(_a)
 
 from parade_of_trades_analysis import (
+    compute_cost_metrics,
     export_result_csv,
     export_result_excel,
 export_comparison_excel,
@@ -62,7 +63,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-04-takt-params-v76"
+_APP_BUILD = "2026-08-04-cost-v77"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -543,14 +544,42 @@ def _peak_wip(result: ParadeResult) -> int:
     return max((sum(h.buffers) for h in result.history), default=0)
 
 
+
+def _trade_costs(n_trades: int = 5) -> list:
+    c = st.session_state.get("trade_costs")
+    if not c or len(c) < n_trades:
+        return [100.0] * n_trades
+    return [float(x) for x in c[:n_trades]]
+
+
+def _render_cost_block(result: ParadeResult, key: str = "cost") -> None:
+    """Tampilkan biaya aktif / idle / total."""
+    costs = _trade_costs(result.config.n_trades)
+    cm = compute_cost_metrics(result, costs)
+    st.markdown("##### Biaya")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Biaya aktif", f"{cm.total_active:,.0f}")
+    c2.metric("Biaya idle", f"{cm.total_idle:,.0f}")
+    c3.metric("Total biaya", f"{cm.total_cost:,.0f}")
+    st.dataframe(cm.as_rows(), use_container_width=True, hide_index=True)
+    st.caption(
+        "Aktif = periode berproduksi setelah mulai · "
+        "Idle = periode tanpa produksi (setelah mulai, sebelum selesai) · "
+        "Biaya = periode × tarif/periode (sidebar)."
+    )
+    st.session_state[f"{key}_cost_metrics"] = cm
+
+
 def _metrics_row(result: ParadeResult) -> None:
-    cols = st.columns(6)
+    cm = compute_cost_metrics(result, _trade_costs(result.config.n_trades))
+    cols = st.columns(7)
     cols[0].metric("Durasi", f"{result.duration}")
     cols[1].metric("vs Ideal", f"{result.duration - result.ideal_duration:+.1f}")
     cols[2].metric("Throughput", f"{result.system_throughput:.3f}")
-    cols[3].metric("Idle total", f"{result.total_idle_capacity}")
+    cols[3].metric("Idle cap.", f"{result.total_idle_capacity}")
     cols[4].metric("Puncak WIP", f"{_peak_wip(result)}")
-    cols[5].metric("Batch", f"{result.config.batch_size}")
+    cols[5].metric("Biaya idle", f"{cm.total_idle:,.0f}")
+    cols[6].metric("Total biaya", f"{cm.total_cost:,.0f}")
 
 
 def _starts_caption(result: ParadeResult) -> str:
@@ -559,17 +588,23 @@ def _starts_caption(result: ParadeResult) -> str:
 
 
 def _trade_table(result: ParadeResult) -> None:
+    cm = compute_cost_metrics(result, _trade_costs(result.config.n_trades))
     rows = []
     for i, m in enumerate(result.trade_metrics):
+        tc = cm.trades[i]
         rows.append({
             "#": i + 1,
             "Tim": m.name,
             "Pace": result.config.trades[i].label(),
             "Produksi": m.total_production,
-            "Idle": m.total_idle,
+            "Idle cap.": m.total_idle,
+            "Periode aktif": tc.periods_active,
+            "Periode idle": tc.periods_idle,
+            "Biaya aktif": round(tc.cost_active, 0),
+            "Biaya idle": round(tc.cost_idle, 0),
+            "Biaya total": round(tc.cost_total, 0),
             "Mulai": m.start_period if m.start_period is not None else "—",
             "Selesai": m.periods_to_finish,
-            "Waktu di lapangan": m.time_on_site,
         })
     st.dataframe(rows, use_container_width=True, hide_index=True)
 
@@ -938,6 +973,20 @@ def render_sidebar():
         help="Default 4: kumpulkan 4 zona dulu baru dilepas ke tim hilir. "
              "1 = one-piece flow.",
     )
+    st.sidebar.divider()
+    st.sidebar.markdown("##### Biaya per periode")
+    st.sidebar.caption("Tarif sama untuk periode aktif & idle (setelah tim mulai).")
+    n_tr = 5
+    names = list(DEFAULT_TRADE_NAMES[:n_tr]) if len(DEFAULT_TRADE_NAMES) >= n_tr else [f"Tim {i+1}" for i in range(n_tr)]
+    costs = []
+    for i, name in enumerate(names):
+        short = name if len(name) <= 28 else name[:26] + "…"
+        costs.append(float(st.sidebar.number_input(
+            f"T{i+1} · {short}",
+            min_value=0.0, max_value=1_000_000.0, value=100.0, step=10.0,
+            key=f"cost_t{i}",
+        )))
+    st.session_state["trade_costs"] = costs
     return int(total_units), seed, 5
 
 
@@ -971,6 +1020,7 @@ def tab_single_run(total_units: int, seed: Optional[int], n_trades: int) -> None
     with right:
         st.markdown("##### Metrik per tim")
         _trade_table(result)
+        _render_cost_block(result, key="single")
         _export_block(result, "single", prefix="parade_simulasi")
 
 
@@ -1107,6 +1157,9 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
             "vs Ideal": round(r.duration - r.ideal_duration, 1),
             "Idle": r.total_idle_capacity,
             "Puncak WIP": _peak_wip(r),
+            "Biaya aktif": round(compute_cost_metrics(r, _trade_costs(n_trades)).total_active, 0),
+            "Biaya idle": round(compute_cost_metrics(r, _trade_costs(n_trades)).total_idle, 0),
+            "Total biaya": round(compute_cost_metrics(r, _trade_costs(n_trades)).total_cost, 0),
             "TH": round(ll.throughput, 3),
             "WIP⌀": round(ll.avg_pipeline_wip, 2),
             "CT": round(ll.cycle_time_pipeline, 2),
