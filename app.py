@@ -66,7 +66,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-05-takt-4bay-day-v90"
+_APP_BUILD = "2026-08-05-takt-12hari-v91"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1484,9 +1484,9 @@ Permintaan = **jumlah lantai** (bukan TZ). Zona = cara memotong tiap lantai {ARE
     ))
     t_avail = float(c2.number_input(
         "Waktu tersedia (hari)",
-        min_value=1.0, max_value=10_000.0, value=100.0, step=1.0,
+        min_value=1.0, max_value=10_000.0, value=12.0, step=1.0,
         key="takt_avail_days",
-        help="Jendela hari sampai serah terima (semua lantai).",
+        help="Demand waktu owner — default 12 hari (semua lantai).",
     ))
     tw = int(c3.number_input(
         "TW — wagon (tim)",
