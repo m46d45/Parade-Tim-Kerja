@@ -247,34 +247,53 @@ Kolom penting:
 
 ## 7. Tab Takt plan
 
-### 7.1 Rumus
+### 7.1 Definisi (literatur)
+
+Menurut **Lean Enterprise Institute**:
+
+> **Takt time** = *available production time* ÷ *customer demand*
+
+Tujuan: menyelaraskan laju produksi dengan permintaan — tanpa overproduction.
+
+Sumber: [lean.org — Takt Time](https://www.lean.org/lexicon-terms/takt-time/)
+
+Contoh klasik: 480 menit tersedia / 240 unit diminta → **TT = 2 menit per unit**.
+
+### 7.2 Di aplikasi (satu panel)
+
+| Input | Arti | Default |
+|-------|------|---------|
+| **Waktu produksi tersedia** | Jendela periode sampai serah terima | **160** |
+| **Permintaan pelanggan** | Jumlah unit/zona | **40** |
+| **TW** | Wagon / jumlah tim train | **5** |
+
+**TT dihitung otomatis:**
+
+```
+TT = waktu tersedia ÷ permintaan
+   = 160 ÷ 40 = 4 periode per zona
+```
+
+### 7.3 Dari TT ke train parade
+
+Setelah TT diketahui, rencana multi-wagon:
 
 ```
 TD = (TW + TZ − 1) × TT
 ```
 
-| Parameter | Arti | Default |
-|-----------|------|---------|
-| **TW** | Wagon / jumlah tim dalam train | **5** (bisa dikurangi/ditambah) |
-| **TZ** | Jumlah zona | **40** |
-| **TT** | Takt time = periode per zona per wagon | **4** |
-| **TD** | Durasi total (dihitung otomatis) | (5+40−1)×4 = **176** |
+(TZ = permintaan dalam model zone-flow.)
 
-Ubah salah satu parameter → TD & wagon chart langsung berubah. Tidak perlu mode “lingkup tetap” terpisah: Anda sendiri yang menentukan TW, TZ, TT.
+Default: TD = (5+40−1)×4 = **176**.  
+Bandingkan **TD** vs **waktu tersedia**:
 
-### 7.2 Cara main
+- TD ≤ tersedia → train **muat** dalam permintaan  
+- TD > tersedia → terlambat; perlu kapasitas / penyesuaian
 
-1. Set **TW**, **TZ**, **TT** di panel atas.  
-2. Baca **TD** dan wagon (Y=zona, X=periode dari 0).  
-3. Opsional: simulasi aktual + variability.  
-4. Opsional: bandingkan 2–3 **set parameter** (mis. TT=4 vs TT=5, atau TW=5 vs TW=4).
+### 7.4 Wagon chart & simulasi
 
-### 7.3 Intuisi
-
-- TW ↓ → train lebih pendek → TD ↓  
-- TZ ↓ → lebih sedikit zona → TD ↓  
-- TT ↓ → tiap zona lebih cepat → TD ↓  
-- TT default **4** (bukan 1): satu wagon butuh 4 periode per zona pada setup awal.
+- Satu wagon chart (bukan multi-set parameter).  
+- Opsional: simulasi aktual + variability vs TD rencana.
 
 ## 8. Line of Balance (LOB)
 

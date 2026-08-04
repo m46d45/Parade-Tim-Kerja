@@ -65,7 +65,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-05-takt-free-params-v85"
+_APP_BUILD = "2026-08-05-takt-definition-v86"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1436,75 +1436,109 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
 
 
 def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
-    """Takt plan — mainkan TW, TZ, TT; TD = (TW+TZ−1)×TT."""
+    """Takt plan — satu panel: TT = waktu tersedia ÷ permintaan pelanggan."""
     st.subheader("Takt plan")
     st.caption(
-        "Little's Takt Law: **TD = (TW + TZ − 1) × TT** · "
-        "[Lean Built](https://leanbuilt.us/is-takt-really-magic/) · "
-        "Ubah parameter → TD & wagon langsung terhitung."
+        "**Takt time** = waktu produksi tersedia ÷ permintaan pelanggan "
+        "([Lean Enterprise Institute](https://www.lean.org/lexicon-terms/takt-time/))"
     )
 
     # ------------------------------------------------------------------
-    # Parameter bebas: TW, TZ, TT (default TT=4, TW=5, TZ=40)
+    # Definisi LEI
     # ------------------------------------------------------------------
-    st.markdown("##### Parameter")
+    st.markdown("##### Definisi")
+    st.info(
+        "**Takt time** adalah laju yang harus dicapai agar produksi **tepat** "
+        "mengikuti permintaan — tidak lebih cepat (overproduction), tidak lebih lambat.\n\n"
+        "**TT = Waktu produksi tersedia ÷ Permintaan pelanggan**\n\n"
+        "Contoh LEI: 480 menit tersedia / 240 unit diminta → **TT = 2 menit/unit**."
+    )
+
+    # ------------------------------------------------------------------
+    # Satu set parameter
+    # ------------------------------------------------------------------
+    st.markdown("##### Input")
     c1, c2, c3 = st.columns(3)
-    tw = int(c1.number_input(
+    t_avail = float(c1.number_input(
+        "Waktu produksi tersedia (periode)",
+        min_value=1.0, max_value=10_000.0, value=160.0, step=1.0,
+        key="takt_avail",
+        help="Available production time — jendela waktu sampai serah terima / shift tersedia.",
+    ))
+    demand = int(c2.number_input(
+        "Permintaan pelanggan (unit / zona)",
+        min_value=1, max_value=500, value=40, step=1,
+        key="takt_demand",
+        help="Customer demand — jumlah unit/zona yang harus diselesaikan.",
+    ))
+    tw = int(c3.number_input(
         "TW — wagon (jumlah tim)",
         min_value=2, max_value=12, value=5, step=1,
         key="takt_tw",
-        help="Panjang train. Default 5; bisa dikurangi/ditambah.",
-    ))
-    tz = int(c2.number_input(
-        "TZ — jumlah zona",
-        min_value=1, max_value=200, value=40, step=1,
-        key="takt_tz",
-        help="Jumlah takt zone.",
-    ))
-    tt = float(c3.number_input(
-        "TT — takt time (periode / zona)",
-        min_value=0.25, max_value=20.0, value=4.0, step=0.25,
-        format="%.2f",
-        key="takt_tt",
-        help="Waktu satu wagon menyelesaikan satu zona. Default 4.",
+        help="Jumlah trade dalam train parade (default 5).",
     ))
 
-    td = float(littles_takt_duration(tw, tz, tt))
-    rate = 1.0 / max(tt, 1e-9)  # zona/periode untuk simulasi (unit size 1)
-    plan = build_takt_plan(
-        n_trades=tw, n_zones=tz, batch_size=1, rate=rate, handoff_lag=1,
-        total_work=None,
-    )
+    # TT dari definisi klasik
+    tt = t_avail / max(demand, 1)
+    tz = demand  # di parade: unit = zona
+    td_train = float(littles_takt_duration(tw, tz, tt))
+    rate = 1.0 / max(tt, 1e-9)
+    plan = build_takt_plan(tw, tz, 1, rate, 1, total_work=None)
 
+    st.markdown("##### Hasil hitung")
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("TW", f"{tw}")
-    m2.metric("TZ", f"{tz}")
-    m3.metric("TT", f"{tt:g}")
-    m4.metric("TD", f"{td:g}")
+    m1.metric("Waktu tersedia", f"{t_avail:g}")
+    m2.metric("Permintaan (zona)", f"{demand}")
+    m3.metric("TT = tersedia ÷ permintaan", f"{tt:.3f}")
+    m4.metric("TW", f"{tw}")
+
     st.success(
-        f"**TD = (TW + TZ − 1) × TT = ({tw} + {tz} − 1) × {tt:g} = {td:g}** periode"
+        f"**TT = {t_avail:g} ÷ {demand} = {tt:.4g}** periode per unit/zona"
     )
 
-    # Ringkas intuisi
+    # Durasi train parade vs jendela tersedia
+    st.markdown("##### Rencana train (parade)")
     st.caption(
-        f"Wagon T1 zona 1 mulai periode **0**, lebar **{tt:g}**. "
-        f"Train diagonal; selesai di **{td:g}**. "
-        f"TW↓ atau TZ↓ atau TT↓ → TD↓."
+        "Setelah TT diketahui, train multi-wagon direncanakan dengan "
+        "**TD = (TW + TZ − 1) × TT** (Little's Takt Law / Lean Built)."
+    )
+    r1, r2, r3 = st.columns(3)
+    r1.metric("TZ (= permintaan)", f"{tz}")
+    r2.metric("TD train", f"{td_train:.2f}")
+    r3.metric(
+        "vs waktu tersedia",
+        f"{td_train - t_avail:+.1f}",
+        help="Negatif/nol = train muat dalam jendela; positif = terlambat vs permintaan.",
     )
 
-    st.markdown("##### Takt plan (wagon)")
-    fig_w = max(5.5, min(9.0, 0.12 * max(td, 1) / max(tt, 1) + 3.0))
+    if td_train <= t_avail + 1e-9:
+        st.success(
+            f"Train **muat** dalam waktu tersedia: TD ({td_train:.2f}) ≤ tersedia ({t_avail:g})."
+        )
+    else:
+        st.warning(
+            f"Train **melebihi** waktu tersedia: TD ({td_train:.2f}) > tersedia ({t_avail:g}). "
+            "Perlu lebih banyak kapasitas, wagon lebih sedikit di jalur kritis, "
+            "atau negosiasi permintaan/waktu."
+        )
+
+    st.caption(
+        f"**TD = (TW + TZ − 1) × TT = ({tw} + {tz} − 1) × {tt:.4g} = {td_train:.2f}**"
+    )
+
+    st.markdown("##### Wagon chart")
+    fig_w = max(5.5, min(9.0, 0.1 * max(td_train, 1) / max(tt, 0.5) + 3.0))
     fig_h = max(3.0, min(7.5, 0.11 * tz + 1.6))
     fig, ax = plt.subplots(figsize=(fig_w, fig_h))
     plot_takt_wagon_chart(
         plan, ax=ax, max_zones=None, compact=True,
-        title=f"TW={tw} · TZ={tz} · TT={tt:g} · TD={td:g}",
+        title=f"TT={tt:.3f} · TW={tw} · TZ={tz} · TD={td_train:.1f}",
     )
     fig.tight_layout()
     _fig_to_st(fig)
 
     # ------------------------------------------------------------------
-    # Simulasi aktual (opsional)
+    # Simulasi aktual opsional — satu tombol
     # ------------------------------------------------------------------
     st.markdown("##### Simulasi aktual (opsional)")
     var_mode = st.selectbox(
@@ -1513,14 +1547,7 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
         format_func=lambda x: VAR_LABELS.get(x, x),
         key="takt_var_main",
     )
-    b1, b2, _ = st.columns([1, 1, 2])
-    run_sim = b1.button("Jalankan simulasi", type="primary", use_container_width=True, key="takt_run_sim")
-    clear_sim = b2.button("Hapus simulasi", use_container_width=True, key="takt_clear_sim")
-    if clear_sim:
-        for k in ("takt_sim_result", "takt_sim_plan", "takt_sim_meta"):
-            st.session_state.pop(k, None)
-
-    if run_sim:
+    if st.button("Jalankan simulasi", type="primary", use_container_width=True, key="takt_run_sim"):
         pairs = [_pair_from_base_and_var(float(rate), var_mode)] * tw
         try:
             cfg = _build_config_from_pairs(pairs, tz, seed, batch_size=1)
@@ -1528,7 +1555,8 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
             st.session_state["takt_sim_result"] = res
             st.session_state["takt_sim_plan"] = plan
             st.session_state["takt_sim_meta"] = {
-                "tw": tw, "tz": tz, "tt": tt, "td": td, "rate": rate,
+                "tw": tw, "tz": tz, "tt": tt, "td": td_train,
+                "t_avail": t_avail, "demand": demand,
             }
         except RuntimeError as exc:
             st.error(str(exc))
@@ -1537,9 +1565,9 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
     if sim is not None:
         meta = st.session_state.get("takt_sim_meta") or {}
         s1, s2, s3 = st.columns(3)
-        s1.metric("TD rencana", f"{float(meta.get('td', td)):g} p")
-        s2.metric("Durasi aktual", f"{sim.duration} p")
-        s3.metric("Δ", f"{sim.duration - float(meta.get('td', td)):+.1f} p")
+        s1.metric("TD rencana", f"{float(meta.get('td', td_train)):.1f}")
+        s2.metric("Durasi aktual", f"{sim.duration}")
+        s3.metric("Waktu tersedia", f"{float(meta.get('t_avail', t_avail)):g}")
         fig, ax = plt.subplots(figsize=(9.0, 4.2))
         plot_line_of_balance(
             sim, ax=ax,
@@ -1550,84 +1578,9 @@ def tab_takt(total_units: int, seed: Optional[int], n_trades: int) -> None:
         _export_takt_block(
             sim, plan,
             takt_plan_reliability(sim, plan),
-            duration_plan=int(round(float(meta.get("td", td)))),
+            duration_plan=int(round(float(meta.get("td", td_train)))),
             key="takt_main",
         )
-
-    # ------------------------------------------------------------------
-    # Mainkan 2–3 set parameter (bukan teori lingkup — bebas TW/TZ/TT)
-    # ------------------------------------------------------------------
-    st.divider()
-    st.markdown("##### Bandingkan beberapa set parameter")
-    st.caption("Isi 2–3 kombinasi TW / TZ / TT — rumus yang sama, hasil berdampingan.")
-
-    n_set = int(st.slider("Jumlah set", 2, 3, 2, key="takt_n_set"))
-    sets = []
-    cols = st.columns(n_set)
-    defaults = [
-        (5, 40, 4.0),
-        (5, 40, 5.0),
-        (4, 40, 4.0),
-    ]
-    for i in range(n_set):
-        with cols[i]:
-            st.markdown(f"**Set {i + 1}**")
-            dtw, dtz, dtt = defaults[i]
-            tw_i = int(st.number_input("TW", 2, 12, dtw, 1, key=f"takt_set{i}_tw"))
-            tz_i = int(st.number_input("TZ", 1, 200, dtz, 1, key=f"takt_set{i}_tz"))
-            tt_i = float(st.number_input("TT", 0.25, 20.0, dtt, 0.25, format="%.2f", key=f"takt_set{i}_tt"))
-            td_i = float(littles_takt_duration(tw_i, tz_i, tt_i))
-            st.metric("TD", f"{td_i:g}")
-            sets.append((f"Set {i + 1}", tw_i, tz_i, tt_i, td_i))
-
-    if st.button("Tampilkan bandingan", type="secondary", use_container_width=True, key="takt_sets_go"):
-        rows = []
-        plans_c = {}
-        for lab, tw_i, tz_i, tt_i, td_i in sets:
-            rate_i = 1.0 / max(tt_i, 1e-9)
-            p = build_takt_plan(tw_i, tz_i, 1, rate_i, 1, total_work=None)
-            plans_c[lab] = p
-            rows.append({
-                "Set": lab,
-                "TW": tw_i,
-                "TZ": tz_i,
-                "TT": tt_i,
-                "TD=(TW+TZ−1)×TT": round(td_i, 3),
-            })
-        st.session_state["takt_set_rows"] = rows
-        st.session_state["takt_set_plans"] = plans_c
-
-    if st.session_state.get("takt_set_rows"):
-        rows = st.session_state["takt_set_rows"]
-        plans_c = st.session_state["takt_set_plans"]
-        st.dataframe(rows, use_container_width=True, hide_index=True)
-
-        fig, ax = plt.subplots(figsize=(6.8, 3.4))
-        labels = [r["Set"] for r in rows]
-        tds = [float(r["TD=(TW+TZ−1)×TT"]) for r in rows]
-        colors = ["#2563eb", "#ea580c", "#16a34a"][: len(labels)]
-        ax.bar(labels, tds, color=colors, edgecolor="white", width=0.55)
-        for i, v in enumerate(tds):
-            ax.text(i, v, f"{v:g}", ha="center", va="bottom", fontsize=9)
-        ax.set_ylabel("TD (periode)")
-        ax.set_title("Perbandingan TD antar set parameter")
-        ax.grid(True, axis="y", alpha=0.3)
-        fig.tight_layout()
-        _fig_to_st(fig)
-
-        st.markdown("**Wagon per set**")
-        cols2 = st.columns(len(plans_c))
-        for i, (lab, p) in enumerate(plans_c.items()):
-            with cols2[i]:
-                fw = max(4.0, min(6.5, 0.08 * float(p.duration) + 2.5))
-                fh = max(2.8, min(6.0, 0.09 * p.n_zones + 1.4))
-                fig, ax = plt.subplots(figsize=(fw, fh))
-                plot_takt_wagon_chart(
-                    p, ax=ax, max_zones=None, compact=True,
-                    title=f"{lab} · TD={p.duration:g}",
-                )
-                fig.tight_layout()
-                _fig_to_st(fig)
 
 
 
