@@ -222,6 +222,29 @@ Sumber: [Is Takt Really Magic? (Lean Built)](https://leanbuilt.us/is-takt-really
 
 Zona ↑ dengan lingkup tetap → TT mengecil → TD sedikit turun (diminishing returns).
 
+
+### 6.1c Cara cek kurva TD vs TZ (seperti grafik Lean Built)
+
+Contoh di spreadsheet Lean Built: **TW=7**, **TT=5**, **TZ=2** → Train length = TW×TT = **35**.
+
+**Total konten kerja** (tetap saat TZ diubah-ubah di kurva):
+
+\[ T_0 = TT \\times TZ_{\mathrm{acuan}} = 5 \\times 2 = 10 \]
+
+Untuk setiap jumlah zona \(tz\) di sumbu X:
+
+| Langkah | Rumus | Contoh \(tz=4\) |
+|---------|--------|------------------|
+| 1. TT efektif | \(TT = T_0 / tz\) | 10/4 = 2,5 |
+| 2. **TD teoritis** (biru) | \((TW + tz - 1) \\times TT\) | (7+4−1)×2,5 = **25** |
+| 3. TT dibulatkan | \(\lceil TT \rceil\) | ⌈2,5⌉ = 3 |
+| 4. **TD rounded** (oranye) | \((TW + tz - 1) \\times TT_{\mathrm{round}}\) | 10×3 = **30** |
+
+Cek titik lain: \(tz=1\) → TT=10 → TD=7×10=**70**; \(tz=2\) → TD=8×5=**40**; \(tz=10\) → TD=16×1=**16**. Cocok dengan kurva biru di artikel.
+
+**Penting:** kalau **TT dipasang tetap** (tidak dibagi ke zona), rumus \((TW+TZ-1)×TT\) membuat TD **naik** saat TZ naik. Kurva **turun** hanya jika lingkup kerja tetap → TT mengecil saat zona ditambah (seperti opsi *lingkup tetap* di app).
+
+
 ### 6.1b Peran edukasi
 
 Tab ini adalah **kelanjutan parade tim kerja** dengan kebijakan tetap:
