@@ -175,14 +175,18 @@ def compute_cost_metrics(
     cost_per_period: Sequence[float],
 ) -> CostMetrics:
     """
-    Biaya per tim dari **mulai kerja sampai selesai** (inklusif).
+    Biaya per tim dari **mulai bekerja sampai akhir proyek**.
 
-    - **Periode aktif**: production > 0
-    - **Periode idle**: production = 0 (masih di rentang mulai…selesai)
-    - Jaminan: aktif + idle = waktu di lapangan (finish − start + 1)
-    - Biaya aktif = periode_aktif × tarif
-    - Biaya idle  = periode_idle × tarif
-    - Total tim  = aktif + idle  (= waktu_lapangan × tarif)
+    Window: ``start_period … duration`` (inklusif).
+
+    - **Aktif**: production > 0
+    - **Idle**: production = 0 (menunggu zona, atau sudah selesai kerja
+      sendiri tetapi proyek belum selesai — kru masih dibebankan)
+    - Biaya = periode × tarif/periode
+    - Total proyek = jumlah biaya semua tim
+
+    Dengan ini, skenario berdurasi lebih panjang (variability tinggi,
+    batch lebih besar) menghasilkan **biaya idle & total lebih tinggi**.
     """
     n = result.config.n_trades
     rates = list(cost_per_period)
@@ -190,20 +194,17 @@ def compute_cost_metrics(
         rates.append(float(rates[-1]) if rates else 100.0)
     rates = [max(0.0, float(r)) for r in rates[:n]]
 
-    # production series per period for each trade
-    # history may start at period 1
-    prod_by_period: List[Dict[int, int]] = []  # unused; use dict period->list
+    proj_end = int(result.duration)
     prod_map: Dict[int, List[int]] = {}
     for rec in result.history:
-        p = int(rec.period)
-        prod_map[p] = [int(x) for x in rec.production]
+        prod_map[int(rec.period)] = [int(x) for x in rec.production]
 
     rows: List[TradeCostRow] = []
     for i in range(n):
         m = result.trade_metrics[i]
         start_p = m.start_period
-        fin_p = int(m.periods_to_finish) if m.periods_to_finish else None
-        if start_p is None or fin_p is None:
+        own_fin = int(m.periods_to_finish) if m.periods_to_finish else None
+        if start_p is None:
             rows.append(
                 TradeCostRow(
                     trade_index=i,
@@ -214,20 +215,17 @@ def compute_cost_metrics(
                     cost_active=0.0,
                     cost_idle=0.0,
                     cost_total=0.0,
-                    start_period=start_p,
-                    finish_period=fin_p,
+                    start_period=None,
+                    finish_period=own_fin,
                 )
             )
             continue
 
         start_p = int(start_p)
-        fin_p = int(fin_p)
-        if fin_p < start_p:
-            fin_p = start_p
-
+        end_p = max(proj_end, start_p)
         n_active = 0
         n_idle = 0
-        for p in range(start_p, fin_p + 1):
+        for p in range(start_p, end_p + 1):
             prod = 0
             if p in prod_map and i < len(prod_map[p]):
                 prod = prod_map[p][i]
@@ -235,12 +233,6 @@ def compute_cost_metrics(
                 n_active += 1
             else:
                 n_idle += 1
-
-        # consistency with time_on_site
-        tos = fin_p - start_p + 1
-        if n_active + n_idle != tos:
-            # repair: trust time range count
-            n_idle = max(0, tos - n_active)
 
         ca = n_active * rates[i]
         ci = n_idle * rates[i]
@@ -255,7 +247,7 @@ def compute_cost_metrics(
                 cost_idle=ci,
                 cost_total=ca + ci,
                 start_period=start_p,
-                finish_period=fin_p,
+                finish_period=own_fin,
             )
         )
 

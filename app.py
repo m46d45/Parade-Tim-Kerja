@@ -65,7 +65,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-04-cost-stack-fix-v79"
+_APP_BUILD = "2026-08-04-cost-to-project-end-v80"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -977,7 +977,7 @@ def render_sidebar():
     )
     st.sidebar.divider()
     st.sidebar.markdown("##### Biaya per periode")
-    st.sidebar.caption("Tarif sama untuk periode aktif & idle (setelah tim mulai).")
+    st.sidebar.caption("Tarif/periode · dihitung dari mulai tim sampai akhir proyek (aktif + idle).")
     n_tr = 5
     names = list(DEFAULT_TRADE_NAMES[:n_tr]) if len(DEFAULT_TRADE_NAMES) >= n_tr else [f"Tim {i+1}" for i in range(n_tr)]
     costs = []
@@ -1150,6 +1150,7 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
     for name, r in results.items():
         m = meta.get(name, {})
         ll = littles_law_metrics(r)
+        cm = compute_cost_metrics(r, _trade_costs(n_trades))
         rows.append({
             "Skenario": name,
             "Variability": m.get("var_label", "—"),
@@ -1157,11 +1158,13 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
             "Pace": m.get("pace", r.config.trades[0].label()),
             "Durasi": r.duration,
             "vs Ideal": round(r.duration - r.ideal_duration, 1),
-            "Idle": r.total_idle_capacity,
+            "Idle cap.": r.total_idle_capacity,
             "Puncak WIP": _peak_wip(r),
-            "Biaya aktif": round(compute_cost_metrics(r, _trade_costs(n_trades)).total_active, 0),
-            "Biaya idle": round(compute_cost_metrics(r, _trade_costs(n_trades)).total_idle, 0),
-            "Total biaya": round(compute_cost_metrics(r, _trade_costs(n_trades)).total_cost, 0),
+            "Periode aktif": sum(t.periods_active for t in cm.trades),
+            "Periode idle": sum(t.periods_idle for t in cm.trades),
+            "Biaya aktif": round(cm.total_active, 0),
+            "Biaya idle": round(cm.total_idle, 0),
+            "Total biaya": round(cm.total_cost, 0),
             "TH": round(ll.throughput, 3),
             "WIP⌀": round(ll.avg_pipeline_wip, 2),
             "CT": round(ll.cycle_time_pipeline, 2),
