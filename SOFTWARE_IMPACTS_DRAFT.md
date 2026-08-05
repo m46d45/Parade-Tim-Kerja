@@ -41,7 +41,7 @@ Telephone: [+xx …].
 
 ## Abstract
 
-Parade Tim Kerja (“Work-Team Parade”) is an open-source, browser-based simulator for teaching and exploring project-production behaviour in construction. The tool implements a zone-flow *parade of trades* model for a five-trade concrete floor cycle: sequential crews advance across spatial zones under capacity limits, batch handoff policies, and optional per-zone production variability. Learners obtain Line of Balance charts, work-in-process (WIP) trajectories, utilisation, active/idle labour-cost metrics, and multi-scenario comparisons without installing local software. Built-in analytics connect simulation outcomes to Little’s Law, Kingman’s VUT approximation, inventory–fill-rate trade-offs, and an educational takt-planning module that separates physical *bays* from planning *zones* on a fixed floor area. Results export to CSV/Excel for classroom reporting. The software is implemented in Python with a Streamlit interface, documented with an Indonesian teaching manual, and released publicly for reuse in civil engineering education, Lean Construction workshops, and reproducible classroom experiments on workflow variability and handoff batch size.
+Parade Tim Kerja (“Work-Team Parade”) is an open-source, browser-based simulator for teaching and exploring project-production behaviour in construction. Building on the Parade of Trades / Parade Game tradition of Tommelein and colleagues, the tool implements a zone-flow *parade of trades* model for a five-trade concrete floor cycle: sequential crews advance across spatial zones under capacity limits, batch handoff policies, and optional per-zone production variability. Learners obtain Line of Balance charts, work-in-process (WIP) trajectories, utilisation, active/idle labour-cost metrics, and multi-scenario comparisons without installing local software. Built-in analytics connect simulation outcomes to Little’s Law, Kingman’s VUT approximation, inventory–fill-rate trade-offs, and an educational takt-planning module that separates physical *bays* from planning *zones* on a fixed floor area. Results export to CSV/Excel for classroom reporting. The software is implemented in Python with a Streamlit interface, documented with an Indonesian teaching manual, and released publicly for reuse in civil engineering education, Lean Construction workshops, and reproducible classroom experiments on workflow variability and handoff batch size.
 
 **Word count (abstract):** ≈168 (≤250 required).
 
@@ -79,11 +79,30 @@ Caption idea: *Parade Tim Kerja connects zone-flow simulation, production analyt
 
 Construction production systems are chains of specialised trades that hand work to one another across space and time. When upstream production is variable or handoffs are batched, downstream crews starve or wait, project duration grows, work-in-process (WIP) accumulates, and labour spends non-productive time on site. These mechanisms are central to Lean Construction and project production management, yet they remain difficult to *experience* in a lecture: spreadsheet demos are opaque, and paper-based parade games do not scale to multi-metric comparison, cost, or takt arithmetic in one session.
 
-The classic *parade of trades* / Parade Game pedagogy [1] established that workflow variability and trade interdependence drive system performance more than local productivity alone. Factory Physics and related production theory formalise the same ideas through Little’s Law, utilisation–variability–time (VUT) relationships, and inventory–service trade-offs [2,3]. In parallel, takt planning translates customer demand and available time into a production beat and zone structure for construction [4,5]. Educators need a single, transparent, open tool that (i) runs a zone-flow parade with controllable capacity, variability, and batch handoff; (ii) visualises Line of Balance (LOB), WIP, and utilisation; (iii) links outcomes to production laws; and (iv) introduces takt decisions (bays versus zones, time per floor) without requiring learners to install a programming stack.
+The classic *parade of trades* / Parade Game pedagogy of Tommelein and colleagues [1] established that workflow variability and trade interdependence drive system performance more than local productivity alone. That pedagogy was embodied not only as a physical dice game but also as a **computer-based Parade of Trades** implementation (Visual Basic; Choo and Tommelein [10]) and in related discrete-event studies [1]. **Parade Tim Kerja is developed from that foundation**: it reuses the scientific core of a sequential trade parade under variability, then extends it for modern classroom analytics.
 
-**Parade Tim Kerja** addresses that gap. It provides:
+### Differentiation versus the original Parade of Trades software
 
-1. An open, reproducible **zone-flow engine** for a five-trade concrete floor cycle (formwork, rebar, pour, strip, finish), with seedable variability and configurable batch handoff (including one-piece flow).  
+| Dimension | Tommelein Parade of Trades (game / VB computer game) [1,10] | **Parade Tim Kerja (this work)** |
+|-----------|------------------------------------------------------------|----------------------------------|
+| Purpose | Show impact of work-flow variability & dependence | Same core lesson **plus** multi-metric production analysis, cost, comparison, takt |
+| Delivery | Dice game; legacy Visual Basic desktop app | **Open-source** Python; **browser** (Streamlit); no learner install |
+| Spatial model | Parade / production steps in the game tradition | Explicit **zone-flow** (5-trade floor cycle) + **batch handoff** (incl. OPF) |
+| Variability | Dice / scenario-based teaching design | Seedable **per-zone** variability; reproducible runs |
+| Analytics | Game outcomes / classic result plots | **LOB**, buffer **WIP**, **utilisation**, multi-scenario overlays |
+| Cost | Not central to the original teaching software | **Active vs idle labour cost** per trade and totals |
+| Theory links | Variability & dependence insight | **Little’s Law**, **Kingman/VUT**, inventory–fill-rate views |
+| Takt / zoning | Outside original Parade software scope | **Takt module**: bays ≠ zones, discrete TZ, time/floor, wagon chart |
+| Comparison | Often single-run / group experience | Built-in **2–5 scenario** comparison |
+| Export & docs | Game instructions / technical reports | **CSV/Excel** + Indonesian **teaching manual** |
+
+**Strengths of this software** relative to the original Parade of Trades computer game are therefore: open web delivery; zone-flow and batch controls; LOB/WIP/utilisation and idle-cost accounting; explicit Factory Physics-style bridges; educational takt planning; multi-scenario comparison; and classroom export—while **preserving** Tommelein’s parade insight rather than replacing it.
+
+Factory Physics formalises related ideas through Little’s Law and VUT-type relationships [2,3]; takt planning adds demand-driven zoning [4,5]. Educators need one transparent tool that keeps the Tommelein lesson **and** integrates those analytics without a local programming stack.
+
+**Parade Tim Kerja** addresses that combined need. It provides:
+
+1. An open, reproducible **zone-flow engine**—in the Tommelein parade tradition [1,10]—for a five-trade concrete floor cycle (formwork, rebar, pour, strip, finish), with seedable variability and configurable batch handoff (including one-piece flow).  
 2. **Classroom analytics**: LOB, buffer WIP, utilisation, active/idle cost, multi-scenario comparison (2–5 scenarios), and export to CSV/Excel.  
 3. **Theory bridges**: Little’s Law / WIP–throughput–cycle-time views, Kingman-style VUT intuition, and inventory–fill-rate charts.  
 4. A **takt-plan module** grounded in a fixed floor geometry (360 m², 3×3 m bays → 40 bays) where *bay ≠ zone*; learners choose discrete zone counts {1, 5, 10, 20, 40}, capacity in bays/day, and owner time per floor, then compute train duration \(TD = (TW + TZ - 1) \times t_e\) with \(TW = 5\).  
@@ -151,7 +170,7 @@ Fig. 1 shows a representative LOB under variability. Fig. 2 shows a takt wagon c
 
 ### 3.1. Research and educational challenge addressed
 
-The software operationalises parade-of-trades dynamics and production laws in a form suitable for **repeatable classroom experiments** and **exploratory analysis** of variability, batch handoff, labour idle cost, and takt zone granularity—problems that are otherwise taught only qualitatively or with one-off spreadsheets.
+Building on Tommelein’s Parade of Trades [1,10], the software operationalises parade-of-trades dynamics and production laws in a form suitable for **repeatable classroom experiments** and **exploratory analysis** of variability, batch handoff, labour idle cost, and takt zone granularity—problems that are otherwise taught only qualitatively or with one-off spreadsheets.
 
 ### 3.2. Evidence of use and scientific contribution
 
@@ -283,6 +302,8 @@ Simulation outputs are generated at runtime from user parameters and optional ra
 [8] [PLACEHOLDER — Your peer-reviewed article that used Parade Tim Kerja, full citation with DOI.]
 
 [9] Lean Built, Is takt really magic? https://leanbuilt.us/is-takt-really-magic/ (accessed 5 August 2026).
+
+[10] H.J. Choo, I.D. Tommelein, Parade of Trades: A Computer Game for Understanding Variability and Dependence, Technical Report 99-1, Construction Engineering and Management Program, Department of Civil and Environmental Engineering, University of California, Berkeley, September 1999. http://p2sl.berkeley.edu/wp-content/uploads/2020/03/Choo_Tommelein_1999_Parade_of_Trades.pdf
 
 ---
 
