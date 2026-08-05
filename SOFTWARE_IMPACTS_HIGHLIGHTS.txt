@@ -1,0 +1,5 @@
+- Open Streamlit simulator of zone-flow parade for floor-cycle concrete work
+- Links capacity, variability, and batch handoff to LOB, WIP, cost, and util.
+- Embeds Little's Law, Kingman VUT, and inventory-fill-rate classroom charts
+- Takt module maps 3x3 m bays to discrete zones and owner time per floor
+- Browser demo and CSV/Excel export; no learner-side Python install required
