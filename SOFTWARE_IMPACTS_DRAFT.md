@@ -1,5 +1,8 @@
 # Software Impacts — Original Software Publication (OSP) Draft
 
+> **DOCX available:** `SOFTWARE_IMPACTS_OSP_Draft.docx` (OSP-structured Word draft).  
+> Still paste into Elsevier’s official **SIMPAC_OSP_Template.docx** if Editorial Manager requires the branded template.
+
 > **How to use this file**  
 > 1. Copy sections into Elsevier’s official **SIMPAC OSP template**  
 >    (Word: `SIMPAC_OSP_Template.docx` or LaTeX from the [Guide for Authors](https://www.sciencedirect.com/journal/software-impacts/publish/guide-for-authors)).  
