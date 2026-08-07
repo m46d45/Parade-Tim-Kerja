@@ -1,21 +1,20 @@
-# Landing page Vercel
+# Landing page Vercel (static)
 
-Halaman statis di root (`index.html`) untuk deploy ke **Vercel**.  
-Simulasi interaktif tetap di **Streamlit Cloud**: https://parade-tim-kerja.streamlit.app/
+Simulasi interaktif: https://parade-tim-kerja.streamlit.app/  
+Landing statis: folder `public/` (bukan Python).
 
-## Deploy (dashboard — disarankan)
+## Pengaturan Vercel (penting)
 
-1. Buka https://vercel.com/new  
-2. Import repo **m46d45/Parade-Tim-Kerja**  
-3. Framework Preset: **Other**  
-4. Build Command: *(kosong)*  
-5. Output Directory: *(kosong / `.`)*  
-6. Root Directory: `.`  
-7. Deploy  
+| Setting | Nilai |
+|---------|--------|
+| Framework Preset | **Other** |
+| Root Directory | `.` (repo root) |
+| Install Command | *otomatis dari vercel.json* (skip) |
+| Build Command | *skip* |
+| Output Directory | **`public`** |
 
-Vercel akan menyajikan `index.html` + folder `assets/`.
+Jangan pilih preset **Python** — app Streamlit tidak di-host di Vercel.
 
-## Catatan
+## Redeploy
 
-- File `app.py` / Python **tidak** dijalankan di Vercel.  
-- Streamlit Cloud tetap memakai `app.py` seperti biasa (abaikan `index.html`).  
+Push ke `main` memicu redeploy jika repo sudah di-import di Vercel.

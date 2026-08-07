@@ -1,0 +1,11 @@
+__pycache__
+*.pyc
+.git
+output
+.streamlit
+*.docx
+SOFTWARE_IMPACTS_*
+test_*.py
+parade_of_trades_*.py
+app.py
+scripts
