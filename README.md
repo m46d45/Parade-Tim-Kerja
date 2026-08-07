@@ -4,7 +4,8 @@ Simulasi **Lean Construction** interaktif untuk belajar dampak *variability* dan
 
 Berdasarkan karya **Iris D. Tommelein** dkk. (UC Berkeley), dengan konteks **floor cycle beton Indonesia** (5 trade).
 
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/)
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://parade-tim-kerja.streamlit.app/)
+[![GitHub](https://img.shields.io/badge/GitHub-Parade--Tim--Kerja-181717?logo=github)](https://github.com/m46d45/Parade-Tim-Kerja)
 <!-- Setelah deploy: ganti URL badge di atas dengan link app Anda, contoh:
 https://YOUR-APP-NAME.streamlit.app
 -->
@@ -13,8 +14,9 @@ https://YOUR-APP-NAME.streamlit.app
 
 > Setelah deploy ke Streamlit Community Cloud, taruh link publik di sini:
 >
-> **🌐 App:** *https://xxxx.streamlit.app*  
-> **📖 Manual belajar:** buka tab **Manual** di dalam app
+> **🌐 Simulasi (Streamlit):** https://parade-tim-kerja.streamlit.app/  
+> **🏠 Landing (Vercel):** hubungkan repo ini ke Vercel → menyajikan `index.html`  
+> **📖 Manual:** tab **Manual** di dalam app
 
 Mahasiswa **tidak perlu menginstal Python** — cukup buka link di browser.
 

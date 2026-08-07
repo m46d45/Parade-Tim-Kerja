@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Parade Tim Kerja — Simulasi Lean Construction</title>
+  <meta name="description" content="Simulasi daring parade tim kerja untuk pembelajaran Lean Construction: variability, handoff, WIP, biaya idle, dan takt plan." />
+  <meta property="og:title" content="Parade Tim Kerja" />
+  <meta property="og:description" content="Simulasi zone-flow & takt plan untuk pendidikan konstruksi. Gratis di browser." />
+  <meta property="og:type" content="website" />
+  <link rel="icon" href="/assets/logo_icon.png" type="image/png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0c1222;
+      --bg2: #141c2f;
+      --card: rgba(255,255,255,0.04);
+      --border: rgba(255,255,255,0.10);
+      --text: #e8eef8;
+      --muted: #94a3b8;
+      --accent: #3b82f6;
+      --accent2: #f59e0b;
+      --ok: #22c55e;
+      --t1: #2563eb; --t2: #eab308; --t3: #16a34a; --t4: #dc2626; --t5: #7c3aed;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "DM Sans", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.55;
+    }
+    body::before {
+      content: "";
+      position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background:
+        radial-gradient(900px 500px at 10% -10%, rgba(37,99,235,.28), transparent 55%),
+        radial-gradient(700px 400px at 90% 10%, rgba(124,58,237,.18), transparent 50%),
+        radial-gradient(600px 400px at 50% 100%, rgba(22,163,74,.10), transparent 45%);
+    }
+    .wrap { position: relative; z-index: 1; max-width: 920px; margin: 0 auto; padding: 2rem 1.25rem 3.5rem; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 2.5rem; }
+    .brand { display: flex; align-items: center; gap: .75rem; text-decoration: none; color: inherit; }
+    .brand img { width: 48px; height: 48px; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.35); }
+    .brand span { font-weight: 700; font-size: 1.05rem; letter-spacing: -.02em; }
+    .gh {
+      color: var(--muted); text-decoration: none; font-size: .9rem; font-weight: 500;
+      border: 1px solid var(--border); padding: .45rem .85rem; border-radius: 999px;
+      transition: color .15s, border-color .15s, background .15s;
+    }
+    .gh:hover { color: var(--text); border-color: rgba(255,255,255,.25); background: var(--card); }
+    .hero { text-align: center; padding: 1rem 0 2rem; }
+    .pills { display: flex; flex-wrap: wrap; gap: .4rem; justify-content: center; margin-bottom: 1.25rem; }
+    .pill {
+      font-size: .72rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+      color: var(--muted); border: 1px solid var(--border); padding: .3rem .65rem; border-radius: 999px;
+      background: var(--card);
+    }
+    h1 {
+      font-family: "Instrument Serif", Georgia, serif;
+      font-weight: 400; font-size: clamp(2.1rem, 5.5vw, 3.15rem);
+      line-height: 1.12; letter-spacing: -.02em; margin-bottom: 1rem;
+    }
+    h1 em { font-style: italic; color: #93c5fd; }
+    .lead {
+      max-width: 36rem; margin: 0 auto 1.75rem; color: var(--muted); font-size: 1.05rem;
+    }
+    .cta-row { display: flex; flex-wrap: wrap; gap: .75rem; justify-content: center; margin-bottom: .75rem; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: .45rem;
+      font-weight: 600; font-size: 1rem; text-decoration: none; border-radius: 12px;
+      padding: .85rem 1.35rem; transition: transform .12s, box-shadow .12s, background .12s;
+    }
+    .btn:active { transform: scale(.98); }
+    .btn-primary {
+      color: #0b1220; background: linear-gradient(180deg, #60a5fa, #3b82f6);
+      box-shadow: 0 8px 28px rgba(59,130,246,.35);
+    }
+    .btn-primary:hover { box-shadow: 0 10px 32px rgba(59,130,246,.5); }
+    .btn-ghost {
+      color: var(--text); border: 1px solid var(--border); background: var(--card);
+    }
+    .btn-ghost:hover { border-color: rgba(255,255,255,.28); }
+    .note { font-size: .85rem; color: var(--muted); }
+    .note a { color: #93c5fd; }
+    .teams {
+      display: flex; justify-content: center; gap: .45rem; flex-wrap: wrap;
+      margin: 2rem 0 2.5rem;
+    }
+    .team {
+      width: 2.5rem; height: 2.5rem; border-radius: 10px; display: grid; place-items: center;
+      font-size: .72rem; font-weight: 800; color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,.25);
+    }
+    .team.t1 { background: var(--t1); } .team.t2 { background: var(--t2); color: #1a1200; }
+    .team.t3 { background: var(--t3); } .team.t4 { background: var(--t4); } .team.t5 { background: var(--t5); }
+    .grid {
+      display: grid; gap: 1rem;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 640px) { .grid { grid-template-columns: 1fr 1fr; } }
+    @media (min-width: 900px) { .grid.three { grid-template-columns: 1fr 1fr 1fr; } }
+    .card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+      padding: 1.15rem 1.2rem; text-align: left;
+    }
+    .card h3 { font-size: .95rem; margin-bottom: .35rem; font-weight: 650; }
+    .card p { font-size: .88rem; color: var(--muted); }
+    .section-title {
+      font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+      color: var(--muted); margin: 0 0 1rem; text-align: center;
+    }
+    footer {
+      margin-top: 2.75rem; padding-top: 1.5rem; border-top: 1px solid var(--border);
+      text-align: center; font-size: .8rem; color: var(--muted);
+    }
+    footer a { color: #93c5fd; text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <a class="brand" href="/">
+        <img src="/assets/logo_icon.png" width="48" height="48" alt="Logo Parade Tim Kerja" />
+        <span>Parade Tim Kerja</span>
+      </a>
+      <a class="gh" href="https://github.com/m46d45/Parade-Tim-Kerja" target="_blank" rel="noopener">GitHub</a>
+    </header>
+
+    <main class="hero">
+      <div class="pills">
+        <span class="pill">Lean Construction</span>
+        <span class="pill">Zone-flow</span>
+        <span class="pill">Takt plan</span>
+        <span class="pill">Gratis · browser</span>
+      </div>
+      <h1>Simulasi <em>parade tim kerja</em><br />untuk pembelajaran produksi konstruksi</h1>
+      <p class="lead">
+        Amati dampak variabilitas, serah terima antar tim, dan zonasi terhadap durasi,
+        antrean kerja (WIP), utilisasi, serta biaya idle — tanpa instalasi software.
+      </p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="https://parade-tim-kerja.streamlit.app/" target="_blank" rel="noopener">
+          Buka simulasi
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/m46d45/Parade-Tim-Kerja" target="_blank" rel="noopener">
+          Kode sumber
+        </a>
+      </div>
+      <p class="note">
+        Simulasi berjalan di Streamlit Cloud ·
+        <a href="https://parade-tim-kerja.streamlit.app/" target="_blank" rel="noopener">parade-tim-kerja.streamlit.app</a>
+      </p>
+
+      <div class="teams" aria-hidden="true">
+        <div class="team t1">T1</div>
+        <div class="team t2">T2</div>
+        <div class="team t3">T3</div>
+        <div class="team t4">T4</div>
+        <div class="team t5">T5</div>
+      </div>
+    </main>
+
+    <p class="section-title">Fitur utama</p>
+    <div class="grid three">
+      <div class="card">
+        <h3>Simulasi zone-flow</h3>
+        <p>Lima tim sekuensial (bekisting → finishing). Atur kapasitas, variability, dan batch handoff.</p>
+      </div>
+      <div class="card">
+        <h3>Analitik produksi</h3>
+        <p>Line of Balance, WIP, utilisasi, biaya aktif/idle, serta perbandingan multi-skenario.</p>
+      </div>
+      <div class="card">
+        <h3>Takt plan</h3>
+        <p>Bay 3×3 m vs zona perencanaan, waktu per lantai, dan wagon chart untuk pembelajaran takt.</p>
+      </div>
+    </div>
+
+    <p class="section-title" style="margin-top:2rem">Untuk siapa</p>
+    <div class="grid">
+      <div class="card">
+        <h3>Mahasiswa & dosen</h3>
+        <p>Praktikum manajemen konstruksi / Lean — eksperimen terkontrol dengan seed dan ekspor CSV/Excel.</p>
+      </div>
+      <div class="card">
+        <h3>Workshop & praktisi</h3>
+        <p>Demo interaktif dampak variability dan ukuran batch tanpa spreadsheet rumit.</p>
+      </div>
+    </div>
+
+    <p class="section-title" style="margin-top:2rem">Dasar ilmiah</p>
+    <div class="card" style="text-align:left">
+      <p style="color:var(--muted);font-size:.9rem">
+        Dikembangkan dari tradisi <strong style="color:var(--text)">Parade of Trades / Parade Game</strong>
+        (Tommelein dkk.), dilengkapi metrik produksi (Little’s Law, utilisasi, biaya idle) dan modul takt edukatif.
+        Bukan pengganti game fisik, melainkan perluasan untuk kelas berbasis browser.
+      </p>
+    </div>
+
+    <footer>
+      <p>
+        Open source ·
+        <a href="https://github.com/m46d45/Parade-Tim-Kerja">m46d45/Parade-Tim-Kerja</a>
+        · Landing di Vercel · App di Streamlit
+      </p>
+    </footer>
+  </div>
+</body>
+</html>
