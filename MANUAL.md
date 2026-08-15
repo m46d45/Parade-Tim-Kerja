@@ -88,6 +88,14 @@ Default **4**; **1** = one-piece flow.
 
 ---
 
+## 3.5 Tab Statistik
+
+Menampilkan **kunjungan** (landing + aplikasi) dan **berapa kali simulasi dijalankan** (tab Simulasi + Perbandingan). Angka agregat, tanpa data pribadi.
+
+- Unik landing = satu perangkat/browser (localStorage).
+- Sesi aplikasi = setiap buka Streamlit.
+- Simulasi dihitung saat tombol **Jalankan** berhasil.
+
 ## 4. Tab Simulasi
 
 1. Mode kapasitas: seragam atau per tim.  

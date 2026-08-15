@@ -197,6 +197,25 @@
       </div>
     </div>
 
+    <p class="section-title" style="margin-top:2rem">Penggunaan</p>
+    <div class="grid three" id="usage-stats">
+      <div class="card">
+        <h3>Kunjungan landing</h3>
+        <p id="stat-landing">…</p>
+      </div>
+      <div class="card">
+        <h3>Pengunjung unik</h3>
+        <p id="stat-unique">…</p>
+      </div>
+      <div class="card">
+        <h3>Simulasi dijalankan</h3>
+        <p id="stat-sim">…</p>
+      </div>
+    </div>
+    <p class="note" style="text-align:center;margin-top:.75rem">
+      Angka agregat, tanpa data pribadi. Simulasi dihitung di aplikasi.
+    </p>
+
     <p class="section-title" style="margin-top:2rem">Dasar ilmiah</p>
     <div class="card" style="text-align:left">
       <p style="color:var(--muted);font-size:.9rem">
@@ -214,5 +233,40 @@
       </p>
     </footer>
   </div>
+  <script>
+  (function () {
+    var NS = "parade-tim-kerja.app";
+    var API = "https://counterapi.com/api/" + NS + "/view/";
+    function get(key, readOnly) {
+      var url = API + encodeURIComponent(key) + (readOnly ? "?readOnly=true" : "");
+      return fetch(url, { cache: "no-store" }).then(function (r) { return r.json(); })
+        .then(function (d) { return (d && d.value) || 0; })
+        .catch(function () { return 0; });
+    }
+    function setText(id, n) {
+      var el = document.getElementById(id);
+      if (el) el.textContent = String(n);
+    }
+    var uidKey = "ptk_uid";
+    var first = !localStorage.getItem(uidKey);
+    if (first) {
+      try { localStorage.setItem(uidKey, (crypto.randomUUID && crypto.randomUUID()) || String(Date.now())); } catch (e) {}
+    }
+    var incVisit = get("landing_visits", false);
+    var incUnique = first ? get("landing_unique", false) : Promise.resolve(null);
+    Promise.all([incVisit, incUnique]).then(function () {
+      return Promise.all([
+        get("landing_visits", true),
+        get("landing_unique", true),
+        get("sim_runs", true),
+        get("compare_runs", true)
+      ]);
+    }).then(function (vals) {
+      setText("stat-landing", vals[0]);
+      setText("stat-unique", vals[1]);
+      setText("stat-sim", (vals[2] || 0) + (vals[3] || 0));
+    });
+  })();
+  </script>
 </body>
 </html>

@@ -14,6 +14,7 @@ import streamlit.components.v1 as components
 import parade_of_trades_analysis as _a
 import parade_of_trades_core as _c
 import parade_of_trades_plots as _p
+import usage_stats as _stats
 
 _c = importlib.reload(_c)
 _p = importlib.reload(_p)
@@ -66,7 +67,7 @@ from parade_of_trades_plots import (
     plot_utilization,
 )
 
-_APP_BUILD = "2026-08-05-wagon-no-legend-v100"
+_APP_BUILD = "2026-08-15-usage-stats-v101"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1004,7 +1005,92 @@ def render_sidebar():
             key=f"cost_t{i}",
         )))
     st.session_state["trade_costs"] = costs
+    _render_sidebar_stats()
     return int(total_units), seed, 5
+
+
+def _cached_totals(*, force: bool = False) -> dict:
+    import time
+    now = time.time()
+    if (
+        not force
+        and st.session_state.get("_stats_cache")
+        and now - float(st.session_state.get("_stats_ts", 0)) < 45
+    ):
+        return st.session_state["_stats_cache"]
+    s = _stats.totals()
+    st.session_state["_stats_cache"] = s
+    st.session_state["_stats_ts"] = now
+    return s
+
+
+def _track_app_visit() -> None:
+    if st.session_state.get("_visit_logged"):
+        return
+    st.session_state["_visit_logged"] = True
+    try:
+        _stats.increment(_stats.KEY_APP_VISITS)
+        _stats.increment(_stats.KEY_APP_SESSIONS)
+        st.session_state.pop("_stats_cache", None)
+    except Exception:
+        pass
+
+
+def _track_sim_run(kind: str = "sim") -> None:
+    key = _stats.KEY_COMPARE_RUNS if kind == "compare" else _stats.KEY_SIM_RUNS
+    try:
+        _stats.increment(key)
+        st.session_state["_sess_runs"] = int(st.session_state.get("_sess_runs", 0)) + 1
+        st.session_state.pop("_stats_cache", None)
+    except Exception:
+        pass
+
+
+def _render_sidebar_stats() -> None:
+    s = _cached_totals()
+    st.sidebar.divider()
+    st.sidebar.markdown("##### Penggunaan")
+    c1, c2 = st.sidebar.columns(2)
+    c1.metric("Kunjungan", f"{s['total_visits']}")
+    c2.metric("Simulasi", f"{s['total_simulations']}")
+    st.sidebar.caption("Total kunjungan (landing + app) dan jumlah simulasi yang dijalankan.")
+
+
+def tab_stats() -> None:
+    st.subheader("Statistik penggunaan")
+    st.caption(
+        "Angka bersifat agregat (tanpa data pribadi). "
+        "Kunjungan landing dihitung per buka halaman; unik landing = per perangkat (browser). "
+        "Sesi aplikasi = setiap buka tab Streamlit. Simulasi = tombol Jalankan yang berhasil."
+    )
+    s = _cached_totals()
+    a, b, c, d = st.columns(4)
+    a.metric("Kunjungan landing", f"{s.get('landing_visits', 0)}")
+    b.metric("Pengunjung landing (unik)", f"{s.get('landing_unique', 0)}")
+    c.metric("Kunjungan aplikasi", f"{s.get('app_visits', 0)}")
+    d.metric("Sesi aplikasi", f"{s.get('app_sessions', 0)}")
+    e, f, g = st.columns(3)
+    e.metric("Simulasi (tab Simulasi)", f"{s.get('sim_runs', 0)}")
+    f.metric("Perbandingan", f"{s.get('compare_runs', 0)}")
+    g.metric("Total simulasi dijalankan", f"{s['total_simulations']}")
+
+    sess = int(st.session_state.get("_sess_runs", 0))
+    st.caption(f"Simulasi di sesi Anda saat ini: **{sess}**.")
+
+    rows = [
+        {"Metrik": "Kunjungan landing", "Jumlah": s.get("landing_visits", 0)},
+        {"Metrik": "Pengunjung unik (landing, per perangkat)", "Jumlah": s.get("landing_unique", 0)},
+        {"Metrik": "Kunjungan aplikasi Streamlit", "Jumlah": s.get("app_visits", 0)},
+        {"Metrik": "Sesi aplikasi", "Jumlah": s.get("app_sessions", 0)},
+        {"Metrik": "Run tab Simulasi", "Jumlah": s.get("sim_runs", 0)},
+        {"Metrik": "Run tab Perbandingan", "Jumlah": s.get("compare_runs", 0)},
+        {"Metrik": "Total run simulasi", "Jumlah": s["total_simulations"]},
+    ]
+    st.dataframe(rows, use_container_width=True, hide_index=True)
+    if st.button("Muat ulang angka", key="stats_refresh"):
+        _cached_totals(force=True)
+        st.rerun()
+
 
 
 # ----- Tabs -----------------------------------------------------------------
@@ -1023,6 +1109,7 @@ def tab_single_run(total_units: int, seed: Optional[int], n_trades: int) -> None
         cfg = _build_config_from_pairs(pairs, total_units, seed)
         try:
             st.session_state.single_result = ParadeOfTrades(cfg).run()
+            _track_sim_run("sim")
         except RuntimeError as exc:
             st.error(f"Simulasi gagal: {exc}")
 
@@ -1155,6 +1242,7 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
         if results:
             st.session_state.cmp_multi = results
             st.session_state.cmp_meta = meta
+            _track_sim_run("compare")
 
     if "cmp_multi" not in st.session_state:
         return
@@ -1557,9 +1645,10 @@ def tab_manual() -> None:
 
 
 def main() -> None:
+    _track_app_visit()
     total_units, seed, n_trades = render_sidebar()
     _render_header()
-    tabs = st.tabs(["Simulasi", "Perbandingan", "Takt plan", "Manual"])
+    tabs = st.tabs(["Simulasi", "Perbandingan", "Takt plan", "Statistik", "Manual"])
     with tabs[0]:
         tab_single_run(total_units, seed, n_trades)
     with tabs[1]:
@@ -1567,6 +1656,8 @@ def main() -> None:
     with tabs[2]:
         tab_takt(total_units, seed, n_trades)
     with tabs[3]:
+        tab_stats()
+    with tabs[4]:
         tab_manual()
 
 
