@@ -72,7 +72,7 @@ from parade_of_trades_plots import (
     plot_time_inventory_pareto,
 )
 
-_APP_BUILD = "2026-08-28-buffer-tab-v102"
+_APP_BUILD = "2026-08-28-buffer-map-fix-v103"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1677,26 +1677,29 @@ def tab_buffer(seed: Optional[int]) -> None:
         )
         b1, b2 = st.columns(2)
         run_one = b1.button("Jalankan", type="primary", use_container_width=True, key="buf_run")
-        run_map = b2.button("Peta 3×3", use_container_width=True, key="buf_map")
+        run_map = b2.button("Peta 3×3", use_container_width=True, key="buf_map_btn")
 
     if run_one:
         try:
-            st.session_state.buf_one = run_time_inventory_buffer(
+            st.session_state.buffer_one_result = run_time_inventory_buffer(
                 die=die, mobilization=mob, total_units=100, seed=seed
             )
-            st.session_state.buf_one_label = f"{die} {mob}"
+            st.session_state.buffer_one_label = f"{die} {mob}"
         except RuntimeError as exc:
             st.error(str(exc))
     if run_map:
         try:
-            st.session_state.buf_map = iris_buffer_sweep(total_units=100, seed=seed)
+            raw = iris_buffer_sweep(total_units=100, seed=seed)
+            st.session_state.buffer_map_rows = [
+                {k: v for k, v in r.items() if k != "result"} for r in raw
+            ]
         except RuntimeError as exc:
             st.error(str(exc))
 
-    one = st.session_state.get("buf_one")
+    one = st.session_state.get("buffer_one_result")
     if one is not None:
         st.divider()
-        st.markdown(f"##### Hasil `{st.session_state.get('buf_one_label', '')}`")
+        st.markdown(f"##### Hasil `{st.session_state.get('buffer_one_label', '')}`")
         c1, c2, c3 = st.columns(3)
         c1.metric("Durasi", f"{one.duration}")
         c2.metric("Time on site", f"{one.total_time_on_site}")
@@ -1706,13 +1709,13 @@ def tab_buffer(seed: Optional[int]) -> None:
         fig.tight_layout()
         _fig_to_st(fig)
 
-    rows = st.session_state.get("buf_map")
+    rows = st.session_state.get("buffer_map_rows")
     if rows:
         st.divider()
         st.markdown("##### Peta time–inventory (kapasitas tetap)")
         fig, ax = plt.subplots(figsize=(9.2, 5.0))
         plot_time_inventory_pareto(
-            rows, ax=ax, highlight=st.session_state.get("buf_one_label")
+            rows, ax=ax, highlight=st.session_state.get("buffer_one_label")
         )
         fig.tight_layout()
         _fig_to_st(fig)
