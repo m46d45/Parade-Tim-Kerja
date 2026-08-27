@@ -84,6 +84,30 @@ class TestTaktStandby(unittest.TestCase):
         self.assertFalse(r.config.takt_enabled)
         self.assertFalse(r.config.same_period_handoff)
 
+    def test_iris_all5_tight_duration_24(self):
+        from parade_of_trades_core import run_time_inventory_buffer
+
+        r = run_time_inventory_buffer("5-5", "0-1-2-3-4", total_units=100, seed=0)
+        self.assertEqual(r.duration, 24)
+        self.assertEqual(r.total_time_on_site, 100)
+        self.assertGreater(r.total_inventory_time, 0)
+
+    def test_iris_looser_start_longer_duration(self):
+        from parade_of_trades_core import run_time_inventory_buffer
+
+        tight = run_time_inventory_buffer("5-5", "0-1-2-3-4", total_units=100, seed=0)
+        wide = run_time_inventory_buffer("5-5", "0-3-6-9-12", total_units=100, seed=0)
+        self.assertGreater(wide.duration, tight.duration)
+        self.assertGreaterEqual(wide.total_inventory_time, tight.total_inventory_time)
+
+    def test_iris_sweep_nine_points(self):
+        from parade_of_trades_core import iris_buffer_sweep
+
+        rows = iris_buffer_sweep(total_units=100, seed=1)
+        self.assertEqual(len(rows), 9)
+        labels = {r["label"] for r in rows}
+        self.assertIn("3-7 0-3-6-9-12", labels)
+
     def test_staggered_mobilization_delays_downstream(self):
         cfg = ParadeConfig.from_pairs(
             [(5, 5)] * 3,

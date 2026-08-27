@@ -1710,3 +1710,66 @@ def plot_single_scenario_lob(
     _apply_axes_style(ax)
     return ax
 
+
+# Iris-style time-inventory buffer scatter (duration vs time-on-site / inventory-time)
+_DIE_STYLE = {
+    "5-5": {"color": "#2563eb", "marker": "s", "label": "5–5 (tanpa variasi)"},
+    "4-6": {"color": "#1d4ed8", "marker": "o", "label": "4–6 (variasi rendah)"},
+    "3-7": {"color": "#1e3a8a", "marker": "D", "label": "3–7 (variasi lebih tinggi)"},
+}
+_DIE_INV_STYLE = {
+    "5-5": {"color": "#b45309", "marker": "s"},
+    "4-6": {"color": "#c2410c", "marker": "o"},
+    "3-7": {"color": "#9a3412", "marker": "D"},
+}
+
+
+def plot_time_inventory_pareto(
+    rows: Sequence[dict],
+    ax: Optional[Axes] = None,
+    highlight: Optional[str] = None,
+) -> Axes:
+    """X = duration; left Y = total time on site; right Y = inventory time."""
+    if ax is None:
+        _, ax = plt.subplots(figsize=(9.2, 5.2))
+    ax_r = ax.twinx()
+    plotted_left = set()
+    for row in rows:
+        die = str(row["die"])
+        lab = str(row["label"])
+        stl = _DIE_STYLE.get(die, {"color": "#334155", "marker": "o", "label": die})
+        inv = _DIE_INV_STYLE.get(die, {"color": "#92400e", "marker": "o"})
+        x = float(row["duration"])
+        y1 = float(row["time_on_site"])
+        y2 = float(row["inventory_time"])
+        s = 90 if highlight and lab == highlight else 55
+        lbl_l = stl["label"] if die not in plotted_left else None
+        plotted_left.add(die)
+        ax.scatter(
+            [x], [y1],
+            c=stl["color"], marker=stl["marker"], s=s,
+            zorder=4, edgecolors="white", linewidths=0.8,
+            label=lbl_l,
+        )
+        ax.annotate(
+            lab, (x, y1), textcoords="offset points", xytext=(4, 4),
+            fontsize=6.5, color="#1e293b",
+        )
+        ax_r.scatter(
+            [x], [y2],
+            c=inv["color"], marker=inv["marker"], s=s,
+            zorder=3, edgecolors="white", linewidths=0.8,
+            label="Inventory time" if die == "5-5" and lab.endswith("0-1-2-3-4") else None,
+        )
+    ax.set_xlabel("Total Duration")
+    ax.set_ylabel("Total Trade Time on Site", color="#1e3a8a")
+    ax_r.set_ylabel("Total Inventory Time", color="#9a3412")
+    ax.tick_params(axis="y", colors="#1e3a8a")
+    ax_r.tick_params(axis="y", colors="#9a3412")
+    ax.grid(True, linestyle="--", alpha=0.45)
+    ax.spines["top"].set_visible(False)
+    h1, l1 = ax.get_legend_handles_labels()
+    h2, l2 = ax_r.get_legend_handles_labels()
+    ax.legend(h1 + h2, l1 + l2, loc="upper left", fontsize=8, framealpha=0.92)
+    return ax
+

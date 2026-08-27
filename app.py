@@ -47,6 +47,10 @@ from parade_of_trades_core import (
     ParadeConfig,
     ParadeOfTrades,
     ParadeResult,
+    IRIS_DICE,
+    IRIS_MOBILIZATION,
+    run_time_inventory_buffer,
+    iris_buffer_sweep,
     )
 from parade_of_trades_plots import (
     plot_buffer_profile,
@@ -65,9 +69,10 @@ from parade_of_trades_plots import (
     plot_takt_wagon_chart,
                 plot_wip_th_ct,
     plot_utilization,
+    plot_time_inventory_pareto,
 )
 
-_APP_BUILD = "2026-08-15-usage-stats-v101"
+_APP_BUILD = "2026-08-28-buffer-tab-v102"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1644,11 +1649,90 @@ def tab_manual() -> None:
     st.caption(f"Build `{_APP_BUILD}` · zone-flow · 5 tim · batch default 4")
 
 
+def tab_buffer(seed: Optional[int]) -> None:
+    """Time–inventory buffer lab (Iris). Mean capacity fixed; no extra crews."""
+    st.subheader("Buffer")
+    st.caption(
+        "Simulasi **time–inventory buffer**. Kapasitas rata-rata tetap (mean 5). "
+        "Yang diubah: kapan tim masuk. Inventory buffer muncul sebagai akibat."
+    )
+    left, right = st.columns([1.15, 1])
+    with left:
+        die = st.selectbox(
+            "Dadu (mean 5)",
+            list(IRIS_DICE.keys()),
+            index=0,
+            format_func=lambda d: {
+                "5-5": "5–5 — tanpa variasi",
+                "4-6": "4–6 — variasi rendah",
+                "3-7": "3–7 — variasi lebih tinggi",
+            }.get(d, d),
+            key="buf_die",
+        )
+        mob = st.selectbox(
+            "Buffer waktu (mobilisasi T1…T5)",
+            list(IRIS_MOBILIZATION.keys()),
+            index=0,
+            key="buf_mob",
+        )
+        b1, b2 = st.columns(2)
+        run_one = b1.button("Jalankan", type="primary", use_container_width=True, key="buf_run")
+        run_map = b2.button("Peta 3×3", use_container_width=True, key="buf_map")
+
+    if run_one:
+        try:
+            st.session_state.buf_one = run_time_inventory_buffer(
+                die=die, mobilization=mob, total_units=100, seed=seed
+            )
+            st.session_state.buf_one_label = f"{die} {mob}"
+        except RuntimeError as exc:
+            st.error(str(exc))
+    if run_map:
+        try:
+            st.session_state.buf_map = iris_buffer_sweep(total_units=100, seed=seed)
+        except RuntimeError as exc:
+            st.error(str(exc))
+
+    one = st.session_state.get("buf_one")
+    if one is not None:
+        st.divider()
+        st.markdown(f"##### Hasil `{st.session_state.get('buf_one_label', '')}`")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Durasi", f"{one.duration}")
+        c2.metric("Time on site", f"{one.total_time_on_site}")
+        c3.metric("Inventory time", f"{one.total_inventory_time}")
+        fig, ax = plt.subplots(figsize=(8.5, 3.8))
+        plot_line_of_balance(one, ax=ax, title="Line of Balance")
+        fig.tight_layout()
+        _fig_to_st(fig)
+
+    rows = st.session_state.get("buf_map")
+    if rows:
+        st.divider()
+        st.markdown("##### Peta time–inventory (kapasitas tetap)")
+        fig, ax = plt.subplots(figsize=(9.2, 5.0))
+        plot_time_inventory_pareto(
+            rows, ax=ax, highlight=st.session_state.get("buf_one_label")
+        )
+        fig.tight_layout()
+        _fig_to_st(fig)
+        table = [
+            {
+                "Skenario": r["label"],
+                "Durasi": r["duration"],
+                "Time on site": r["time_on_site"],
+                "Inventory time": r["inventory_time"],
+            }
+            for r in rows
+        ]
+        st.dataframe(table, use_container_width=True, hide_index=True)
+
+
 def main() -> None:
     _track_app_visit()
     total_units, seed, n_trades = render_sidebar()
     _render_header()
-    tabs = st.tabs(["Simulasi", "Perbandingan", "Takt plan", "Statistik", "Manual"])
+    tabs = st.tabs(["Simulasi", "Perbandingan", "Takt plan", "Buffer", "Statistik", "Manual"])
     with tabs[0]:
         tab_single_run(total_units, seed, n_trades)
     with tabs[1]:
@@ -1656,8 +1740,10 @@ def main() -> None:
     with tabs[2]:
         tab_takt(total_units, seed, n_trades)
     with tabs[3]:
-        tab_stats()
+        tab_buffer(seed)
     with tabs[4]:
+        tab_stats()
+    with tabs[5]:
         tab_manual()
 
 

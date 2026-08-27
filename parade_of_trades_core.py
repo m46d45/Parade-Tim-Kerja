@@ -178,6 +178,10 @@ class ParadeConfig:
     same_period_handoff: bool = False
     # Optional extra gate: trade i may not work before period (i+1).
     staggered_mobilization: bool = False
+    # 0-based start delays (Iris): e.g. (0, 1, 2, 3, 4) or (0, 3, 6, 9, 12).
+    # Trade i may work when period >= offset[i] + 1 (period is 1-indexed).
+    # If set, this overrides the boolean staggered_mobilization pattern.
+    mobilization_offsets: Optional[Tuple[int, ...]] = None
     # Classroom zone-flow model (app default): work zone-by-zone (or batch),
     # variability is per-zone speed, not bulk multi-zone dice.
     zone_flow: bool = False
@@ -194,6 +198,15 @@ class ParadeConfig:
             raise ValueError("standby_capacity must be non-negative")
         if self.batch_size < 1:
             raise ValueError("batch_size must be >= 1")
+        if self.mobilization_offsets is not None:
+            offs = tuple(int(x) for x in self.mobilization_offsets)
+            if len(offs) != self.n_trades:
+                raise ValueError(
+                    f"mobilization_offsets length {len(offs)} != n_trades {self.n_trades}"
+                )
+            if any(x < 0 for x in offs):
+                raise ValueError("mobilization_offsets must be non-negative")
+            self.mobilization_offsets = offs
 
     @property
     def n_trades(self) -> int:
@@ -221,6 +234,8 @@ class ParadeConfig:
             parts.append("handoff=next_period")
         if self.staggered_mobilization:
             parts.append("staggered")
+        if self.mobilization_offsets is not None:
+            parts.append("mob=" + "-".join(str(x) for x in self.mobilization_offsets))
         if self.takt_enabled:
             parts.append(f"takt={self.takt_rate}")
             parts.append(f"standby={self.standby_capacity}")
@@ -238,6 +253,7 @@ class ParadeConfig:
         standby_capacity: int = 0,
         same_period_handoff: bool = False,
         staggered_mobilization: bool = False,
+        mobilization_offsets: Optional[Sequence[int]] = None,
     ) -> "ParadeConfig":
         """
         Build config from named variability preset(s).
@@ -278,6 +294,11 @@ class ParadeConfig:
             standby_capacity=standby_capacity,
             same_period_handoff=same_period_handoff,
             staggered_mobilization=staggered_mobilization,
+            mobilization_offsets=(
+                tuple(int(x) for x in mobilization_offsets)
+                if mobilization_offsets is not None
+                else None
+            ),
         )
         cfg._preset_labels = preset_labels  # type: ignore[attr-defined]
         return cfg
@@ -293,6 +314,7 @@ class ParadeConfig:
         standby_capacity: int = 0,
         same_period_handoff: bool = False,
         staggered_mobilization: bool = False,
+        mobilization_offsets: Optional[Sequence[int]] = None,
         zone_flow: bool = False,
         batch_size: int = 1,
     ) -> "ParadeConfig":
@@ -345,6 +367,11 @@ class ParadeConfig:
             standby_capacity=standby_capacity,
             same_period_handoff=same_period_handoff,
             staggered_mobilization=staggered_mobilization,
+            mobilization_offsets=(
+                tuple(int(x) for x in mobilization_offsets)
+                if mobilization_offsets is not None
+                else None
+            ),
             zone_flow=zone_flow,
             batch_size=batch_size,
         )
@@ -425,6 +452,8 @@ class ParadeResult:
     system_throughput: float  # total_units / duration
     ideal_duration: float  # total_units / mean_capacity of bottleneck (same mean)
     total_standby_used: int = 0
+    total_inventory_time: int = 0  # Σ_t Σ_interfaces WIP(t)
+    total_time_on_site: int = 0  # Σ_trades time_on_site
 
     def to_dict(self) -> dict:
         """JSON-serialisable summary (history included)."""
@@ -436,6 +465,11 @@ class ParadeResult:
             "standby_capacity": self.config.standby_capacity,
             "same_period_handoff": self.config.same_period_handoff,
             "staggered_mobilization": self.config.staggered_mobilization,
+            "mobilization_offsets": (
+                list(self.config.mobilization_offsets)
+                if self.config.mobilization_offsets is not None
+                else None
+            ),
             "trades": [
                 {
                     "name": t.name,
@@ -450,6 +484,8 @@ class ParadeResult:
             "ideal_duration": self.ideal_duration,
             "total_idle_capacity": self.total_idle_capacity,
             "total_standby_used": self.total_standby_used,
+            "total_inventory_time": self.total_inventory_time,
+            "total_time_on_site": self.total_time_on_site,
             "max_buffer": self.max_buffer,
             "trade_metrics": [asdict(m) for m in self.trade_metrics],
             "history": [asdict(h) for h in self.history],
@@ -607,10 +643,13 @@ class ParadeOfTrades:
         return base_capacity + used, used
 
     def _is_mobilized(self, trade_idx: int) -> bool:
-        """Whether trade may work this period (staggered mobilization)."""
+        """Whether trade may work this period (time buffer / delayed start)."""
+        offs = self.config.mobilization_offsets
+        if offs is not None:
+            delay = int(offs[trade_idx]) if trade_idx < len(offs) else 0
+            return self.period >= delay + 1
         if not self.config.staggered_mobilization:
             return True
-        # Trade i mobilizes at the start of period (i + 1)
         return self.period >= (trade_idx + 1)
 
     def step(self) -> PeriodRecord:
@@ -1059,6 +1098,8 @@ class ParadeOfTrades:
 
         duration = self.period
         throughput = total / duration if duration > 0 else 0.0
+        inv_time = sum(sum(rec.buffers) for rec in self.history)
+        tos = sum(m.time_on_site for m in metrics)
 
         return ParadeResult(
             config=self.config,
@@ -1070,6 +1111,8 @@ class ParadeOfTrades:
             system_throughput=throughput,
             ideal_duration=ideal,
             total_standby_used=sum(self._total_standby),
+            total_inventory_time=int(inv_time),
+            total_time_on_site=int(tos),
         )
 
     # -- reporting ----------------------------------------------------------
@@ -1212,6 +1255,75 @@ def run_preset(
     if verbose:
         sim.print_summary(result)
     return result
+
+
+# Iris time-inventory buffer experiment (capacity mean fixed at 5)
+IRIS_DICE: Dict[str, Tuple[int, int]] = {
+    "5-5": (5, 5),
+    "4-6": (4, 6),
+    "3-7": (3, 7),
+}
+IRIS_MOBILIZATION: Dict[str, Tuple[int, ...]] = {
+    "0-1-2-3-4": (0, 1, 2, 3, 4),
+    "0-2-4-6-8": (0, 2, 4, 6, 8),
+    "0-3-6-9-12": (0, 3, 6, 9, 12),
+}
+
+
+def run_time_inventory_buffer(
+    die: str = "5-5",
+    mobilization: str = "0-1-2-3-4",
+    total_units: int = DEFAULT_TOTAL_UNITS,
+    seed: Optional[int] = 42,
+    n_trades: int = 5,
+) -> ParadeResult:
+    """Classic unit-flow run: fixed mean capacity, time-buffer via start delays."""
+    if die not in IRIS_DICE:
+        raise ValueError(f"Unknown die '{die}'. Choose from {list(IRIS_DICE)}")
+    if mobilization not in IRIS_MOBILIZATION:
+        raise ValueError(
+            f"Unknown mobilization '{mobilization}'. Choose from {list(IRIS_MOBILIZATION)}"
+        )
+    lo, hi = IRIS_DICE[die]
+    offs = IRIS_MOBILIZATION[mobilization]
+    if n_trades != 5:
+        step = offs[1] - offs[0] if len(offs) > 1 else 1
+        offs = tuple(i * step for i in range(n_trades))
+    cfg = ParadeConfig.from_pairs(
+        [(lo, hi)] * n_trades,
+        total_units=total_units,
+        seed=seed,
+        same_period_handoff=False,
+        mobilization_offsets=offs,
+        zone_flow=False,
+        batch_size=1,
+    )
+    return ParadeOfTrades(cfg).run()
+
+
+def iris_buffer_sweep(
+    total_units: int = DEFAULT_TOTAL_UNITS,
+    seed: Optional[int] = 42,
+) -> List[Dict[str, object]]:
+    """3 dice × 3 mobilization patterns (mean capacity fixed)."""
+    rows: List[Dict[str, object]] = []
+    for die in IRIS_DICE:
+        for mob in IRIS_MOBILIZATION:
+            r = run_time_inventory_buffer(
+                die=die, mobilization=mob, total_units=total_units, seed=seed
+            )
+            rows.append(
+                {
+                    "die": die,
+                    "mobilization": mob,
+                    "label": f"{die} {mob}",
+                    "duration": r.duration,
+                    "time_on_site": r.total_time_on_site,
+                    "inventory_time": r.total_inventory_time,
+                    "result": r,
+                }
+            )
+    return rows
 
 
 def compare_presets(

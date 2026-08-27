@@ -22,7 +22,17 @@ Panduan untuk mahasiswa, dosen, dan workshop Lean Construction / Project Product
 5. [Biaya aktif & idle](#5-biaya-aktif--idle)
 6. [Tab Perbandingan](#6-tab-perbandingan)
 7. [Tab Takt plan](#7-tab-takt-plan)
-8. [Line of Balance (LOB)](#8-line-of-balance-lob)
+8. [Tab Buffer](#8-tab-buffer)
+9. [Line of Balance (LOB)](#9-line-of-balance-lob)
+10. [Buffer / WIP](#10-buffer--wip)
+11. [Utilisasi](#11-utilisasi)
+12. [Little's Law & kurva WIP–TH–CT](#12-littles-law--kurva-wipthct)
+13. [Kingman (VUT)](#13-kingman-vut)
+14. [Inventory vs fill rate](#14-inventory-vs-fill-rate)
+15. [Unduh data](#15-unduh-data)
+16. [Skenario latihan](#16-skenario-latihan)
+17. [Batasan model](#17-batasan-model)
+18. [Literatur](#18-literatur)
 9. [Buffer / WIP](#9-buffer--wip)
 10. [Utilisasi](#10-utilisasi)
 11. [Little's Law & kurva WIP–TH–CT](#11-littles-law--kurva-wipthct)
@@ -183,49 +193,62 @@ Di sini permintaan = **lantai** (bukan jumlah zona). Waktu diisi **per lantai**.
 
 ---
 
-## 8. Line of Balance (LOB)
+## 8. Tab Buffer
+
+Laboratorium **time–inventory buffer** (Iris Tommelein / PPI). Kapasitas rata-rata **tidak dinaikkan** (mean dadu = 5).
+
+- Dadu: 5–5 / 4–6 / 3–7 (variasi, bukan nambah kru).
+- Mobilisasi: `0-1-2-3-4`, `0-2-4-6-8`, `0-3-6-9-12` = buffer **waktu**.
+- Metrik: durasi, *time on site*, *inventory time* (WIP × periode — akibat tunda).
+- **Jalankan** satu skenario; **Peta 3×3** sembilan titik.
+
+Bukan tab buffer kapasitas. Mode zona di Simulasi tidak berubah.
+
+---
+
+## 9. Line of Balance (LOB)
 
 X = periode, Y = zona kumulatif; mulai (0,0); kemiringan ≈ laju.
 
 ---
 
-## 9. Buffer / WIP
+## 10. Buffer / WIP
 
 WIP antar-tim = zona dilepas hulu, belum dikerjakan hilir.
 
 ---
 
-## 10. Utilisasi
+## 11. Utilisasi
 
 Produksi / kapasitas efektif; idle menurunkan utilisasi.
 
 ---
 
-## 11. Little's Law & kurva WIP–TH–CT
+## 12. Little's Law & kurva WIP–TH–CT
 
 WIP = TH × CT. Batas W_min, W_opt, CONWIP.
 
 ---
 
-## 12. Kingman (VUT)
+## 13. Kingman (VUT)
 
 CT naik tajam saat utilisasi tinggi + variability.
 
 ---
 
-## 13. Inventory vs fill rate
+## 14. Inventory vs fill rate
 
 Tradeoff inventory (Y) vs fill rate (X).
 
 ---
 
-## 14. Unduh data
+## 15. Unduh data
 
 Excel/CSV di Simulasi, Perbandingan, dan (rencana) Takt.
 
 ---
 
-## 15. Skenario latihan
+## 16. Skenario latihan
 
 | # | Setup | Amati |
 |---|--------|--------|
@@ -237,7 +260,7 @@ Excel/CSV di Simulasi, Perbandingan, dan (rencana) Takt.
 
 ---
 
-## 16. Batasan model
+## 17. Batasan model
 
 1. Satu rantai 5 trade.  
 2. Takt: lantai berurutan (bukan paralel multi-tower).  
@@ -246,7 +269,7 @@ Excel/CSV di Simulasi, Perbandingan, dan (rencana) Takt.
 
 ---
 
-## 17. Literatur
+## 18. Literatur
 
 1. Tommelein et al. — Parade Game.  
 2. Hopp & Spearman — *Factory Physics*.  
