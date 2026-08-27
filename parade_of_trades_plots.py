@@ -1713,15 +1713,26 @@ def plot_single_scenario_lob(
 
 # Iris-style time-inventory buffer scatter (duration vs time-on-site / inventory-time)
 _DIE_STYLE = {
-    "5-5": {"color": "#2563eb", "marker": "s", "label": "5–5 (tanpa variasi)"},
-    "4-6": {"color": "#1d4ed8", "marker": "o", "label": "4–6 (variasi rendah)"},
-    "3-7": {"color": "#1e3a8a", "marker": "D", "label": "3–7 (variasi lebih tinggi)"},
+    "5-5": {"color": "#2563eb", "marker": "s", "label": "Time on site · 5–5"},
+    "4-6": {"color": "#06b6d4", "marker": "o", "label": "Time on site · 4–6"},
+    "3-7": {"color": "#7c3aed", "marker": "D", "label": "Time on site · 3–7"},
 }
 _DIE_INV_STYLE = {
-    "5-5": {"color": "#b45309", "marker": "s"},
-    "4-6": {"color": "#c2410c", "marker": "o"},
-    "3-7": {"color": "#9a3412", "marker": "D"},
+    "5-5": {"color": "#f59e0b", "marker": "s", "label": "Inventory time · 5–5"},
+    "4-6": {"color": "#ea580c", "marker": "o", "label": "Inventory time · 4–6"},
+    "3-7": {"color": "#dc2626", "marker": "D", "label": "Inventory time · 3–7"},
 }
+
+
+def _regression_line(xs: Sequence[float], ys: Sequence[float], x_grid):
+    import numpy as np
+    x = np.asarray(xs, dtype=float)
+    y = np.asarray(ys, dtype=float)
+    if len(x) < 2 or float(np.std(x)) < 1e-9:
+        y_hat = np.full_like(x_grid, float(np.mean(y)) if len(y) else 0.0, dtype=float)
+        return x_grid, y_hat
+    coef = np.polyfit(x, y, 1)
+    return x_grid, np.polyval(coef, x_grid)
 
 
 def plot_time_inventory_pareto(
@@ -1729,47 +1740,88 @@ def plot_time_inventory_pareto(
     ax: Optional[Axes] = None,
     highlight: Optional[str] = None,
 ) -> Axes:
-    """X = duration; left Y = total time on site; right Y = inventory time."""
+    """X = duration; left Y = total time on site; right Y = inventory time.
+
+    Satu garis regresi putus-putus per jenis dadu, untuk masing-masing sumbu Y
+    (seperti peta Iris: tren time-on-site vs tren inventory-time).
+    """
+    import numpy as np
+
     if ax is None:
         _, ax = plt.subplots(figsize=(9.2, 5.2))
     ax_r = ax.twinx()
-    plotted_left = set()
+
+    by_die: Dict[str, List[dict]] = {}
     for row in rows:
-        die = str(row["die"])
-        lab = str(row["label"])
+        by_die.setdefault(str(row["die"]), []).append(row)
+
+    all_x = [float(r["duration"]) for r in rows]
+    x_min, x_max = (min(all_x), max(all_x)) if all_x else (0.0, 1.0)
+    pad = max(1.0, 0.12 * (x_max - x_min or 1.0))
+    x_grid = np.linspace(x_min - pad * 0.15, x_max + pad, 80)
+
+    order = [d for d in ("5-5", "4-6", "3-7") if d in by_die] + [
+        d for d in by_die if d not in ("5-5", "4-6", "3-7")
+    ]
+    plotted_tos: set = set()
+    plotted_inv: set = set()
+
+    for die in order:
+        group = by_die[die]
         stl = _DIE_STYLE.get(die, {"color": "#334155", "marker": "o", "label": die})
-        inv = _DIE_INV_STYLE.get(die, {"color": "#92400e", "marker": "o"})
-        x = float(row["duration"])
-        y1 = float(row["time_on_site"])
-        y2 = float(row["inventory_time"])
-        s = 90 if highlight and lab == highlight else 55
-        lbl_l = stl["label"] if die not in plotted_left else None
-        plotted_left.add(die)
-        ax.scatter(
-            [x], [y1],
-            c=stl["color"], marker=stl["marker"], s=s,
-            zorder=4, edgecolors="white", linewidths=0.8,
-            label=lbl_l,
+        inv = _DIE_INV_STYLE.get(die, {"color": "#92400e", "marker": "o", "label": die})
+        xs = [float(r["duration"]) for r in group]
+        y_tos = [float(r["time_on_site"]) for r in group]
+        y_inv = [float(r["inventory_time"]) for r in group]
+
+        xg, y_tos_hat = _regression_line(xs, y_tos, x_grid)
+        _, y_inv_hat = _regression_line(xs, y_inv, x_grid)
+        ax.plot(
+            xg, y_tos_hat, color=stl["color"], linestyle="--", linewidth=1.6,
+            alpha=0.85, zorder=2, label="Regresi time on site" if die == order[0] else None,
         )
-        ax.annotate(
-            lab, (x, y1), textcoords="offset points", xytext=(4, 4),
-            fontsize=6.5, color="#1e293b",
+        ax_r.plot(
+            xg, y_inv_hat, color=inv["color"], linestyle="--", linewidth=1.6,
+            alpha=0.85, zorder=2, label="Regresi inventory time" if die == order[0] else None,
         )
-        ax_r.scatter(
-            [x], [y2],
-            c=inv["color"], marker=inv["marker"], s=s,
-            zorder=3, edgecolors="white", linewidths=0.8,
-            label="Inventory time" if die == "5-5" and lab.endswith("0-1-2-3-4") else None,
-        )
+
+        for r, x, y1, y2 in zip(group, xs, y_tos, y_inv):
+            lab = str(r["label"])
+            s = 120 if highlight and lab == highlight else 78
+            edge = "#0f172a" if highlight and lab == highlight else "white"
+            lbl_l = stl["label"] if die not in plotted_tos else None
+            plotted_tos.add(die)
+            ax.scatter(
+                [x], [y1],
+                c=stl["color"], marker=stl["marker"], s=s,
+                zorder=5, edgecolors=edge, linewidths=1.1,
+                label=lbl_l,
+            )
+            ax.annotate(
+                lab, (x, y1), textcoords="offset points", xytext=(6, 5),
+                fontsize=6.5, color=stl["color"], fontweight="medium",
+            )
+            lbl_r = inv["label"] if die not in plotted_inv else None
+            plotted_inv.add(die)
+            ax_r.scatter(
+                [x], [y2],
+                c=inv["color"], marker=inv["marker"], s=s,
+                zorder=4, edgecolors=edge, linewidths=1.1,
+                label=lbl_r,
+            )
+
     ax.set_xlabel("Total Duration")
-    ax.set_ylabel("Total Trade Time on Site", color="#1e3a8a")
-    ax_r.set_ylabel("Total Inventory Time", color="#9a3412")
-    ax.tick_params(axis="y", colors="#1e3a8a")
-    ax_r.tick_params(axis="y", colors="#9a3412")
-    ax.grid(True, linestyle="--", alpha=0.45)
+    ax.set_ylabel("Total Trade Time on Site", color="#1d4ed8")
+    ax_r.set_ylabel("Total Inventory Time", color="#c2410c")
+    ax.tick_params(axis="y", colors="#1d4ed8")
+    ax_r.tick_params(axis="y", colors="#c2410c")
+    ax.grid(True, linestyle="--", alpha=0.4)
     ax.spines["top"].set_visible(False)
     h1, l1 = ax.get_legend_handles_labels()
     h2, l2 = ax_r.get_legend_handles_labels()
-    ax.legend(h1 + h2, l1 + l2, loc="upper left", fontsize=8, framealpha=0.92)
+    ax.legend(
+        h1 + h2, l1 + l2,
+        loc="upper left", fontsize=7.5, framealpha=0.94, ncol=1,
+    )
     return ax
 

@@ -72,7 +72,7 @@ from parade_of_trades_plots import (
     plot_time_inventory_pareto,
 )
 
-_APP_BUILD = "2026-08-28-buffer-map-fix-v103"
+_APP_BUILD = "2026-08-28-buffer-reg-v104"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
