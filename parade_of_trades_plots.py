@@ -1724,14 +1724,18 @@ _DIE_INV_STYLE = {
 }
 
 
-def _regression_line(xs: Sequence[float], ys: Sequence[float], x_grid):
+def _regression_line(xs: Sequence[float], ys: Sequence[float], x_grid, degree: int = 1):
     import numpy as np
     x = np.asarray(xs, dtype=float)
     y = np.asarray(ys, dtype=float)
-    if len(x) < 2 or float(np.std(x)) < 1e-9:
-        y_hat = np.full_like(x_grid, float(np.mean(y)) if len(y) else 0.0, dtype=float)
+    n = len(x)
+    if n == 0:
+        return x_grid, np.zeros_like(x_grid, dtype=float)
+    deg = int(max(1, min(degree, n - 1)))
+    if n < 2 or float(np.std(x)) < 1e-9:
+        y_hat = np.full_like(x_grid, float(np.mean(y)), dtype=float)
         return x_grid, y_hat
-    coef = np.polyfit(x, y, 1)
+    coef = np.polyfit(x, y, deg)
     return x_grid, np.polyval(coef, x_grid)
 
 
@@ -1773,9 +1777,14 @@ def plot_time_inventory_pareto(
         xs = [float(r["duration"]) for r in group]
         y_tos = [float(r["time_on_site"]) for r in group]
         y_inv = [float(r["inventory_time"]) for r in group]
+        # Tanpa variasi: tren linier. Ada variasi: kuadratik (lengkung seperti Iris).
+        deg = 1 if die == "5-5" else 2
+        x_lo, x_hi = min(xs), max(xs)
+        span = max(x_hi - x_lo, 1.0)
+        x_local = np.linspace(x_lo - 0.04 * span, x_hi + 0.08 * span, 80)
 
-        xg, y_tos_hat = _regression_line(xs, y_tos, x_grid)
-        _, y_inv_hat = _regression_line(xs, y_inv, x_grid)
+        xg, y_tos_hat = _regression_line(xs, y_tos, x_local, degree=deg)
+        _, y_inv_hat = _regression_line(xs, y_inv, x_local, degree=deg)
         ax.plot(
             xg, y_tos_hat, color=stl["color"], linestyle="--", linewidth=1.6,
             alpha=0.85, zorder=2, label="Regresi time on site" if die == order[0] else None,
