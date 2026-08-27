@@ -72,7 +72,7 @@ from parade_of_trades_plots import (
     plot_time_inventory_pareto,
 )
 
-_APP_BUILD = "2026-08-28-buffer-dense-v106"
+_APP_BUILD = "2026-08-28-buffer-frontier-v107"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1713,7 +1713,10 @@ def tab_buffer(seed: Optional[int]) -> None:
     if rows:
         st.divider()
         st.markdown("##### Peta time–inventory (kapasitas tetap)")
-        st.caption("81 pola tunda × 3 dadu. Label hanya pada 0-1-2-3-4, 0-2-4-6-8, 0-3-6-9-12.")
+        st.caption(
+            "Titik redup = semua pola tunda. Garis putus-putus = frontier "
+            "(time on site / inventory terendah di tiap durasi). Label: 0-1-2-3-4, 0-2-4-6-8, 0-3-6-9-12."
+        )
         fig, ax = plt.subplots(figsize=(9.2, 5.0))
         plot_time_inventory_pareto(
             rows, ax=ax, highlight=st.session_state.get("buffer_one_label")
