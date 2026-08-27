@@ -1268,6 +1268,45 @@ IRIS_MOBILIZATION: Dict[str, Tuple[int, ...]] = {
     "0-2-4-6-8": (0, 2, 4, 6, 8),
     "0-3-6-9-12": (0, 3, 6, 9, 12),
 }
+# Labels that stay annotated on the dense Iris-style map
+IRIS_MOB_ANCHORS: Tuple[str, ...] = (
+    "0-1-2-3-4",
+    "0-2-4-6-8",
+    "0-3-6-9-12",
+)
+
+
+def iris_mobilization_grid(max_gap: int = 3) -> Dict[str, Tuple[int, ...]]:
+    """All non-decreasing start times with consecutive gaps in 1..max_gap.
+
+    T1 always starts at 0. Four gaps → ``max_gap**4`` patterns (default 81).
+    Includes the three Iris anchors (uniform gap 1, 2, 3).
+    """
+    from itertools import product
+
+    out: Dict[str, Tuple[int, ...]] = {}
+    for gaps in product(range(1, int(max_gap) + 1), repeat=4):
+        offs = [0]
+        for g in gaps:
+            offs.append(offs[-1] + int(g))
+        key = "-".join(str(x) for x in offs)
+        out[key] = tuple(offs)
+    return out
+
+
+def _parse_mobilization(mobilization: str, n_trades: int = 5) -> Tuple[int, ...]:
+    if mobilization in IRIS_MOBILIZATION:
+        offs = IRIS_MOBILIZATION[mobilization]
+    else:
+        parts = [int(x) for x in str(mobilization).split("-") if x != ""]
+        offs = tuple(parts)
+    if n_trades != len(offs):
+        if n_trades != 5:
+            step = offs[1] - offs[0] if len(offs) > 1 else 1
+            offs = tuple(i * step for i in range(n_trades))
+        else:
+            raise ValueError(f"mobilization {mobilization!r} has {len(offs)} starts")
+    return offs
 
 
 def run_time_inventory_buffer(
@@ -1280,15 +1319,8 @@ def run_time_inventory_buffer(
     """Classic unit-flow run: fixed mean capacity, time-buffer via start delays."""
     if die not in IRIS_DICE:
         raise ValueError(f"Unknown die '{die}'. Choose from {list(IRIS_DICE)}")
-    if mobilization not in IRIS_MOBILIZATION:
-        raise ValueError(
-            f"Unknown mobilization '{mobilization}'. Choose from {list(IRIS_MOBILIZATION)}"
-        )
+    offs = _parse_mobilization(mobilization, n_trades=n_trades)
     lo, hi = IRIS_DICE[die]
-    offs = IRIS_MOBILIZATION[mobilization]
-    if n_trades != 5:
-        step = offs[1] - offs[0] if len(offs) > 1 else 1
-        offs = tuple(i * step for i in range(n_trades))
     cfg = ParadeConfig.from_pairs(
         [(lo, hi)] * n_trades,
         total_units=total_units,
@@ -1304,11 +1336,13 @@ def run_time_inventory_buffer(
 def iris_buffer_sweep(
     total_units: int = DEFAULT_TOTAL_UNITS,
     seed: Optional[int] = 42,
+    max_gap: int = 3,
 ) -> List[Dict[str, object]]:
-    """3 dice × 3 mobilization patterns (mean capacity fixed)."""
+    """Dense time-buffer map: 3 dice × gap-grid (default 81 patterns)."""
+    grid = iris_mobilization_grid(max_gap=max_gap)
     rows: List[Dict[str, object]] = []
     for die in IRIS_DICE:
-        for mob in IRIS_MOBILIZATION:
+        for mob, _offs in grid.items():
             r = run_time_inventory_buffer(
                 die=die, mobilization=mob, total_units=total_units, seed=seed
             )
@@ -1320,7 +1354,7 @@ def iris_buffer_sweep(
                     "duration": r.duration,
                     "time_on_site": r.total_time_on_site,
                     "inventory_time": r.total_inventory_time,
-                    "result": r,
+                    "anchor": mob in IRIS_MOB_ANCHORS,
                 }
             )
     return rows

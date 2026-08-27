@@ -1796,26 +1796,34 @@ def plot_time_inventory_pareto(
 
         for r, x, y1, y2 in zip(group, xs, y_tos, y_inv):
             lab = str(r["label"])
-            s = 120 if highlight and lab == highlight else 78
+            is_anchor = bool(r.get("anchor")) or (
+                highlight is not None and lab == highlight
+            )
+            s = 110 if is_anchor else 28
             edge = "#0f172a" if highlight and lab == highlight else "white"
             lbl_l = stl["label"] if die not in plotted_tos else None
             plotted_tos.add(die)
             ax.scatter(
                 [x], [y1],
                 c=stl["color"], marker=stl["marker"], s=s,
-                zorder=5, edgecolors=edge, linewidths=1.1,
+                zorder=5 if is_anchor else 4,
+                edgecolors=edge, linewidths=1.0 if is_anchor else 0.4,
+                alpha=0.95 if is_anchor else 0.72,
                 label=lbl_l,
             )
-            ax.annotate(
-                lab, (x, y1), textcoords="offset points", xytext=(6, 5),
-                fontsize=6.5, color=stl["color"], fontweight="medium",
-            )
+            if is_anchor:
+                ax.annotate(
+                    lab, (x, y1), textcoords="offset points", xytext=(6, 5),
+                    fontsize=6.5, color=stl["color"], fontweight="medium",
+                )
             lbl_r = inv["label"] if die not in plotted_inv else None
             plotted_inv.add(die)
             ax_r.scatter(
                 [x], [y2],
                 c=inv["color"], marker=inv["marker"], s=s,
-                zorder=4, edgecolors=edge, linewidths=1.1,
+                zorder=4 if is_anchor else 3,
+                edgecolors=edge, linewidths=1.0 if is_anchor else 0.4,
+                alpha=0.95 if is_anchor else 0.72,
                 label=lbl_r,
             )
 

@@ -101,10 +101,12 @@ class TestTaktStandby(unittest.TestCase):
         self.assertGreaterEqual(wide.total_inventory_time, tight.total_inventory_time)
 
     def test_iris_sweep_nine_points(self):
-        from parade_of_trades_core import iris_buffer_sweep
+        from parade_of_trades_core import iris_buffer_sweep, iris_mobilization_grid
 
+        grid = iris_mobilization_grid(max_gap=3)
+        self.assertEqual(len(grid), 81)
         rows = iris_buffer_sweep(total_units=100, seed=1)
-        self.assertEqual(len(rows), 9)
+        self.assertEqual(len(rows), 81 * 3)
         labels = {r["label"] for r in rows}
         self.assertIn("3-7 0-3-6-9-12", labels)
 

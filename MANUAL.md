@@ -200,7 +200,7 @@ Laboratorium **time–inventory buffer** (Iris Tommelein / PPI). Kapasitas rata-
 - Dadu: 5–5 / 4–6 / 3–7 (variasi, bukan nambah kru).
 - Mobilisasi: `0-1-2-3-4`, `0-2-4-6-8`, `0-3-6-9-12` = buffer **waktu**.
 - Metrik: durasi, *time on site*, *inventory time* (WIP × periode — akibat tunda).
-- **Jalankan** satu skenario; **Peta 3×3** sembilan titik.
+- **Jalankan** satu skenario; **Peta tren** = 81 pola tunda × 3 dadu.
 
 Bukan tab buffer kapasitas. Mode zona di Simulasi tidak berubah.
 

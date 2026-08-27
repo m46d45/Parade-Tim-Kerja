@@ -72,7 +72,7 @@ from parade_of_trades_plots import (
     plot_time_inventory_pareto,
 )
 
-_APP_BUILD = "2026-08-28-buffer-curve-v105"
+_APP_BUILD = "2026-08-28-buffer-dense-v106"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1677,7 +1677,7 @@ def tab_buffer(seed: Optional[int]) -> None:
         )
         b1, b2 = st.columns(2)
         run_one = b1.button("Jalankan", type="primary", use_container_width=True, key="buf_run")
-        run_map = b2.button("Peta 3×3", use_container_width=True, key="buf_map_btn")
+        run_map = b2.button("Peta tren", use_container_width=True, key="buf_map_btn")
 
     if run_one:
         try:
@@ -1713,22 +1713,24 @@ def tab_buffer(seed: Optional[int]) -> None:
     if rows:
         st.divider()
         st.markdown("##### Peta time–inventory (kapasitas tetap)")
+        st.caption("81 pola tunda × 3 dadu. Label hanya pada 0-1-2-3-4, 0-2-4-6-8, 0-3-6-9-12.")
         fig, ax = plt.subplots(figsize=(9.2, 5.0))
         plot_time_inventory_pareto(
             rows, ax=ax, highlight=st.session_state.get("buffer_one_label")
         )
         fig.tight_layout()
         _fig_to_st(fig)
-        table = [
-            {
-                "Skenario": r["label"],
-                "Durasi": r["duration"],
-                "Time on site": r["time_on_site"],
-                "Inventory time": r["inventory_time"],
-            }
-            for r in rows
-        ]
-        st.dataframe(table, use_container_width=True, hide_index=True)
+        with st.expander("Tabel semua skenario"):
+            table = [
+                {
+                    "Skenario": r["label"],
+                    "Durasi": r["duration"],
+                    "Time on site": r["time_on_site"],
+                    "Inventory time": r["inventory_time"],
+                }
+                for r in rows
+            ]
+            st.dataframe(table, use_container_width=True, hide_index=True)
 
 
 def main() -> None:
