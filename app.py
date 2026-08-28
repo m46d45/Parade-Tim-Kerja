@@ -70,9 +70,10 @@ from parade_of_trades_plots import (
                 plot_wip_th_ct,
     plot_utilization,
     plot_time_inventory_pareto,
+    fit_buffer_trends,
 )
 
-_APP_BUILD = "2026-08-28-buffer-frontier-v107"
+_APP_BUILD = "2026-08-28-buffer-ols-v108"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1714,8 +1715,9 @@ def tab_buffer(seed: Optional[int]) -> None:
         st.divider()
         st.markdown("##### Peta time–inventory (kapasitas tetap)")
         st.caption(
-            "Titik redup = semua pola tunda. Garis putus-putus = frontier "
-            "(time on site / inventory terendah di tiap durasi). Label: 0-1-2-3-4, 0-2-4-6-8, 0-3-6-9-12."
+            "Titik redup = semua pola. Titik sedang = rata-rata per durasi. "
+            "Garis putus-putus = rumus regresi pada rata-rata itu "
+            "(5–5 linier; 4–6 dan 3–7 kuadratik)."
         )
         fig, ax = plt.subplots(figsize=(9.2, 5.0))
         plot_time_inventory_pareto(
@@ -1723,6 +1725,18 @@ def tab_buffer(seed: Optional[int]) -> None:
         )
         fig.tight_layout()
         _fig_to_st(fig)
+        fits = fit_buffer_trends(rows)
+        eq_rows = [
+            {
+                "Dadu": f["die"],
+                "Metrik": "Time on site" if f["metric"] == "time_on_site" else "Inventory time",
+                "Model": "Linier" if f["degree"] == 1 else "Kuadratik",
+                "Rumus": f["eq"],
+                "R²": round(f["r2"], 3),
+            }
+            for f in fits
+        ]
+        st.dataframe(eq_rows, use_container_width=True, hide_index=True)
         with st.expander("Tabel semua skenario"):
             table = [
                 {

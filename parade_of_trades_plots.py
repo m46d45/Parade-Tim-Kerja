@@ -1724,28 +1724,80 @@ _DIE_INV_STYLE = {
 }
 
 
-def _regression_line(xs: Sequence[float], ys: Sequence[float], x_grid, degree: int = 1):
-    import numpy as np
-    x = np.asarray(xs, dtype=float)
-    y = np.asarray(ys, dtype=float)
-    n = len(x)
-    if n == 0:
-        return x_grid, np.zeros_like(x_grid, dtype=float)
-    deg = int(max(1, min(degree, n - 1)))
-    if n < 2 or float(np.std(x)) < 1e-9:
-        y_hat = np.full_like(x_grid, float(np.mean(y)), dtype=float)
-        return x_grid, y_hat
-    coef = np.polyfit(x, y, deg)
-    return x_grid, np.polyval(coef, x_grid)
-
-
-def _min_envelope(xs: Sequence[float], ys: Sequence[float]) -> Tuple[List[float], List[float]]:
+def _bin_means(xs: Sequence[float], ys: Sequence[float]) -> Tuple[List[float], List[float]]:
     buckets: Dict[float, List[float]] = {}
     for x, y in zip(xs, ys):
         buckets.setdefault(float(x), []).append(float(y))
-    env_x = sorted(buckets)
-    env_y = [min(buckets[x]) for x in env_x]
-    return env_x, env_y
+    mx = sorted(buckets)
+    my = [sum(buckets[x]) / len(buckets[x]) for x in mx]
+    return mx, my
+
+
+def _poly_equation(coef, yname: str, xname: str = "D") -> str:
+    c = [float(v) for v in coef]
+    n = len(c) - 1
+    parts: List[str] = []
+    for i, v in enumerate(c):
+        p = n - i
+        if abs(v) < 5e-5:
+            continue
+        av = abs(v)
+        if p == 0:
+            term = f"{av:.3f}"
+        elif p == 1:
+            term = f"{av:.4f}{xname}" if abs(av - 1.0) > 0.02 else xname
+        elif p == 2:
+            term = f"{av:.5f}{xname}²"
+        else:
+            term = f"{av:.5f}{xname}^{p}"
+        if not parts:
+            parts.append(f"−{term}" if v < 0 else term)
+        else:
+            parts.append((" − " if v < 0 else " + ") + term)
+    if not parts:
+        parts = ["0"]
+    return f"{yname} = {''.join(parts)}"
+
+
+def fit_buffer_trends(rows: Sequence[dict]) -> List[dict]:
+    """Rata-rata Y di tiap durasi, lalu polinomial. 5-5 linier; variasi kuadratik."""
+    import numpy as np
+
+    by_die: Dict[str, List[dict]] = {}
+    for row in rows:
+        by_die.setdefault(str(row["die"]), []).append(row)
+
+    out: List[dict] = []
+    for die, group in by_die.items():
+        xs = [float(r["duration"]) for r in group]
+        deg = 1 if die == "5-5" else 2
+        for metric, yname in (
+            ("time_on_site", "TOS"),
+            ("inventory_time", "INV"),
+        ):
+            ys = [float(r[metric]) for r in group]
+            mx, my = _bin_means(xs, ys)
+            if len(mx) < 2:
+                continue
+            degree = int(max(1, min(deg, len(mx) - 1)))
+            coef = np.polyfit(mx, my, degree)
+            yhat = np.polyval(coef, mx)
+            ss_res = float(np.sum((np.asarray(my) - yhat) ** 2))
+            ss_tot = float(np.sum((np.asarray(my) - np.mean(my)) ** 2))
+            r2 = 1.0 if ss_tot < 1e-12 else 1.0 - ss_res / ss_tot
+            out.append(
+                {
+                    "die": die,
+                    "metric": metric,
+                    "degree": degree,
+                    "coef": [float(v) for v in coef],
+                    "eq": _poly_equation(coef, yname),
+                    "r2": r2,
+                    "x_mean": mx,
+                    "y_mean": my,
+                }
+            )
+    return out
 
 
 def plot_time_inventory_pareto(
@@ -1753,12 +1805,7 @@ def plot_time_inventory_pareto(
     ax: Optional[Axes] = None,
     highlight: Optional[str] = None,
 ) -> Axes:
-    """X = duration; left Y = time on site; right Y = inventory time.
-
-    Interior points are faint. Dashed curves follow the *lower envelope*
-    (best TOS / least inventory at each duration) — closer to Iris's slide
-    than a least-squares fit through the whole cloud.
-    """
+    """Fit rumus pada rata-rata tiap durasi, lalu gambar kurva rumus itu."""
     import numpy as np
 
     if ax is None:
@@ -1769,6 +1816,7 @@ def plot_time_inventory_pareto(
     for row in rows:
         by_die.setdefault(str(row["die"]), []).append(row)
 
+    fits = {(f["die"], f["metric"]): f for f in fit_buffer_trends(rows)}
     order = [d for d in ("5-5", "4-6", "3-7") if d in by_die] + [
         d for d in by_die if d not in ("5-5", "4-6", "3-7")
     ]
@@ -1783,31 +1831,21 @@ def plot_time_inventory_pareto(
         y_tos = [float(r["time_on_site"]) for r in group]
         y_inv = [float(r["inventory_time"]) for r in group]
 
-        ex_t, ey_t = _min_envelope(xs, y_tos)
-        ex_i, ey_i = _min_envelope(xs, y_inv)
-        env_tos = {(round(x, 6), round(y, 6)) for x, y in zip(ex_t, ey_t)}
-        env_inv = {(round(x, 6), round(y, 6)) for x, y in zip(ex_i, ey_i)}
-
-        deg = 1 if die == "5-5" else 2
-        if len(ex_t) >= 2:
-            x_lo, x_hi = min(ex_t), max(ex_t)
-            span = max(x_hi - x_lo, 1.0)
-            x_local = np.linspace(x_lo, x_hi + 0.04 * span, 100)
-            xg, yhat = _regression_line(ex_t, ey_t, x_local, degree=deg)
+        fit_t = fits.get((die, "time_on_site"))
+        fit_i = fits.get((die, "inventory_time"))
+        if fit_t:
+            xg = np.linspace(min(fit_t["x_mean"]), max(fit_t["x_mean"]), 100)
             ax.plot(
-                xg, yhat, color=stl["color"], linestyle="--", linewidth=1.85,
-                alpha=0.9, zorder=2,
-                label="Frontier time on site" if die == order[0] else None,
+                xg, np.polyval(fit_t["coef"], xg),
+                color=stl["color"], linestyle="--", linewidth=1.9, zorder=3,
+                label=f"Regresi TOS {die}",
             )
-        if len(ex_i) >= 2:
-            x_lo, x_hi = min(ex_i), max(ex_i)
-            span = max(x_hi - x_lo, 1.0)
-            x_local = np.linspace(x_lo, x_hi + 0.04 * span, 100)
-            xg, yhat = _regression_line(ex_i, ey_i, x_local, degree=deg)
+        if fit_i:
+            xg = np.linspace(min(fit_i["x_mean"]), max(fit_i["x_mean"]), 100)
             ax_r.plot(
-                xg, yhat, color=invs["color"], linestyle="--", linewidth=1.85,
-                alpha=0.9, zorder=2,
-                label="Frontier inventory time" if die == order[0] else None,
+                xg, np.polyval(fit_i["coef"], xg),
+                color=invs["color"], linestyle="--", linewidth=1.9, zorder=3,
+                label=f"Regresi INV {die}",
             )
 
         for r, x, y1, y2 in zip(group, xs, y_tos, y_inv):
@@ -1815,49 +1853,48 @@ def plot_time_inventory_pareto(
             is_anchor = bool(r.get("anchor")) or (
                 highlight is not None and lab == highlight
             )
-            on_front = (round(x, 6), round(y1, 6)) in env_tos
-            s = 120 if is_anchor else (48 if on_front else 16)
-            alpha = 0.96 if is_anchor else (0.8 if on_front else 0.22)
-            edge = "#0f172a" if highlight and lab == highlight else "white"
-            lbl_l = stl["label"] if die not in plotted_tos else None
-            plotted_tos.add(die)
+            s = 110 if is_anchor else 14
             ax.scatter(
-                [x], [y1],
-                c=stl["color"], marker=stl["marker"], s=s,
-                zorder=6 if is_anchor else (4 if on_front else 3),
-                edgecolors=edge, linewidths=0.9 if is_anchor else 0.25,
-                alpha=alpha, label=lbl_l,
+                [x], [y1], c=stl["color"], marker=stl["marker"], s=s,
+                zorder=4, edgecolors="white", linewidths=0.2,
+                alpha=0.95 if is_anchor else 0.18,
+                label=stl["label"] if die not in plotted_tos else None,
             )
+            plotted_tos.add(die)
             if is_anchor:
                 ax.annotate(
                     lab, (x, y1), textcoords="offset points", xytext=(6, 5),
                     fontsize=6.5, color=stl["color"], fontweight="medium",
                 )
-            on_front_i = (round(x, 6), round(y2, 6)) in env_inv
-            s_i = 120 if is_anchor else (48 if on_front_i else 16)
-            a_i = 0.96 if is_anchor else (0.8 if on_front_i else 0.22)
-            lbl_r = invs["label"] if die not in plotted_inv else None
-            plotted_inv.add(die)
             ax_r.scatter(
-                [x], [y2],
-                c=invs["color"], marker=invs["marker"], s=s_i,
-                zorder=5 if is_anchor else (3 if on_front_i else 2),
-                edgecolors=edge, linewidths=0.9 if is_anchor else 0.25,
-                alpha=a_i, label=lbl_r,
+                [x], [y2], c=invs["color"], marker=invs["marker"], s=s,
+                zorder=3, edgecolors="white", linewidths=0.2,
+                alpha=0.95 if is_anchor else 0.18,
+                label=invs["label"] if die not in plotted_inv else None,
+            )
+            plotted_inv.add(die)
+
+        if fit_t:
+            ax.scatter(
+                fit_t["x_mean"], fit_t["y_mean"],
+                c=stl["color"], marker=stl["marker"], s=36,
+                zorder=5, edgecolors="white", linewidths=0.6, alpha=0.9,
+            )
+        if fit_i:
+            ax_r.scatter(
+                fit_i["x_mean"], fit_i["y_mean"],
+                c=invs["color"], marker=invs["marker"], s=36,
+                zorder=5, edgecolors="white", linewidths=0.6, alpha=0.9,
             )
 
-    ax.set_xlabel("Total Duration")
-    ax.set_ylabel("Total Trade Time on Site", color="#1d4ed8")
-    ax_r.set_ylabel("Total Inventory Time", color="#c2410c")
+    ax.set_xlabel("Total Duration  D")
+    ax.set_ylabel("Total Trade Time on Site  TOS", color="#1d4ed8")
+    ax_r.set_ylabel("Total Inventory Time  INV", color="#c2410c")
     ax.tick_params(axis="y", colors="#1d4ed8")
     ax_r.tick_params(axis="y", colors="#c2410c")
     ax.grid(True, linestyle="--", alpha=0.35)
     ax.spines["top"].set_visible(False)
     h1, l1 = ax.get_legend_handles_labels()
     h2, l2 = ax_r.get_legend_handles_labels()
-    ax.legend(
-        h1 + h2, l1 + l2,
-        loc="upper left", fontsize=7.5, framealpha=0.94, ncol=1,
-    )
+    ax.legend(h1 + h2, l1 + l2, loc="upper left", fontsize=7.2, framealpha=0.94)
     return ax
-
