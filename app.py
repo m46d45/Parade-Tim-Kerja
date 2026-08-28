@@ -75,7 +75,7 @@ from parade_of_trades_plots import (
     fit_inv_vs_tos,
 )
 
-_APP_BUILD = "2026-08-28-buffer-aic-v111"
+_APP_BUILD = "2026-08-28-buffer-theory-v112"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1717,8 +1717,8 @@ def tab_buffer(seed: Optional[int]) -> None:
         st.divider()
         st.markdown("##### Time on site & inventory vs durasi")
         st.caption(
-            "Seperti slide Iris: X = durasi. Kiri TOS (5–5 datar di 100; 4–6 / 3–7 lebih tinggi lalu turun). "
-            "Kanan INV (diagonal naik — tunda yang lebih longgar)."
+            "Kurva teori: TOS ≥ 100 (turun ke lantai proses). INV linier vs durasi. "
+            "5–5 identitas. 4–6 / 3–7: invers atau exp ke 100 (Kingman)."
         )
         fig, ax = plt.subplots(figsize=(9.4, 5.4))
         plot_time_inventory_pareto(
@@ -1740,7 +1740,9 @@ def tab_buffer(seed: Optional[int]) -> None:
         st.dataframe(eq_rows, use_container_width=True, hide_index=True)
 
         st.markdown("##### Inventory time vs time on site")
-        st.caption("Pasangan Iris yang lain: 5–5 vertikal; 4–6 / 3–7 bergeser ke kanan.")
+        st.caption(
+            "Trade-off I vs T: 5–5 vertikal. Variasi: INV = a + b/(TOS−100) — TOS turun, INV naik."
+        )
         fig, ax = plt.subplots(figsize=(9.0, 5.2))
         plot_inventory_vs_tos(
             rows, ax=ax, highlight=st.session_state.get("buffer_one_label")

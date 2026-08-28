@@ -1772,6 +1772,10 @@ def _r2_aic(y, yhat, k: int):
     return r2, aic
 
 
+
+TOS_FLOOR = 100.0
+
+
 def predict_buffer_curve(fit: dict, x):
     import numpy as np
     x = np.asarray(x, dtype=float)
@@ -1779,6 +1783,14 @@ def predict_buffer_curve(fit: dict, x):
     c = fit.get("coef") or []
     if kind == "poly":
         return np.polyval(c, x)
+    if kind == "const":
+        return np.full_like(x, float(c[0]), dtype=float)
+    if kind == "floor_inv":
+        return TOS_FLOOR + float(c[0]) / np.maximum(x, 1e-9)
+    if kind == "floor_exp":
+        return TOS_FLOOR + float(c[0]) * np.exp(-float(c[1]) * x)
+    if kind == "hyp_tos":
+        return float(c[0]) + float(c[1]) / np.maximum(x - TOS_FLOOR, 1e-3)
     if kind == "log":
         return c[0] + c[1] * np.log(np.maximum(x, 1e-9))
     if kind == "power":
@@ -1790,93 +1802,94 @@ def predict_buffer_curve(fit: dict, x):
     return np.full_like(x, float(np.mean(fit.get("y_mean") or [0.0])))
 
 
-def _fit_best_curve(
-    mx: Sequence[float],
-    my: Sequence[float],
-    yname: str,
-    xname: str,
-    force_linear: bool = False,
-) -> dict:
-    """Pick the curve with lowest AIC (linear if 5-5 / already perfect)."""
-    import numpy as np
+def _pack_fit(name, kind, coef, y, yhat, mx, my, eq, extra=None):
+    r2, aic = _r2_aic(y, yhat, max(1, len(coef)))
+    d = {
+        "model": name,
+        "kind": kind,
+        "coef": [float(v) for v in coef],
+        "eq": eq,
+        "r2": r2,
+        "aic": aic,
+        "k": len(coef),
+        "degree": max(1, len(coef) - 1),
+        "x_mean": list(mx),
+        "y_mean": list(my),
+    }
+    if extra:
+        d.update(extra)
+    return d
 
+
+def _fit_tos_theory(mx, my) -> dict:
+    """TOS = 100 + surplus. Surplus ~ B/D or A e^{-λD} (Kingman: turun ke lantai proses)."""
+    import numpy as np
     x = np.asarray(mx, dtype=float)
     y = np.asarray(my, dtype=float)
-    n = len(x)
-    cands: List[dict] = []
+    excess = y - TOS_FLOOR
+    cands = []
 
-    def add(name, kind, coef, yhat, k, eq):
-        r2, aic = _r2_aic(y, yhat, k)
-        cands.append(
-            {
-                "model": name,
-                "kind": kind,
-                "coef": [float(v) for v in coef],
-                "eq": eq,
-                "r2": r2,
-                "aic": aic,
-                "k": k,
-            }
+    invx = 1.0 / np.maximum(x, 1e-9)
+    denom = float(np.dot(invx, invx)) or 1.0
+    B = max(0.0, float(np.dot(invx, excess) / denom))
+    yhat = TOS_FLOOR + B * invx
+    cands.append(
+        _pack_fit(
+            "Invers ke 100",
+            "floor_inv",
+            [B],
+            y, yhat, mx, my,
+            f"TOS = 100 + {B:.3f}/D",
         )
+    )
 
-    # linear
-    coef = np.polyfit(x, y, 1)
-    add("Linier", "poly", coef, np.polyval(coef, x), 2, _poly_equation(coef, yname, xname))
-    if force_linear or (cands and cands[0]["r2"] >= 0.999):
-        best = cands[0]
-        best.update({"x_mean": list(mx), "y_mean": list(my), "degree": 1})
-        return best
-
-    if n >= 3:
-        coef = np.polyfit(x, y, 2)
-        add("Kuadratik", "poly", coef, np.polyval(coef, x), 3, _poly_equation(coef, yname, xname))
-
-    if np.all(x > 0):
-        A = np.column_stack([np.ones(n), np.log(x)])
-        co, *_ = np.linalg.lstsq(A, y, rcond=None)
-        yhat = A @ co
-        eq = f"{yname} = {co[0]:.3f} + {co[1]:.4f} ln({xname})"
-        add("Logaritmik", "log", co, yhat, 2, eq)
-
-        A = np.column_stack([np.ones(n), 1.0 / x])
-        co, *_ = np.linalg.lstsq(A, y, rcond=None)
-        yhat = A @ co
-        eq = f"{yname} = {co[0]:.3f} + {co[1]:.3f}/{xname}"
-        add("Invers", "inv", co, yhat, 2, eq)
-
-        if np.all(y > 0):
-            A = np.column_stack([np.ones(n), np.log(x)])
-            co, *_ = np.linalg.lstsq(A, np.log(y), rcond=None)
-            a, b = float(np.exp(co[0])), float(co[1])
-            yhat = a * np.power(x, b)
-            eq = f"{yname} = {a:.4f}·{xname}^{b:.4f}"
-            add("Pangkat", "power", [a, b], yhat, 2, eq)
-
-    # y = a + b exp(c x)  (grid over c)
-    best_sse, best_pack = None, None
-    for c in np.linspace(-0.85, 0.45, 66):
-        if abs(c) < 1e-4:
-            continue
-        z = np.exp(c * x)
-        A = np.column_stack([np.ones(n), z])
-        co, *_ = np.linalg.lstsq(A, y, rcond=None)
-        yhat = A @ co
+    best_sse, best = None, None
+    for lam in np.linspace(0.015, 0.55, 90):
+        z = np.exp(-lam * x)
+        zz = float(np.dot(z, z)) or 1.0
+        A = max(0.0, float(np.dot(z, excess) / zz))
+        yhat = TOS_FLOOR + A * z
         sse = float(np.sum((y - yhat) ** 2))
         if best_sse is None or sse < best_sse:
-            best_sse, best_pack = sse, (co, c, yhat)
-    if best_pack is not None:
-        co, c, yhat = best_pack
-        eq = f"{yname} = {co[0]:.3f} + {co[1]:.4f}·e^({c:.4f}{xname})"
-        add("Eksponensial", "exp", [co[0], co[1], c], yhat, 3, eq)
+            best_sse, best = sse, (A, lam, yhat)
+    if best is not None:
+        A, lam, yhat = best
+        cands.append(
+            _pack_fit(
+                "Exp ke 100",
+                "floor_exp",
+                [A, lam],
+                y, yhat, mx, my,
+                f"TOS = 100 + {A:.3f}·e^(-{lam:.4f} D)",
+            )
+        )
+    cands.sort(key=lambda d: (-d["r2"], d["aic"]))
+    return cands[0]
 
-    cands.sort(key=lambda d: (d["aic"], -d["r2"]))
-    best = cands[0]
-    best.update({"x_mean": list(mx), "y_mean": list(my), "degree": best["k"] - 1})
-    return best
+
+def _fit_inv_linear(mx, my) -> dict:
+    """Inventory ~ linier terhadap durasi (tunda × mean kapasitas)."""
+    import numpy as np
+    x = np.asarray(mx, dtype=float)
+    y = np.asarray(my, dtype=float)
+    slope, intercept = np.polyfit(x, y, 1)
+    if slope < 0:
+        slope = 0.0
+        intercept = float(np.mean(y))
+    coef = [slope, intercept]
+    yhat = np.polyval(coef, x)
+    return _pack_fit(
+        "Linier (teori tunda)",
+        "poly",
+        coef,
+        y, yhat, mx, my,
+        _poly_equation(coef, "INV", "D"),
+    )
 
 
 def fit_buffer_trends(rows: Sequence[dict]) -> List[dict]:
-    """Rata-rata Y per durasi, lalu model dengan AIC terendah (5-5: linier)."""
+    """Kurva selaras teori: 5-5 identitas; TOS≥100; INV linier vs D."""
+    import numpy as np
     by_die: Dict[str, List[dict]] = {}
     for row in rows:
         by_die.setdefault(str(row["die"]), []).append(row)
@@ -1884,19 +1897,28 @@ def fit_buffer_trends(rows: Sequence[dict]) -> List[dict]:
     out: List[dict] = []
     for die, group in by_die.items():
         xs = [float(r["duration"]) for r in group]
-        for metric, yname in (
-            ("time_on_site", "TOS"),
-            ("inventory_time", "INV"),
-        ):
-            ys = [float(r[metric]) for r in group]
-            mx, my = _bin_means(xs, ys)
-            if len(mx) < 2:
-                continue
-            fit = _fit_best_curve(
-                mx, my, yname, "D", force_linear=(die == "5-5")
+        tos = [float(r["time_on_site"]) for r in group]
+        inv = [float(r["inventory_time"]) for r in group]
+        mx_t, my_t = _bin_means(xs, tos)
+        mx_i, my_i = _bin_means(xs, inv)
+
+        if die == "5-5" or float(np.std(my_t)) < 1e-6:
+            yhat = np.full(len(mx_t), TOS_FLOOR)
+            fit_t = _pack_fit(
+                "Lantai proses",
+                "const",
+                [TOS_FLOOR],
+                np.asarray(my_t), yhat, mx_t, my_t,
+                "TOS = 100",
             )
-            fit.update({"die": die, "metric": metric})
-            out.append(fit)
+        else:
+            fit_t = _fit_tos_theory(mx_t, my_t)
+        fit_t.update({"die": die, "metric": "time_on_site"})
+        out.append(fit_t)
+
+        fit_i = _fit_inv_linear(mx_i, my_i)
+        fit_i.update({"die": die, "metric": "inventory_time"})
+        out.append(fit_i)
     return out
 
 
@@ -2006,7 +2028,7 @@ _IRIS_PAIR = {
 
 
 def fit_inv_vs_tos(rows: Sequence[dict]) -> List[dict]:
-    """INV as a function of TOS. 5-5: vertical (TOS tetap). Else quadratic."""
+    """INV vs TOS. 5-5 vertikal. Variasi: INV = a + b/(TOS−100), b≥0."""
     import numpy as np
 
     by_die: Dict[str, List[dict]] = {}
@@ -2021,20 +2043,37 @@ def fit_inv_vs_tos(rows: Sequence[dict]) -> List[dict]:
             out.append(
                 {
                     "die": die,
-                    "eq": f"TOS = {sum(tos)/len(tos):.1f}  (vertikal; INV mengikuti tunda)",
+                    "eq": "TOS = 100  (vertikal; INV mengikuti tunda)",
                     "r2": 1.0,
                     "model": "Vertikal",
                     "vertical": True,
-                    "tos0": float(sum(tos) / len(tos)),
+                    "kind": "const",
+                    "tos0": TOS_FLOOR,
                     "inv_min": float(min(inv)),
                     "inv_max": float(max(inv)),
                     "x_mean": mx,
                     "y_mean": my,
-                    "coef": None,
+                    "coef": [TOS_FLOOR],
                 }
             )
             continue
-        fit = _fit_best_curve(mx, my, "INV", "TOS", force_linear=False)
+        x = np.asarray(mx, dtype=float)
+        y = np.asarray(my, dtype=float)
+        z = 1.0 / np.maximum(x - TOS_FLOOR, 0.35)
+        A = np.column_stack([np.ones(len(x)), z])
+        co, *_ = np.linalg.lstsq(A, y, rcond=None)
+        a, b = float(co[0]), float(co[1])
+        if b < 0:
+            b = 0.0
+            a = float(np.mean(y))
+        yhat = a + b * z
+        fit = _pack_fit(
+            "Hiperbola (I vs T)",
+            "hyp_tos",
+            [a, b],
+            y, yhat, mx, my,
+            f"INV = {a:.1f} + {b:.1f}/(TOS − 100)",
+        )
         fit.update({"die": die, "vertical": False})
         out.append(fit)
     return out
