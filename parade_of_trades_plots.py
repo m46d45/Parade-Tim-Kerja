@@ -1898,3 +1898,135 @@ def plot_time_inventory_pareto(
     h2, l2 = ax_r.get_legend_handles_labels()
     ax.legend(h1 + h2, l1 + l2, loc="upper left", fontsize=7.2, framealpha=0.94)
     return ax
+
+
+# Iris pairing: Inventory time (Y) vs Time on site (X)
+_IRIS_PAIR = {
+    "5-5": {"color": "#16a34a", "marker": "s", "label": "5–5"},
+    "4-6": {"color": "#ca8a04", "marker": "o", "label": "4–6"},
+    "3-7": {"color": "#dc2626", "marker": "D", "label": "3–7"},
+}
+
+
+def fit_inv_vs_tos(rows: Sequence[dict]) -> List[dict]:
+    """INV as a function of TOS. 5-5: vertical (TOS tetap). Else quadratic."""
+    import numpy as np
+
+    by_die: Dict[str, List[dict]] = {}
+    for row in rows:
+        by_die.setdefault(str(row["die"]), []).append(row)
+    out: List[dict] = []
+    for die, group in by_die.items():
+        tos = [float(r["time_on_site"]) for r in group]
+        inv = [float(r["inventory_time"]) for r in group]
+        mx, my = _bin_means(tos, inv)
+        if die == "5-5" or float(np.std(mx)) < 1e-6:
+            out.append(
+                {
+                    "die": die,
+                    "eq": f"TOS = {sum(tos)/len(tos):.1f}  (vertikal; INV mengikuti tunda)",
+                    "r2": 1.0,
+                    "vertical": True,
+                    "tos0": float(sum(tos) / len(tos)),
+                    "inv_min": float(min(inv)),
+                    "inv_max": float(max(inv)),
+                    "x_mean": mx,
+                    "y_mean": my,
+                    "coef": None,
+                }
+            )
+            continue
+        degree = int(max(1, min(2, len(mx) - 1)))
+        coef = np.polyfit(mx, my, degree)
+        yhat = np.polyval(coef, mx)
+        ss_res = float(np.sum((np.asarray(my) - yhat) ** 2))
+        ss_tot = float(np.sum((np.asarray(my) - np.mean(my)) ** 2))
+        r2 = 1.0 if ss_tot < 1e-12 else 1.0 - ss_res / ss_tot
+        out.append(
+            {
+                "die": die,
+                "eq": _poly_equation(coef, "INV", xname="TOS"),
+                "r2": r2,
+                "vertical": False,
+                "x_mean": mx,
+                "y_mean": my,
+                "coef": [float(v) for v in coef],
+            }
+        )
+    return out
+
+
+def plot_inventory_vs_tos(
+    rows: Sequence[dict],
+    ax: Optional[Axes] = None,
+    highlight: Optional[str] = None,
+) -> Axes:
+    """Iris slide: Y = inventory time, X = time on site. Families separate."""
+    import numpy as np
+
+    if ax is None:
+        _, ax = plt.subplots(figsize=(9.0, 5.4))
+
+    by_die: Dict[str, List[dict]] = {}
+    for row in rows:
+        by_die.setdefault(str(row["die"]), []).append(row)
+    fits = {f["die"]: f for f in fit_inv_vs_tos(rows)}
+    order = [d for d in ("5-5", "4-6", "3-7") if d in by_die]
+
+    for die in order:
+        group = by_die[die]
+        stl = _IRIS_PAIR.get(die, {"color": "#334155", "marker": "o", "label": die})
+        fit = fits.get(die)
+        xs = [float(r["time_on_site"]) for r in group]
+        ys = [float(r["inventory_time"]) for r in group]
+
+        if fit and fit.get("vertical"):
+            ax.plot(
+                [fit["tos0"], fit["tos0"]],
+                [fit["inv_min"], fit["inv_max"]],
+                color=stl["color"], linestyle="--", linewidth=2.0, zorder=3,
+                label=f"5–5  TOS tetap",
+            )
+        elif fit and fit.get("coef"):
+            xg = np.linspace(min(fit["x_mean"]), max(fit["x_mean"]), 100)
+            ax.plot(
+                xg, np.polyval(fit["coef"], xg),
+                color=stl["color"], linestyle="--", linewidth=2.0, zorder=3,
+                label=f"Regresi {die}",
+            )
+
+        labeled = False
+        for r, x, y in zip(group, xs, ys):
+            lab = str(r["label"])
+            is_anchor = bool(r.get("anchor")) or (
+                highlight is not None and lab == highlight
+            )
+            ax.scatter(
+                [x], [y], c=stl["color"], marker=stl["marker"],
+                s=120 if is_anchor else 22,
+                zorder=5 if is_anchor else 4,
+                edgecolors="white", linewidths=0.7 if is_anchor else 0.25,
+                alpha=0.95 if is_anchor else 0.28,
+                label=stl["label"] if not labeled else None,
+            )
+            labeled = True
+            if is_anchor:
+                ax.annotate(
+                    lab, (x, y), textcoords="offset points", xytext=(6, 4),
+                    fontsize=6.5, color=stl["color"], fontweight="medium",
+                )
+        if fit:
+            ax.scatter(
+                fit["x_mean"], fit["y_mean"],
+                c=stl["color"], marker=stl["marker"], s=42,
+                zorder=5, edgecolors="white", linewidths=0.6, alpha=0.9,
+            )
+
+    ax.set_xlabel("Total Trade Time on Site  TOS")
+    ax.set_ylabel("Total Inventory Time  INV")
+    ax.set_title("Inventory time vs time on site")
+    ax.grid(True, linestyle="--", alpha=0.4)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.legend(loc="upper right", fontsize=8, framealpha=0.94)
+    return ax

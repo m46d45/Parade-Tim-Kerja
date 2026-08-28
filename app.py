@@ -70,10 +70,12 @@ from parade_of_trades_plots import (
                 plot_wip_th_ct,
     plot_utilization,
     plot_time_inventory_pareto,
+    plot_inventory_vs_tos,
     fit_buffer_trends,
+    fit_inv_vs_tos,
 )
 
-_APP_BUILD = "2026-08-28-buffer-ols-v108"
+_APP_BUILD = "2026-08-28-buffer-iris-xy-v109"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1713,30 +1715,50 @@ def tab_buffer(seed: Optional[int]) -> None:
     rows = st.session_state.get("buffer_map_rows")
     if rows:
         st.divider()
-        st.markdown("##### Peta time–inventory (kapasitas tetap)")
+        st.markdown("##### Inventory time vs time on site")
         st.caption(
-            "Titik redup = semua pola. Titik sedang = rata-rata per durasi. "
-            "Garis putus-putus = rumus regresi pada rata-rata itu "
-            "(5–5 linier; 4–6 dan 3–7 kuadratik)."
+            "Sumbu seperti slide Iris: X = TOS, Y = INV. "
+            "5–5 vertikal (TOS=100). 4–6 dan 3–7: tunda lebih longgar → INV naik, TOS turun ke 100."
         )
-        fig, ax = plt.subplots(figsize=(9.2, 5.0))
-        plot_time_inventory_pareto(
+        fig, ax = plt.subplots(figsize=(9.0, 5.3))
+        plot_inventory_vs_tos(
             rows, ax=ax, highlight=st.session_state.get("buffer_one_label")
         )
         fig.tight_layout()
         _fig_to_st(fig)
-        fits = fit_buffer_trends(rows)
-        eq_rows = [
+        pair_eq = [
             {
                 "Dadu": f["die"],
-                "Metrik": "Time on site" if f["metric"] == "time_on_site" else "Inventory time",
-                "Model": "Linier" if f["degree"] == 1 else "Kuadratik",
                 "Rumus": f["eq"],
                 "R²": round(f["r2"], 3),
             }
-            for f in fits
+            for f in fit_inv_vs_tos(rows)
         ]
-        st.dataframe(eq_rows, use_container_width=True, hide_index=True)
+        st.dataframe(pair_eq, use_container_width=True, hide_index=True)
+
+        with st.expander("Grafik vs durasi (D)"):
+            st.caption(
+                "INV vs D hampir berhimpit — tunda yang sama menumpuk rata-rata sama "
+                "(mean kapasitas 5). Perbedaan dadu baru kelihatan di TOS."
+            )
+            fig, ax = plt.subplots(figsize=(9.2, 5.0))
+            plot_time_inventory_pareto(
+                rows, ax=ax, highlight=st.session_state.get("buffer_one_label")
+            )
+            fig.tight_layout()
+            _fig_to_st(fig)
+            fits = fit_buffer_trends(rows)
+            eq_rows = [
+                {
+                    "Dadu": f["die"],
+                    "Metrik": "Time on site" if f["metric"] == "time_on_site" else "Inventory time",
+                    "Model": "Linier" if f["degree"] == 1 else "Kuadratik",
+                    "Rumus": f["eq"],
+                    "R²": round(f["r2"], 3),
+                }
+                for f in fits
+            ]
+            st.dataframe(eq_rows, use_container_width=True, hide_index=True)
         with st.expander("Tabel semua skenario"):
             table = [
                 {
