@@ -1853,23 +1853,20 @@ def plot_time_inventory_pareto(
             is_anchor = bool(r.get("anchor")) or (
                 highlight is not None and lab == highlight
             )
-            s = 110 if is_anchor else 14
+            s = 78
             ax.scatter(
                 [x], [y1], c=stl["color"], marker=stl["marker"], s=s,
-                zorder=4, edgecolors="white", linewidths=0.2,
-                alpha=0.95 if is_anchor else 0.18,
+                zorder=5, edgecolors="white", linewidths=0.6, alpha=0.92,
                 label=stl["label"] if die not in plotted_tos else None,
             )
             plotted_tos.add(die)
-            if is_anchor:
-                ax.annotate(
-                    lab, (x, y1), textcoords="offset points", xytext=(6, 5),
-                    fontsize=6.5, color=stl["color"], fontweight="medium",
-                )
+            ax.annotate(
+                lab, (x, y1), textcoords="offset points", xytext=(5, 4),
+                fontsize=5.8, color=stl["color"],
+            )
             ax_r.scatter(
                 [x], [y2], c=invs["color"], marker=invs["marker"], s=s,
-                zorder=3, edgecolors="white", linewidths=0.2,
-                alpha=0.95 if is_anchor else 0.18,
+                zorder=4, edgecolors="white", linewidths=0.6, alpha=0.88,
                 label=invs["label"] if die not in plotted_inv else None,
             )
             plotted_inv.add(die)

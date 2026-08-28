@@ -1274,6 +1274,26 @@ IRIS_MOB_ANCHORS: Tuple[str, ...] = (
     "0-2-4-6-8",
     "0-3-6-9-12",
 )
+# Curated start patterns from Iris's lecture slides (readable, not 81-gap grid)
+IRIS_SLIDE_MOBS: Tuple[str, ...] = (
+    "0-1-2-3-4",
+    "0-1-2-3-5",
+    "0-1-2-4-5",
+    "0-1-3-4-5",
+    "0-2-3-4-5",
+    "0-1-2-3-6",
+    "0-1-2-4-6",
+    "0-1-2-5-6",
+    "0-1-3-4-6",
+    "0-1-3-5-6",
+    "0-1-4-5-6",
+    "0-2-3-4-6",
+    "0-2-3-5-6",
+    "0-2-4-5-6",
+    "0-3-4-5-6",
+    "0-2-4-6-8",
+    "0-3-6-9-12",
+)
 
 
 def iris_mobilization_grid(max_gap: int = 3) -> Dict[str, Tuple[int, ...]]:
@@ -1337,12 +1357,16 @@ def iris_buffer_sweep(
     total_units: int = DEFAULT_TOTAL_UNITS,
     seed: Optional[int] = 42,
     max_gap: int = 3,
+    dense: bool = False,
 ) -> List[Dict[str, object]]:
-    """Dense time-buffer map: 3 dice × gap-grid (default 81 patterns)."""
-    grid = iris_mobilization_grid(max_gap=max_gap)
+    """3 dice × Iris slide patterns (or dense gap-grid if ``dense``)."""
+    if dense:
+        keys = list(iris_mobilization_grid(max_gap=max_gap).keys())
+    else:
+        keys = list(IRIS_SLIDE_MOBS)
     rows: List[Dict[str, object]] = []
     for die in IRIS_DICE:
-        for mob, _offs in grid.items():
+        for mob in keys:
             r = run_time_inventory_buffer(
                 die=die, mobilization=mob, total_units=total_units, seed=seed
             )
@@ -1354,7 +1378,7 @@ def iris_buffer_sweep(
                     "duration": r.duration,
                     "time_on_site": r.total_time_on_site,
                     "inventory_time": r.total_inventory_time,
-                    "anchor": mob in IRIS_MOB_ANCHORS,
+                    "anchor": True,
                 }
             )
     return rows
