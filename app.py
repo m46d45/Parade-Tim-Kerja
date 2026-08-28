@@ -49,6 +49,7 @@ from parade_of_trades_core import (
     ParadeResult,
     IRIS_DICE,
     IRIS_MOBILIZATION,
+    BUFFER_VAR_PRESETS,
     run_time_inventory_buffer,
     iris_buffer_sweep,
     )
@@ -75,7 +76,7 @@ from parade_of_trades_plots import (
     fit_inv_vs_tos,
 )
 
-_APP_BUILD = "2026-08-28-buffer-theory-v112"
+_APP_BUILD = "2026-08-28-buffer-zoneflow-v113"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1652,28 +1653,38 @@ def tab_manual() -> None:
     st.caption(f"Build `{_APP_BUILD}` · zone-flow · 5 tim · batch default 4")
 
 
-def tab_buffer(seed: Optional[int]) -> None:
-    """Time–inventory buffer lab (Iris). Mean capacity fixed; no extra crews."""
+
+_BUF_VAR_LABEL = {
+    "no_variability": "Tanpa variability",
+    "low": "Sedang (±25%)",
+    "medium": "Tinggi (±50%)",
+}
+_BUF_VAR_SHORT = {
+    "no_variability": "Tanpa var",
+    "low": "Sedang",
+    "medium": "Tinggi",
+}
+
+
+def tab_buffer(total_units: int, seed: Optional[int], n_trades: int) -> None:
+    """Buffer waktu–inventory: zone-flow, kapasitas normal, batch 1."""
     st.subheader("Buffer")
     st.caption(
-        "Simulasi **time–inventory buffer**. Kapasitas rata-rata tetap (mean 5). "
-        "Yang diubah: kapan tim masuk. Inventory buffer muncul sebagai akibat."
+        "Buffer **waktu–inventory** pada parade tim kerja. Kapasitas **normal** "
+        "(1 zona/periode), batch **1**. Yang diubah: kapan tim masuk dan tingkat "
+        "variability. Analog kuliah Iris (5–5 / 4–6 / 3–7), tanpa dadu."
     )
-    left, right = st.columns([1.15, 1])
+    left, _right = st.columns([1.15, 1])
     with left:
-        die = st.selectbox(
-            "Dadu (mean 5)",
-            list(IRIS_DICE.keys()),
+        var = st.selectbox(
+            "Variability (per zona)",
+            list(BUFFER_VAR_PRESETS),
             index=0,
-            format_func=lambda d: {
-                "5-5": "5–5 — tanpa variasi",
-                "4-6": "4–6 — variasi rendah",
-                "3-7": "3–7 — variasi lebih tinggi",
-            }.get(d, d),
+            format_func=lambda d: _BUF_VAR_LABEL.get(d, d),
             key="buf_die",
         )
         mob = st.selectbox(
-            "Buffer waktu (mobilisasi T1…T5)",
+            "Buffer waktu (tunda masuk T1…T5)",
             list(IRIS_MOBILIZATION.keys()),
             index=0,
             key="buf_mob",
@@ -1685,17 +1696,27 @@ def tab_buffer(seed: Optional[int]) -> None:
     if run_one:
         try:
             st.session_state.buffer_one_result = run_time_inventory_buffer(
-                die=die, mobilization=mob, total_units=100, seed=seed
+                die=var,
+                mobilization=mob,
+                total_units=total_units,
+                seed=seed,
+                n_trades=n_trades,
             )
-            st.session_state.buffer_one_label = f"{die} {mob}"
+            st.session_state.buffer_one_label = f"{_BUF_VAR_SHORT.get(var, var)} {mob}"
         except RuntimeError as exc:
             st.error(str(exc))
     if run_map:
         try:
-            raw = iris_buffer_sweep(total_units=100, seed=seed)
-            st.session_state.buffer_map_rows = [
-                {k: v for k, v in r.items() if k != "result"} for r in raw
-            ]
+            raw = iris_buffer_sweep(
+                total_units=total_units, seed=seed, n_trades=n_trades
+            )
+            mapped = []
+            for r in raw:
+                d = {k: v for k, v in r.items() if k != "result"}
+                short = _BUF_VAR_SHORT.get(str(d.get("die")), d.get("die"))
+                d["label"] = f"{short} {d.get('mobilization')}"
+                mapped.append(d)
+            st.session_state.buffer_map_rows = mapped
         except RuntimeError as exc:
             st.error(str(exc))
 
@@ -1705,7 +1726,7 @@ def tab_buffer(seed: Optional[int]) -> None:
         st.markdown(f"##### Hasil `{st.session_state.get('buffer_one_label', '')}`")
         c1, c2, c3 = st.columns(3)
         c1.metric("Durasi", f"{one.duration}")
-        c2.metric("Time on site", f"{one.total_time_on_site}")
+        c2.metric("Waktu di lapangan", f"{one.total_time_on_site}")
         c3.metric("Inventory time", f"{one.total_inventory_time}")
         fig, ax = plt.subplots(figsize=(8.5, 3.8))
         plot_line_of_balance(one, ax=ax, title="Line of Balance")
@@ -1714,11 +1735,12 @@ def tab_buffer(seed: Optional[int]) -> None:
 
     rows = st.session_state.get("buffer_map_rows")
     if rows:
+        floor = n_trades * total_units
         st.divider()
-        st.markdown("##### Time on site & inventory vs durasi")
+        st.markdown("##### Waktu di lapangan & inventory vs durasi")
         st.caption(
-            "Kurva teori: TOS ≥ 100 (turun ke lantai proses). INV linier vs durasi. "
-            "5–5 identitas. 4–6 / 3–7: invers atau exp ke 100 (Kingman)."
+            f"Kurva teori: TOS ≥ {floor} ({n_trades} tim × {total_units} zona). "
+            "Tanpa var = lantai proses. Variasi: exp/invers turun ke lantai. INV linier vs durasi."
         )
         fig, ax = plt.subplots(figsize=(9.4, 5.4))
         plot_time_inventory_pareto(
@@ -1729,9 +1751,9 @@ def tab_buffer(seed: Optional[int]) -> None:
         fits = fit_buffer_trends(rows)
         eq_rows = [
             {
-                "Dadu": f["die"],
-                "Metrik": "Time on site" if f["metric"] == "time_on_site" else "Inventory time",
-                "Model": f.get("model", "Linier" if f.get("degree") == 1 else "Kuadratik"),
+                "Variability": _BUF_VAR_SHORT.get(f["die"], f["die"]),
+                "Metrik": "Waktu di lapangan" if f["metric"] == "time_on_site" else "Inventory time",
+                "Model": f.get("model", ""),
                 "Rumus": f["eq"],
                 "R²": round(f["r2"], 3),
             }
@@ -1739,9 +1761,10 @@ def tab_buffer(seed: Optional[int]) -> None:
         ]
         st.dataframe(eq_rows, use_container_width=True, hide_index=True)
 
-        st.markdown("##### Inventory time vs time on site")
+        st.markdown("##### Inventory time vs waktu di lapangan")
         st.caption(
-            "Trade-off I vs T: 5–5 vertikal. Variasi: INV = a + b/(TOS−100) — TOS turun, INV naik."
+            f"Trade-off I vs T: tanpa var vertikal di TOS={floor}. "
+            "Variasi: INV = a + b/(TOS − lantai)."
         )
         fig, ax = plt.subplots(figsize=(9.0, 5.2))
         plot_inventory_vs_tos(
@@ -1751,7 +1774,7 @@ def tab_buffer(seed: Optional[int]) -> None:
         _fig_to_st(fig)
         pair_eq = [
             {
-                "Dadu": f["die"],
+                "Variability": _BUF_VAR_SHORT.get(f["die"], f["die"]),
                 "Model": f.get("model", ""),
                 "Rumus": f["eq"],
                 "R²": round(f["r2"], 3),
@@ -1764,7 +1787,7 @@ def tab_buffer(seed: Optional[int]) -> None:
                 {
                     "Skenario": r["label"],
                     "Durasi": r["duration"],
-                    "Time on site": r["time_on_site"],
+                    "Waktu di lapangan": r["time_on_site"],
                     "Inventory time": r["inventory_time"],
                 }
                 for r in rows
@@ -1784,7 +1807,7 @@ def main() -> None:
     with tabs[2]:
         tab_takt(total_units, seed, n_trades)
     with tabs[3]:
-        tab_buffer(seed)
+        tab_buffer(total_units, seed, n_trades)
     with tabs[4]:
         tab_stats()
     with tabs[5]:

@@ -195,14 +195,14 @@ Di sini permintaan = **lantai** (bukan jumlah zona). Waktu diisi **per lantai**.
 
 ## 8. Tab Buffer
 
-Laboratorium **time–inventory buffer** (Iris Tommelein / PPI). Kapasitas rata-rata **tidak dinaikkan** (mean dadu = 5).
+Laboratorium **time–inventory buffer** pada **parade zona–tim** (bukan dadu). Analog kuliah Iris (5–5 / 4–6 / 3–7).
 
-- Dadu: 5–5 / 4–6 / 3–7 (variasi, bukan nambah kru).
-- Mobilisasi: `0-1-2-3-4`, `0-2-4-6-8`, `0-3-6-9-12` = buffer **waktu**.
-- Metrik: durasi, *time on site*, *inventory time* (WIP × periode — akibat tunda).
-- **Jalankan** satu skenario; **Peta tren** = 81 pola tunda × 3 dadu.
-
-Bukan tab buffer kapasitas. Mode zona di Simulasi tidak berubah.
+- Mesin sama dengan Simulasi: **zone-flow**, kapasitas **normal** (1 zona/periode), **batch 1**.
+- Variability: tanpa / sedang (±25%) / tinggi (±50%) — per zona.
+- Tunda masuk T1…T5: `0-1-2-3-4`, `0-2-4-6-8`, `0-3-6-9-12` (dan pola Iris lain di peta).
+- Total zona & seed dari **sidebar**. Kapasitas rata-rata **tidak** ditambah.
+- Metrik: durasi, **waktu di lapangan**, inventory time.
+- Kurva teori: TOS ≥ 5 × zona (tanpa var = lantai); variasi turun ke lantai; INV linier vs durasi.
 
 ---
 

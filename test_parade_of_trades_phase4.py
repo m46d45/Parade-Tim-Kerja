@@ -87,16 +87,24 @@ class TestTaktStandby(unittest.TestCase):
     def test_iris_all5_tight_duration_24(self):
         from parade_of_trades_core import run_time_inventory_buffer
 
-        r = run_time_inventory_buffer("5-5", "0-1-2-3-4", total_units=100, seed=0)
-        self.assertEqual(r.duration, 24)
-        self.assertEqual(r.total_time_on_site, 100)
+        r = run_time_inventory_buffer(
+            "no_variability", "0-1-2-3-4", total_units=10, seed=0
+        )
+        self.assertTrue(r.config.zone_flow)
+        self.assertEqual(r.config.batch_size, 1)
+        self.assertEqual(r.total_time_on_site, 50)
         self.assertGreater(r.total_inventory_time, 0)
+        self.assertGreaterEqual(r.duration, 14)
 
     def test_iris_looser_start_longer_duration(self):
         from parade_of_trades_core import run_time_inventory_buffer
 
-        tight = run_time_inventory_buffer("5-5", "0-1-2-3-4", total_units=100, seed=0)
-        wide = run_time_inventory_buffer("5-5", "0-3-6-9-12", total_units=100, seed=0)
+        tight = run_time_inventory_buffer(
+            "no_variability", "0-1-2-3-4", total_units=10, seed=0
+        )
+        wide = run_time_inventory_buffer(
+            "no_variability", "0-3-6-9-12", total_units=10, seed=0
+        )
         self.assertGreater(wide.duration, tight.duration)
         self.assertGreaterEqual(wide.total_inventory_time, tight.total_inventory_time)
 
@@ -109,11 +117,12 @@ class TestTaktStandby(unittest.TestCase):
 
         grid = iris_mobilization_grid(max_gap=3)
         self.assertEqual(len(grid), 81)
-        rows = iris_buffer_sweep(total_units=100, seed=1)
+        rows = iris_buffer_sweep(total_units=10, seed=1)
         self.assertEqual(len(rows), len(IRIS_SLIDE_MOBS) * 3)
         labels = {r["label"] for r in rows}
-        self.assertIn("3-7 0-3-6-9-12", labels)
-        self.assertIn("4-6 0-1-2-3-5", labels)
+        self.assertIn("medium 0-3-6-9-12", labels)
+        self.assertIn("low 0-1-2-3-5", labels)
+        self.assertTrue(all(r["tos_floor"] == 50 for r in rows))
 
     def test_staggered_mobilization_delays_downstream(self):
         cfg = ParadeConfig.from_pairs(

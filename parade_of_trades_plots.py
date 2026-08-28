@@ -1713,14 +1713,20 @@ def plot_single_scenario_lob(
 
 # Iris-style time-inventory buffer scatter (duration vs time-on-site / inventory-time)
 _DIE_STYLE = {
-    "5-5": {"color": "#2563eb", "marker": "s", "label": "Time on site · 5–5"},
-    "4-6": {"color": "#06b6d4", "marker": "o", "label": "Time on site · 4–6"},
-    "3-7": {"color": "#7c3aed", "marker": "D", "label": "Time on site · 3–7"},
+    "no_variability": {"color": "#2563eb", "marker": "s", "label": "Waktu di lapangan · tanpa var"},
+    "low": {"color": "#06b6d4", "marker": "o", "label": "Waktu di lapangan · sedang"},
+    "medium": {"color": "#7c3aed", "marker": "D", "label": "Waktu di lapangan · tinggi"},
+    "5-5": {"color": "#2563eb", "marker": "s", "label": "Waktu di lapangan · tanpa var"},
+    "4-6": {"color": "#06b6d4", "marker": "o", "label": "Waktu di lapangan · sedang"},
+    "3-7": {"color": "#7c3aed", "marker": "D", "label": "Waktu di lapangan · tinggi"},
 }
 _DIE_INV_STYLE = {
-    "5-5": {"color": "#f59e0b", "marker": "s", "label": "Inventory time · 5–5"},
-    "4-6": {"color": "#ea580c", "marker": "o", "label": "Inventory time · 4–6"},
-    "3-7": {"color": "#dc2626", "marker": "D", "label": "Inventory time · 3–7"},
+    "no_variability": {"color": "#f59e0b", "marker": "s", "label": "Inventory time · tanpa var"},
+    "low": {"color": "#ea580c", "marker": "o", "label": "Inventory time · sedang"},
+    "medium": {"color": "#dc2626", "marker": "D", "label": "Inventory time · tinggi"},
+    "5-5": {"color": "#f59e0b", "marker": "s", "label": "Inventory time · tanpa var"},
+    "4-6": {"color": "#ea580c", "marker": "o", "label": "Inventory time · sedang"},
+    "3-7": {"color": "#dc2626", "marker": "D", "label": "Inventory time · tinggi"},
 }
 
 
@@ -1781,16 +1787,17 @@ def predict_buffer_curve(fit: dict, x):
     x = np.asarray(x, dtype=float)
     kind = fit.get("kind", "poly")
     c = fit.get("coef") or []
+    floor = float(fit.get("tos_floor") or TOS_FLOOR)
     if kind == "poly":
         return np.polyval(c, x)
     if kind == "const":
-        return np.full_like(x, float(c[0]), dtype=float)
+        return np.full_like(x, floor if not c else float(c[0]), dtype=float)
     if kind == "floor_inv":
-        return TOS_FLOOR + float(c[0]) / np.maximum(x, 1e-9)
+        return floor + float(c[0]) / np.maximum(x, 1e-9)
     if kind == "floor_exp":
-        return TOS_FLOOR + float(c[0]) * np.exp(-float(c[1]) * x)
+        return floor + float(c[0]) * np.exp(-float(c[1]) * x)
     if kind == "hyp_tos":
-        return float(c[0]) + float(c[1]) / np.maximum(x - TOS_FLOOR, 1e-3)
+        return float(c[0]) + float(c[1]) / np.maximum(x - floor, 1e-3)
     if kind == "log":
         return c[0] + c[1] * np.log(np.maximum(x, 1e-9))
     if kind == "power":
@@ -1821,25 +1828,28 @@ def _pack_fit(name, kind, coef, y, yhat, mx, my, eq, extra=None):
     return d
 
 
-def _fit_tos_theory(mx, my) -> dict:
-    """TOS = 100 + surplus. Surplus ~ B/D or A e^{-λD} (Kingman: turun ke lantai proses)."""
+def _fit_tos_theory(mx, my, tos_floor: float) -> dict:
+    """TOS = lantai + surplus. Surplus ~ B/D or A e^{-λD}."""
     import numpy as np
     x = np.asarray(mx, dtype=float)
     y = np.asarray(my, dtype=float)
-    excess = y - TOS_FLOOR
+    floor = float(tos_floor)
+    excess = y - floor
+    extra = {"tos_floor": floor}
     cands = []
 
     invx = 1.0 / np.maximum(x, 1e-9)
     denom = float(np.dot(invx, invx)) or 1.0
     B = max(0.0, float(np.dot(invx, excess) / denom))
-    yhat = TOS_FLOOR + B * invx
+    yhat = floor + B * invx
     cands.append(
         _pack_fit(
-            "Invers ke 100",
+            f"Invers ke {floor:g}",
             "floor_inv",
             [B],
             y, yhat, mx, my,
-            f"TOS = 100 + {B:.3f}/D",
+            f"TOS = {floor:g} + {B:.3f}/D",
+            extra=extra,
         )
     )
 
@@ -1848,7 +1858,7 @@ def _fit_tos_theory(mx, my) -> dict:
         z = np.exp(-lam * x)
         zz = float(np.dot(z, z)) or 1.0
         A = max(0.0, float(np.dot(z, excess) / zz))
-        yhat = TOS_FLOOR + A * z
+        yhat = floor + A * z
         sse = float(np.sum((y - yhat) ** 2))
         if best_sse is None or sse < best_sse:
             best_sse, best = sse, (A, lam, yhat)
@@ -1856,11 +1866,12 @@ def _fit_tos_theory(mx, my) -> dict:
         A, lam, yhat = best
         cands.append(
             _pack_fit(
-                "Exp ke 100",
+                f"Exp ke {floor:g}",
                 "floor_exp",
                 [A, lam],
                 y, yhat, mx, my,
-                f"TOS = 100 + {A:.3f}·e^(-{lam:.4f} D)",
+                f"TOS = {floor:g} + {A:.3f}·e^(-{lam:.4f} D)",
+                extra=extra,
             )
         )
     cands.sort(key=lambda d: (-d["r2"], d["aic"]))
@@ -1887,12 +1898,27 @@ def _fit_inv_linear(mx, my) -> dict:
     )
 
 
+def _infer_tos_floor(rows: Sequence[dict]) -> float:
+    for r in rows:
+        if r.get("tos_floor"):
+            return float(r["tos_floor"])
+    stables = [
+        float(r["time_on_site"])
+        for r in rows
+        if str(r.get("die")) in ("no_variability", "5-5", "tanpa")
+    ]
+    if stables:
+        return float(min(stables))
+    return float(TOS_FLOOR)
+
+
 def fit_buffer_trends(rows: Sequence[dict]) -> List[dict]:
-    """Kurva selaras teori: 5-5 identitas; TOS≥100; INV linier vs D."""
+    """Kurva teori: tanpa var = lantai proses; TOS ≥ lantai; INV linier vs D."""
     import numpy as np
     by_die: Dict[str, List[dict]] = {}
     for row in rows:
         by_die.setdefault(str(row["die"]), []).append(row)
+    floor = _infer_tos_floor(rows)
 
     out: List[dict] = []
     for die, group in by_die.items():
@@ -1901,23 +1927,25 @@ def fit_buffer_trends(rows: Sequence[dict]) -> List[dict]:
         inv = [float(r["inventory_time"]) for r in group]
         mx_t, my_t = _bin_means(xs, tos)
         mx_i, my_i = _bin_means(xs, inv)
+        extra = {"tos_floor": floor}
 
-        if die == "5-5" or float(np.std(my_t)) < 1e-6:
-            yhat = np.full(len(mx_t), TOS_FLOOR)
+        if die in ("no_variability", "5-5", "tanpa") or float(np.std(my_t)) < 1e-6:
+            yhat = np.full(len(mx_t), floor)
             fit_t = _pack_fit(
                 "Lantai proses",
                 "const",
-                [TOS_FLOOR],
+                [floor],
                 np.asarray(my_t), yhat, mx_t, my_t,
-                "TOS = 100",
+                f"TOS = {floor:g}",
+                extra=extra,
             )
         else:
-            fit_t = _fit_tos_theory(mx_t, my_t)
+            fit_t = _fit_tos_theory(mx_t, my_t, floor)
         fit_t.update({"die": die, "metric": "time_on_site"})
         out.append(fit_t)
 
         fit_i = _fit_inv_linear(mx_i, my_i)
-        fit_i.update({"die": die, "metric": "inventory_time"})
+        fit_i.update({"die": die, "metric": "inventory_time", "tos_floor": floor})
         out.append(fit_i)
     return out
 
@@ -1939,8 +1967,8 @@ def plot_time_inventory_pareto(
         by_die.setdefault(str(row["die"]), []).append(row)
 
     fits = {(f["die"], f["metric"]): f for f in fit_buffer_trends(rows)}
-    order = [d for d in ("5-5", "4-6", "3-7") if d in by_die] + [
-        d for d in by_die if d not in ("5-5", "4-6", "3-7")
+    order = [d for d in ("no_variability", "low", "medium") if d in by_die] + [
+        d for d in by_die if d not in ("no_variability", "low", "medium")
     ]
     plotted_tos: set = set()
     plotted_inv: set = set()
@@ -2006,9 +2034,9 @@ def plot_time_inventory_pareto(
                 zorder=5, edgecolors="white", linewidths=0.6, alpha=0.9,
             )
 
-    ax.set_xlabel("Total Duration  D")
-    ax.set_ylabel("Total Trade Time on Site  TOS", color="#1d4ed8")
-    ax_r.set_ylabel("Total Inventory Time  INV", color="#c2410c")
+    ax.set_xlabel("Durasi  D")
+    ax.set_ylabel("Waktu di lapangan  TOS", color="#1d4ed8")
+    ax_r.set_ylabel("Inventory time  INV", color="#c2410c")
     ax.tick_params(axis="y", colors="#1d4ed8")
     ax_r.tick_params(axis="y", colors="#c2410c")
     ax.grid(True, linestyle="--", alpha=0.35)
@@ -2021,9 +2049,12 @@ def plot_time_inventory_pareto(
 
 # Iris pairing: Inventory time (Y) vs Time on site (X)
 _IRIS_PAIR = {
-    "5-5": {"color": "#16a34a", "marker": "s", "label": "5–5"},
-    "4-6": {"color": "#ca8a04", "marker": "o", "label": "4–6"},
-    "3-7": {"color": "#dc2626", "marker": "D", "label": "3–7"},
+    "no_variability": {"color": "#16a34a", "marker": "s", "label": "Tanpa var"},
+    "low": {"color": "#ca8a04", "marker": "o", "label": "Sedang"},
+    "medium": {"color": "#dc2626", "marker": "D", "label": "Tinggi"},
+    "5-5": {"color": "#16a34a", "marker": "s", "label": "Tanpa var"},
+    "4-6": {"color": "#ca8a04", "marker": "o", "label": "Sedang"},
+    "3-7": {"color": "#dc2626", "marker": "D", "label": "Tinggi"},
 }
 
 
@@ -2039,27 +2070,29 @@ def fit_inv_vs_tos(rows: Sequence[dict]) -> List[dict]:
         tos = [float(r["time_on_site"]) for r in group]
         inv = [float(r["inventory_time"]) for r in group]
         mx, my = _bin_means(tos, inv)
-        if die == "5-5" or float(np.std(mx)) < 1e-6:
+        floor = _infer_tos_floor(rows)
+        if die in ("no_variability", "5-5", "tanpa") or float(np.std(mx)) < 1e-6:
             out.append(
                 {
                     "die": die,
-                    "eq": "TOS = 100  (vertikal; INV mengikuti tunda)",
+                    "eq": f"TOS = {floor:g}  (vertikal; INV mengikuti tunda)",
                     "r2": 1.0,
                     "model": "Vertikal",
                     "vertical": True,
                     "kind": "const",
-                    "tos0": TOS_FLOOR,
+                    "tos0": floor,
+                    "tos_floor": floor,
                     "inv_min": float(min(inv)),
                     "inv_max": float(max(inv)),
                     "x_mean": mx,
                     "y_mean": my,
-                    "coef": [TOS_FLOOR],
+                    "coef": [floor],
                 }
             )
             continue
         x = np.asarray(mx, dtype=float)
         y = np.asarray(my, dtype=float)
-        z = 1.0 / np.maximum(x - TOS_FLOOR, 0.35)
+        z = 1.0 / np.maximum(x - floor, 0.35)
         A = np.column_stack([np.ones(len(x)), z])
         co, *_ = np.linalg.lstsq(A, y, rcond=None)
         a, b = float(co[0]), float(co[1])
@@ -2072,7 +2105,8 @@ def fit_inv_vs_tos(rows: Sequence[dict]) -> List[dict]:
             "hyp_tos",
             [a, b],
             y, yhat, mx, my,
-            f"INV = {a:.1f} + {b:.1f}/(TOS − 100)",
+            f"INV = {a:.1f} + {b:.1f}/(TOS − {floor:g})",
+            extra={"tos_floor": floor},
         )
         fit.update({"die": die, "vertical": False})
         out.append(fit)
@@ -2094,7 +2128,7 @@ def plot_inventory_vs_tos(
     for row in rows:
         by_die.setdefault(str(row["die"]), []).append(row)
     fits = {f["die"]: f for f in fit_inv_vs_tos(rows)}
-    order = [d for d in ("5-5", "4-6", "3-7") if d in by_die]
+    order = [d for d in ("no_variability", "low", "medium") if d in by_die]
 
     for die in order:
         group = by_die[die]
@@ -2108,7 +2142,7 @@ def plot_inventory_vs_tos(
                 [fit["tos0"], fit["tos0"]],
                 [fit["inv_min"], fit["inv_max"]],
                 color=stl["color"], linestyle="--", linewidth=2.0, zorder=3,
-                label=f"5–5  TOS tetap",
+                label=f"Tanpa var  TOS tetap",
             )
         elif fit and not fit.get("vertical"):
             xg = np.linspace(min(fit["x_mean"]), max(fit["x_mean"]), 100)
@@ -2145,9 +2179,9 @@ def plot_inventory_vs_tos(
                 zorder=5, edgecolors="white", linewidths=0.6, alpha=0.9,
             )
 
-    ax.set_xlabel("Total Trade Time on Site  TOS")
-    ax.set_ylabel("Total Inventory Time  INV")
-    ax.set_title("Inventory time vs time on site")
+    ax.set_xlabel("Waktu di lapangan  TOS")
+    ax.set_ylabel("Inventory time  INV")
+    ax.set_title("Inventory time vs waktu di lapangan")
     ax.grid(True, linestyle="--", alpha=0.4)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)

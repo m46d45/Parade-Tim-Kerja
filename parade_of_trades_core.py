@@ -1257,12 +1257,25 @@ def run_preset(
     return result
 
 
-# Iris time-inventory buffer experiment (capacity mean fixed at 5)
-IRIS_DICE: Dict[str, Tuple[int, int]] = {
-    "5-5": (5, 5),
-    "4-6": (4, 6),
-    "3-7": (3, 7),
+# Time-inventory buffer (zone-flow Parade Tim Kerja; analog Iris 5-5 / 4-6 / 3-7)
+BUFFER_VAR_PRESETS: Tuple[str, ...] = ("no_variability", "low", "medium")
+BUFFER_VAR_FACTORS: Dict[str, Tuple[float, float]] = {
+    "no_variability": (1.0, 1.0),
+    "low": (0.75, 1.25),
+    "medium": (0.5, 1.5),
 }
+BUFFER_VAR_ALIASES: Dict[str, str] = {
+    "5-5": "no_variability",
+    "tanpa": "no_variability",
+    "no_variability": "no_variability",
+    "4-6": "low",
+    "sedang": "low",
+    "low": "low",
+    "3-7": "medium",
+    "tinggi": "medium",
+    "medium": "medium",
+}
+IRIS_DICE = {k: k for k in BUFFER_VAR_PRESETS}  # back-compat name
 IRIS_MOBILIZATION: Dict[str, Tuple[int, ...]] = {
     "0-1-2-3-4": (0, 1, 2, 3, 4),
     "0-2-4-6-8": (0, 2, 4, 6, 8),
@@ -1330,55 +1343,68 @@ def _parse_mobilization(mobilization: str, n_trades: int = 5) -> Tuple[int, ...]
 
 
 def run_time_inventory_buffer(
-    die: str = "5-5",
+    die: str = "no_variability",
     mobilization: str = "0-1-2-3-4",
-    total_units: int = DEFAULT_TOTAL_UNITS,
+    total_units: int = 10,
     seed: Optional[int] = 42,
     n_trades: int = 5,
+    base_speed: float = 1.0,
 ) -> ParadeResult:
-    """Classic unit-flow run: fixed mean capacity, time-buffer via start delays."""
-    if die not in IRIS_DICE:
-        raise ValueError(f"Unknown die '{die}'. Choose from {list(IRIS_DICE)}")
+    """Zone-flow time-buffer run. Mean capacity locked (normal); variability per zona."""
+    var = BUFFER_VAR_ALIASES.get(die, die)
+    if var not in BUFFER_VAR_FACTORS:
+        raise ValueError(f"Unknown variability '{die}'. Use {list(BUFFER_VAR_PRESETS)}")
     offs = _parse_mobilization(mobilization, n_trades=n_trades)
-    lo, hi = IRIS_DICE[die]
+    f_lo, f_hi = BUFFER_VAR_FACTORS[var]
+    b = float(base_speed)
+    lo, hi = max(1e-9, b * f_lo), max(1e-9, b * f_hi)
+    det = abs(f_lo - f_hi) < 1e-12
+    pair = (lo, hi, 0.5, b, det)
     cfg = ParadeConfig.from_pairs(
-        [(lo, hi)] * n_trades,
+        [pair] * n_trades,
+        trade_names=DEFAULT_TRADE_NAMES[:n_trades] if n_trades <= 5 else None,
         total_units=total_units,
         seed=seed,
         same_period_handoff=False,
         mobilization_offsets=offs,
-        zone_flow=False,
+        zone_flow=True,
         batch_size=1,
     )
     return ParadeOfTrades(cfg).run()
 
 
 def iris_buffer_sweep(
-    total_units: int = DEFAULT_TOTAL_UNITS,
+    total_units: int = 10,
     seed: Optional[int] = 42,
     max_gap: int = 3,
     dense: bool = False,
+    n_trades: int = 5,
 ) -> List[Dict[str, object]]:
-    """3 dice × Iris slide patterns (or dense gap-grid if ``dense``)."""
+    """3 tingkat variability × pola tunda (zone-flow, batch=1, kapasitas normal)."""
     if dense:
         keys = list(iris_mobilization_grid(max_gap=max_gap).keys())
     else:
         keys = list(IRIS_SLIDE_MOBS)
     rows: List[Dict[str, object]] = []
-    for die in IRIS_DICE:
+    for var in BUFFER_VAR_PRESETS:
         for mob in keys:
             r = run_time_inventory_buffer(
-                die=die, mobilization=mob, total_units=total_units, seed=seed
+                die=var,
+                mobilization=mob,
+                total_units=total_units,
+                seed=seed,
+                n_trades=n_trades,
             )
             rows.append(
                 {
-                    "die": die,
+                    "die": var,
                     "mobilization": mob,
-                    "label": f"{die} {mob}",
+                    "label": f"{var} {mob}",
                     "duration": r.duration,
                     "time_on_site": r.total_time_on_site,
                     "inventory_time": r.total_inventory_time,
-                    "anchor": True,
+                    "anchor": mob in IRIS_MOB_ANCHORS,
+                    "tos_floor": n_trades * total_units,
                 }
             )
     return rows
