@@ -1379,32 +1379,43 @@ def iris_buffer_sweep(
     max_gap: int = 3,
     dense: bool = False,
     n_trades: int = 5,
+    n_reps: int = 12,
 ) -> List[Dict[str, object]]:
-    """3 tingkat variability × pola tunda (zone-flow, batch=1, kapasitas normal)."""
+    """3 tingkat variability × pola tunda. Default: 3 jangkar, rata-rata n_reps seed."""
     if dense:
-        keys = list(iris_mobilization_grid(max_gap=max_gap).keys())
-    else:
         keys = list(IRIS_SLIDE_MOBS)
+    else:
+        keys = list(IRIS_MOBILIZATION.keys())
+    base = 0 if seed is None else int(seed)
     rows: List[Dict[str, object]] = []
     for var in BUFFER_VAR_PRESETS:
         for mob in keys:
-            r = run_time_inventory_buffer(
-                die=var,
-                mobilization=mob,
-                total_units=total_units,
-                seed=seed,
-                n_trades=n_trades,
-            )
+            ds: List[float] = []
+            ts: List[float] = []
+            invs: List[float] = []
+            for i in range(max(1, int(n_reps))):
+                r = run_time_inventory_buffer(
+                    die=var,
+                    mobilization=mob,
+                    total_units=total_units,
+                    seed=base + i,
+                    n_trades=n_trades,
+                )
+                ds.append(float(r.duration))
+                ts.append(float(r.total_time_on_site))
+                invs.append(float(r.total_inventory_time))
+            n = len(ds)
             rows.append(
                 {
                     "die": var,
                     "mobilization": mob,
                     "label": f"{var} {mob}",
-                    "duration": r.duration,
-                    "time_on_site": r.total_time_on_site,
-                    "inventory_time": r.total_inventory_time,
-                    "anchor": mob in IRIS_MOB_ANCHORS,
+                    "duration": sum(ds) / n,
+                    "time_on_site": sum(ts) / n,
+                    "inventory_time": sum(invs) / n,
+                    "anchor": mob in IRIS_MOBILIZATION,
                     "tos_floor": n_trades * total_units,
+                    "n_reps": n,
                 }
             )
     return rows

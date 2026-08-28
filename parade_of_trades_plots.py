@@ -1950,12 +1950,19 @@ def fit_buffer_trends(rows: Sequence[dict]) -> List[dict]:
     return out
 
 
+_MOB_SHORT = {
+    "0-1-2-3-4": "rapat",
+    "0-2-4-6-8": "tengah",
+    "0-3-6-9-12": "longgar",
+}
+
+
 def plot_time_inventory_pareto(
     rows: Sequence[dict],
     ax: Optional[Axes] = None,
     highlight: Optional[str] = None,
 ) -> Axes:
-    """Fit rumus pada rata-rata tiap durasi, lalu gambar kurva rumus itu."""
+    """Rata-rata TOS/INV vs durasi; kurva teori per keluarga variability."""
     import numpy as np
 
     if ax is None:
@@ -1984,55 +1991,46 @@ def plot_time_inventory_pareto(
         fit_t = fits.get((die, "time_on_site"))
         fit_i = fits.get((die, "inventory_time"))
         if fit_t:
-            xg = np.linspace(min(fit_t["x_mean"]), max(fit_t["x_mean"]), 100)
+            xmin, xmax = min(fit_t["x_mean"]), max(fit_t["x_mean"])
+            span = max(2.0, xmax - xmin)
+            xg = np.linspace(xmin, xmax + 0.35 * span, 120)
             ax.plot(
                 xg, predict_buffer_curve(fit_t, xg),
                 color=stl["color"], linestyle="--", linewidth=1.9, zorder=3,
-                label=f"Regresi TOS {die}",
+                label=stl["label"] if die not in plotted_tos else None,
             )
+            plotted_tos.add(die)
         if fit_i:
-            xg = np.linspace(min(fit_i["x_mean"]), max(fit_i["x_mean"]), 100)
+            xmin, xmax = min(fit_i["x_mean"]), max(fit_i["x_mean"])
+            xg = np.linspace(xmin, xmax, 100)
             ax_r.plot(
                 xg, predict_buffer_curve(fit_i, xg),
                 color=invs["color"], linestyle="--", linewidth=1.9, zorder=3,
-                label=f"Regresi INV {die}",
+                label=invs["label"] if die not in plotted_inv else None,
             )
+            plotted_inv.add(die)
 
         for r, x, y1, y2 in zip(group, xs, y_tos, y_inv):
             lab = str(r["label"])
             is_anchor = bool(r.get("anchor")) or (
                 highlight is not None and lab == highlight
             )
-            s = 78
+            s = 88 if is_anchor else 28
             ax.scatter(
                 [x], [y1], c=stl["color"], marker=stl["marker"], s=s,
-                zorder=5, edgecolors="white", linewidths=0.6, alpha=0.92,
-                label=stl["label"] if die not in plotted_tos else None,
-            )
-            plotted_tos.add(die)
-            ax.annotate(
-                lab, (x, y1), textcoords="offset points", xytext=(5, 4),
-                fontsize=5.8, color=stl["color"],
+                zorder=5, edgecolors="white", linewidths=0.6, alpha=0.95,
             )
             ax_r.scatter(
                 [x], [y2], c=invs["color"], marker=invs["marker"], s=s,
-                zorder=4, edgecolors="white", linewidths=0.6, alpha=0.88,
-                label=invs["label"] if die not in plotted_inv else None,
+                zorder=4, edgecolors="white", linewidths=0.6, alpha=0.9,
             )
-            plotted_inv.add(die)
-
-        if fit_t:
-            ax.scatter(
-                fit_t["x_mean"], fit_t["y_mean"],
-                c=stl["color"], marker=stl["marker"], s=36,
-                zorder=5, edgecolors="white", linewidths=0.6, alpha=0.9,
-            )
-        if fit_i:
-            ax_r.scatter(
-                fit_i["x_mean"], fit_i["y_mean"],
-                c=invs["color"], marker=invs["marker"], s=36,
-                zorder=5, edgecolors="white", linewidths=0.6, alpha=0.9,
-            )
+            if is_anchor:
+                short = _MOB_SHORT.get(str(r.get("mobilization")), "")
+                if short:
+                    ax.annotate(
+                        short, (x, y1), textcoords="offset points", xytext=(5, 5),
+                        fontsize=7.2, color=stl["color"], fontweight="medium",
+                    )
 
     ax.set_xlabel("Durasi  D")
     ax.set_ylabel("Waktu di lapangan  TOS", color="#1d4ed8")
@@ -2043,7 +2041,7 @@ def plot_time_inventory_pareto(
     ax.spines["top"].set_visible(False)
     h1, l1 = ax.get_legend_handles_labels()
     h2, l2 = ax_r.get_legend_handles_labels()
-    ax.legend(h1 + h2, l1 + l2, loc="upper left", fontsize=7.2, framealpha=0.94)
+    ax.legend(h1 + h2, l1 + l2, loc="upper left", fontsize=7.4, framealpha=0.94)
     return ax
 
 
@@ -2149,7 +2147,7 @@ def plot_inventory_vs_tos(
             ax.plot(
                 xg, predict_buffer_curve(fit, xg),
                 color=stl["color"], linestyle="--", linewidth=2.0, zorder=3,
-                label=f"{fit.get('model', 'Regresi')} {die}",
+                label=stl["label"],
             )
 
         labeled = False
@@ -2168,10 +2166,12 @@ def plot_inventory_vs_tos(
             )
             labeled = True
             if is_anchor:
-                ax.annotate(
-                    lab, (x, y), textcoords="offset points", xytext=(6, 4),
-                    fontsize=6.5, color=stl["color"], fontweight="medium",
-                )
+                short = _MOB_SHORT.get(str(r.get("mobilization")), "")
+                if short:
+                    ax.annotate(
+                        short, (x, y), textcoords="offset points", xytext=(6, 4),
+                        fontsize=7.2, color=stl["color"], fontweight="medium",
+                    )
         if fit:
             ax.scatter(
                 fit["x_mean"], fit["y_mean"],

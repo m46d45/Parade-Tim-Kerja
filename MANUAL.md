@@ -199,7 +199,8 @@ Laboratorium **time–inventory buffer** pada **parade zona–tim** (bukan dadu)
 
 - Mesin sama dengan Simulasi: **zone-flow**, kapasitas **normal** (1 zona/periode), **batch 1**.
 - Variability: tanpa / sedang (±25%) / tinggi (±50%) — per zona.
-- Tunda masuk T1…T5: `0-1-2-3-4`, `0-2-4-6-8`, `0-3-6-9-12` (dan pola Iris lain di peta).
+- Tunda masuk T1…T5: rapat `0-1-2-3-4`, tengah `0-2-4-6-8`, longgar `0-3-6-9-12`.
+- **Peta tren**: 3 × 3, rata-rata 12 seed (bukan 1 run berisik).
 - Total zona & seed dari **sidebar**. Kapasitas rata-rata **tidak** ditambah.
 - Metrik: durasi, **waktu di lapangan**, inventory time.
 - Kurva teori: TOS ≥ 5 × zona (tanpa var = lantai); variasi turun ke lantai; INV linier vs durasi.

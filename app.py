@@ -76,7 +76,7 @@ from parade_of_trades_plots import (
     fit_inv_vs_tos,
 )
 
-_APP_BUILD = "2026-08-28-buffer-zoneflow-v113"
+_APP_BUILD = "2026-08-28-buffer-3x3-v114"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1708,7 +1708,7 @@ def tab_buffer(total_units: int, seed: Optional[int], n_trades: int) -> None:
     if run_map:
         try:
             raw = iris_buffer_sweep(
-                total_units=total_units, seed=seed, n_trades=n_trades
+                total_units=total_units, seed=seed, n_trades=n_trades, n_reps=12
             )
             mapped = []
             for r in raw:
@@ -1739,8 +1739,9 @@ def tab_buffer(total_units: int, seed: Optional[int], n_trades: int) -> None:
         st.divider()
         st.markdown("##### Waktu di lapangan & inventory vs durasi")
         st.caption(
-            f"Kurva teori: TOS ≥ {floor} ({n_trades} tim × {total_units} zona). "
-            "Tanpa var = lantai proses. Variasi: exp/invers turun ke lantai. INV linier vs durasi."
+            f"Rata-rata 12 seed. Tiga pola tunda (rapat / tengah / longgar). "
+            f"TOS ≥ {floor} ({n_trades} tim × {total_units} zona). "
+            "Tanpa var = lantai. Variasi: TOS turun ke lantai jika tunda longgar. INV naik linier."
         )
         fig, ax = plt.subplots(figsize=(9.4, 5.4))
         plot_time_inventory_pareto(

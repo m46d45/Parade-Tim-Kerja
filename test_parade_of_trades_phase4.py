@@ -112,16 +112,15 @@ class TestTaktStandby(unittest.TestCase):
         from parade_of_trades_core import (
             iris_buffer_sweep,
             iris_mobilization_grid,
-            IRIS_SLIDE_MOBS,
         )
 
         grid = iris_mobilization_grid(max_gap=3)
         self.assertEqual(len(grid), 81)
-        rows = iris_buffer_sweep(total_units=10, seed=1)
-        self.assertEqual(len(rows), len(IRIS_SLIDE_MOBS) * 3)
+        rows = iris_buffer_sweep(total_units=10, seed=1, n_reps=3)
+        self.assertEqual(len(rows), 9)
         labels = {r["label"] for r in rows}
         self.assertIn("medium 0-3-6-9-12", labels)
-        self.assertIn("low 0-1-2-3-5", labels)
+        self.assertIn("low 0-1-2-3-4", labels)
         self.assertTrue(all(r["tos_floor"] == 50 for r in rows))
 
     def test_staggered_mobilization_delays_downstream(self):
