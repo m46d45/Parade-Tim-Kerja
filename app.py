@@ -75,7 +75,7 @@ from parade_of_trades_plots import (
     fit_inv_vs_tos,
 )
 
-_APP_BUILD = "2026-08-28-buffer-slide-v110"
+_APP_BUILD = "2026-08-28-buffer-aic-v111"
 _APP_DIR = Path(__file__).resolve().parent
 _ASSETS_DIR = _APP_DIR / "assets"
 _HEADER_BANNER = _ASSETS_DIR / "header_banner.jpg"
@@ -1731,7 +1731,7 @@ def tab_buffer(seed: Optional[int]) -> None:
             {
                 "Dadu": f["die"],
                 "Metrik": "Time on site" if f["metric"] == "time_on_site" else "Inventory time",
-                "Model": "Linier" if f["degree"] == 1 else "Kuadratik",
+                "Model": f.get("model", "Linier" if f.get("degree") == 1 else "Kuadratik"),
                 "Rumus": f["eq"],
                 "R²": round(f["r2"], 3),
             }
@@ -1750,6 +1750,7 @@ def tab_buffer(seed: Optional[int]) -> None:
         pair_eq = [
             {
                 "Dadu": f["die"],
+                "Model": f.get("model", ""),
                 "Rumus": f["eq"],
                 "R²": round(f["r2"], 3),
             }
