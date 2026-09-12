@@ -1,0 +1,1 @@
+window.KELAS_GIF=window.KELAS_GIF||{};window.KELAS_GIF.wip='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
