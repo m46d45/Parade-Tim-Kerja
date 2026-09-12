@@ -1,74 +1,223 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Animasi kelas — Parade Tim Kerja</title>
-  <link rel="icon" href="/favicon.ico" />
-  <style>
-    html,body{margin:0;background:#f3f2ee;color:#1d1d1d;font-family:"Segoe UI","Noto Sans",sans-serif}
-    .bar{max-width:1220px;margin:0 auto;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
-    .bar a{color:#1d1d1d;text-decoration:none;font-size:13px;font-weight:600;border:1px solid #d8d5ce;border-radius:999px;padding:6px 12px;background:#fff}
-    .bar a.sim{background:#202020;color:#fff;border-color:#202020}
-    .bar .brand{border:0;padding:0;color:#8a8a8a;letter-spacing:.06em;text-transform:uppercase;font-size:12px}
-    .wrap{max-width:1220px;margin:0 auto 24px;background:#fff;border:1px solid #e4e1da;border-radius:16px;padding:18px}
-    .kicker{margin:0 0 4px;color:#8a8a8a;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
-    h1{margin:0 0 8px;font-size:22px}
-    .sub{margin:0 0 16px;color:#5c5c5c;font-size:14px;line-height:1.45}
-    nav{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
-    nav button{background:#fff;border:1px solid #ccc;border-radius:999px;padding:7px 12px;cursor:pointer;font:inherit}
-    nav button.active{background:#202020;color:#fff;border-color:#202020}
-    .stage{min-height:200px}
-    .stage img{width:100%;display:none;background:#fff;border:1px solid #e4e1da;border-radius:10px}
-    .stage img.on{display:block}
-    .note{margin:12px 0 0;color:#8a8a8a;font-size:12px}
-  </style>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Animasi kelas — Parade Tim Kerja</title>
+<link rel="icon" href="/favicon.ico"/>
+<style>
+html,body{margin:0;background:#f3f2ee;color:#1d1d1d;font-family:"Segoe UI","Noto Sans",sans-serif}
+.bar{max-width:1100px;margin:0 auto;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.bar a{color:#1d1d1d;text-decoration:none;font-size:13px;font-weight:600;border:1px solid #d8d5ce;border-radius:999px;padding:6px 12px;background:#fff}
+.bar a.sim{background:#202020;color:#fff;border-color:#202020}
+.bar .brand{border:0;padding:0;color:#8a8a8a;letter-spacing:.06em;text-transform:uppercase;font-size:12px}
+.wrap{max-width:1100px;margin:0 auto 24px;background:#fff;border:1px solid #e4e1da;border-radius:16px;padding:18px}
+.kicker{margin:0 0 4px;color:#8a8a8a;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+h1{margin:0 0 8px;font-size:22px}
+.sub{margin:0 0 14px;color:#5c5c5c;font-size:14px;line-height:1.45}
+nav{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+nav button{background:#fff;border:1px solid #ccc;border-radius:999px;padding:7px 12px;cursor:pointer;font:inherit}
+nav button.active{background:#202020;color:#fff;border-color:#202020}
+.stage{display:none}
+.stage.on{display:block}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:720px){.grid{grid-template-columns:1fr}}
+.panel{border:1px solid #e4e1da;border-radius:12px;padding:10px 10px 8px;background:#fafaf7}
+.panel h2{margin:0 0 8px;font-size:13px;font-weight:700}
+svg{width:100%;height:auto;display:block;background:#fff;border-radius:8px}
+.note{margin:12px 0 0;color:#8a8a8a;font-size:12px}
+.cap{margin:6px 0 0;color:#5c5c5c;font-size:12px;line-height:1.4}
+.prod{offset-path:path("M 40 118 L 360 118");offset-rotate:0deg;animation:run 8s linear infinite}
+@keyframes run{0%{offset-distance:0%;opacity:1}90%{offset-distance:92%}100%{offset-distance:100%;opacity:.3}}
+.c1{animation-delay:0s}.c2{animation-delay:2.6s}.c3{animation-delay:5.2s}
+.tul{animation:tul 12s linear infinite}
+.bek{animation:bek 12s linear infinite}
+.cor{animation:cor 12s linear infinite}
+.rebar{animation:rebar 12s linear infinite;transform-box:fill-box;transform-origin:bottom}
+.form{animation:form 12s linear infinite;opacity:0}
+.fill{animation:fill 12s linear infinite;opacity:0}
+@keyframes tul{0%,8%{transform:translateX(-70px)}18%,38%{transform:translateX(0)}48%,100%{transform:translateX(-70px)}}
+@keyframes bek{0%,40%{transform:translateX(90px);opacity:.35}50%,70%{transform:translateX(0);opacity:1}80%,100%{transform:translateX(90px);opacity:.35}}
+@keyframes cor{0%,72%{transform:translateX(90px);opacity:.25}80%,92%{transform:translateX(0);opacity:1}96%,100%{transform:translateX(90px);opacity:.25}}
+@keyframes rebar{0%,16%{transform:scaleY(.15)}28%,100%{transform:scaleY(1)}}
+@keyframes form{0%,48%{opacity:0}58%,100%{opacity:1}}
+@keyframes fill{0%,78%{opacity:0}88%,100%{opacity:1}}
+.waitbek{animation:blink 1.4s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:.35}50%{opacity:1}}
+</style>
 </head>
 <body>
-  <div class="bar">
-    <a class="brand" href="/">Parade Tim Kerja</a>
-    <div>
-      <a href="/">Landing</a>
-      <a class="sim" href="https://parade-tim-kerja.streamlit.app/" target="_blank" rel="noopener">Buka simulasi</a>
-    </div>
+<div class="bar">
+  <a class="brand" href="/">Parade Tim Kerja</a>
+  <div>
+    <a href="/">Landing</a>
+    <a class="sim" href="https://parade-tim-kerja.streamlit.app/" target="_blank" rel="noopener">Buka simulasi</a>
   </div>
-  <div class="wrap">
-    <p class="kicker">Empat clip kelas · GIF looping</p>
-    <h1>Manufaktur vs konstruksi</h1>
-    <p class="sub">Clip 0 = parade TUL → BEK → COR. Clip 1–3 = WIP, inventory, menunggu.</p>
-    <nav>
-      <button data-id="inversi" class="active">0 · Inversi</button>
-      <button data-id="wip">1 · WIP</button>
-      <button data-id="stock">2 · Inventory</button>
-      <button data-id="wait">3 · Menunggu</button>
-    </nav>
-    <div class="stage">
-      <img id="inversi" class="on" alt="Inversi" />
-      <img id="wip" alt="WIP" />
-      <img id="stock" alt="Inventory" />
-      <img id="wait" alt="Menunggu" />
+</div>
+<div class="wrap">
+  <p class="kicker">Empat clip kelas · SVG di halaman</p>
+  <h1>Manufaktur vs konstruksi</h1>
+  <p class="sub" id="s">Clip 0 = parade TUL → BEK → COR. Pabrik: stasiun diam, benda berjalan.</p>
+  <nav>
+    <button data-id="inversi" class="active">0 · Inversi</button>
+    <button data-id="wip">1 · WIP</button>
+    <button data-id="stock">2 · Inventory</button>
+    <button data-id="wait">3 · Menunggu</button>
+  </nav>
+  <div id="inversi" class="stage on">
+    <div class="grid">
+      <div class="panel">
+        <h2>Manufaktur · stasiun diam, produk berjalan</h2>
+        <svg viewBox="0 0 400 180" xmlns="http://www.w3.org/2000/svg">
+          <rect x="20" y="20" width="360" height="140" rx="8" fill="#f6f7f9" stroke="#d8d5ce"/>
+          <text x="30" y="38" font-size="11" fill="#6b6b6b">S1</text>
+          <text x="175" y="38" font-size="11" fill="#6b6b6b">S2</text>
+          <text x="320" y="38" font-size="11" fill="#6b6b6b">S3</text>
+          <rect x="28" y="48" width="54" height="44" rx="6" fill="#fee2e2" stroke="#dc2626"/>
+          <rect x="173" y="48" width="54" height="44" rx="6" fill="#ffedd5" stroke="#ea580c"/>
+          <rect x="318" y="48" width="54" height="44" rx="6" fill="#dbeafe" stroke="#2563eb"/>
+          <circle cx="55" cy="70" r="8" fill="#dc2626"/>
+          <circle cx="200" cy="70" r="8" fill="#ea580c"/>
+          <circle cx="345" cy="70" r="8" fill="#2563eb"/>
+          <rect x="24" y="108" width="352" height="16" rx="4" fill="#e5e7eb"/>
+          <rect class="prod c1" x="0" y="0" width="18" height="14" rx="2" fill="#dc2626"/>
+          <g class="prod c2"><rect x="0" y="0" width="12" height="14" rx="2" fill="#dc2626"/><rect x="10" y="0" width="12" height="14" rx="2" fill="#ea580c"/></g>
+          <g class="prod c3"><rect x="0" y="0" width="10" height="14" rx="2" fill="#dc2626"/><rect x="8" y="0" width="10" height="14" rx="2" fill="#ea580c"/><rect x="16" y="0" width="10" height="14" rx="2" fill="#2563eb"/></g>
+          <text x="200" y="150" text-anchor="middle" font-size="11" fill="#6b6b6b">satu benda · satu aliran</text>
+        </svg>
+      </div>
+      <div class="panel">
+        <h2>Konstruksi · kolom diam, tim bergantian</h2>
+        <svg viewBox="0 0 400 180" xmlns="http://www.w3.org/2000/svg">
+          <rect x="20" y="20" width="360" height="140" rx="8" fill="#f6f7f9" stroke="#d8d5ce"/>
+          <rect x="118" y="36" width="164" height="108" fill="none" stroke="#94a3b8" stroke-dasharray="4 3"/>
+          <text x="200" y="50" text-anchor="middle" font-size="10" fill="#64748b">batas site</text>
+          <rect x="178" y="70" width="44" height="64" fill="#e5e7eb" stroke="#64748b"/>
+          <rect class="rebar" x="188" y="78" width="24" height="48" fill="none" stroke="#334155" stroke-width="2"/>
+          <rect class="form" x="174" y="68" width="52" height="68" fill="none" stroke="#ea580c" stroke-width="3"/>
+          <rect class="fill" x="178" y="70" width="44" height="64" fill="#9ca3af"/>
+          <g class="tul"><circle cx="148" cy="118" r="8" fill="#2563eb"/><text x="148" y="142" text-anchor="middle" font-size="10" fill="#2563eb">TUL</text></g>
+          <g class="bek"><circle cx="248" cy="118" r="8" fill="#ea580c"/><text x="248" y="142" text-anchor="middle" font-size="10" fill="#ea580c">BEK</text></g>
+          <g class="cor"><circle cx="292" cy="118" r="8" fill="#64748b"/><text x="292" y="142" text-anchor="middle" font-size="10" fill="#64748b">COR</text></g>
+        </svg>
+      </div>
     </div>
-    <p class="note">Tidak ada stok cor. COR datang membawa kerja.</p>
+    <p class="cap">Satu tubuh di dalam site. TUL kerja lalu keluar kiri. BEK masuk–pasang–keluar. COR masuk–cor–keluar. Tidak ada stok cor.</p>
   </div>
-  <script src="gifs-wip.js"></script>
-  <script src="gifs-inv.js"></script>
-  <script src="gifs-wait.js"></script>
-  <script src="gifs-inversi.js"></script>
-  <script>
-    function applyGifs(){
-      var g = window.KELAS_GIF || {};
-      if (g.inversi) document.getElementById("inversi").src = g.inversi;
-      if (g.wip) document.getElementById("wip").src = g.wip;
-      if (g.inv) document.getElementById("stock").src = g.inv;
-      if (g.wait) document.getElementById("wait").src = g.wait;
-    }
-    applyGifs();
-    document.querySelectorAll("nav button").forEach(function(b){
-      b.addEventListener("click", function(){
-        document.querySelectorAll("nav button").forEach(function(x){ x.classList.toggle("active", x===b); });
-        document.querySelectorAll(".stage img").forEach(function(img){ img.classList.toggle("on", img.id===b.dataset.id); });
-      });
-    });
-  </script>
+  <div id="wip" class="stage">
+    <div class="grid">
+      <div class="panel">
+        <h2>Manufaktur · lihat produknya</h2>
+        <svg viewBox="0 0 400 180" xmlns="http://www.w3.org/2000/svg">
+          <rect x="20" y="20" width="360" height="140" rx="8" fill="#fff" stroke="#d8d5ce"/>
+          <rect x="36" y="48" width="50" height="40" rx="6" fill="#fee2e2" stroke="#dc2626"/>
+          <rect x="175" y="48" width="50" height="40" rx="6" fill="#ffedd5" stroke="#ea580c"/>
+          <rect x="314" y="48" width="50" height="40" rx="6" fill="#dbeafe" stroke="#2563eb"/>
+          <circle cx="61" cy="68" r="8" fill="#dc2626"/>
+          <circle cx="200" cy="68" r="8" fill="#ea580c"/>
+          <circle cx="339" cy="68" r="8" fill="#2563eb"/>
+          <rect x="28" y="108" width="344" height="14" rx="4" fill="#e5e7eb"/>
+          <rect x="118" y="100" width="22" height="16" rx="2" fill="#dc2626" stroke="#991b1b"/>
+          <text x="200" y="150" text-anchor="middle" font-size="11" fill="#b45309">WIP = benda sudah S1, belum S2</text>
+        </svg>
+      </div>
+      <div class="panel">
+        <h2>Konstruksi · lihat kolomnya</h2>
+        <svg viewBox="0 0 400 180" xmlns="http://www.w3.org/2000/svg">
+          <rect x="20" y="20" width="360" height="140" rx="8" fill="#fff" stroke="#d8d5ce"/>
+          <rect x="118" y="36" width="164" height="108" fill="none" stroke="#94a3b8" stroke-dasharray="4 3"/>
+          <rect x="178" y="70" width="44" height="64" fill="#e5e7eb" stroke="#64748b"/>
+          <rect x="188" y="78" width="24" height="48" fill="none" stroke="#334155" stroke-width="2"/>
+          <circle cx="92" cy="118" r="8" fill="#2563eb"/>
+          <text x="92" y="142" text-anchor="middle" font-size="10" fill="#2563eb">TUL</text>
+          <circle cx="300" cy="118" r="8" fill="#ea580c"/>
+          <text x="300" y="142" text-anchor="middle" font-size="10" fill="#ea580c">BEK</text>
+          <text x="200" y="58" text-anchor="middle" font-size="11" fill="#b45309">WIP = TUL selesai, BEK belum masuk</text>
+        </svg>
+      </div>
+    </div>
+    <p class="cap">WIP bukan tumpukan bahan. Di lapangan: site yang sudah dikerjakan tim satu dan belum dilanjutkan tim berikutnya.</p>
+  </div>
+  <div id="stock" class="stage">
+    <div class="grid">
+      <div class="panel">
+        <h2>Manufaktur · lihat bahan di sisi pekerja</h2>
+        <svg viewBox="0 0 400 180" xmlns="http://www.w3.org/2000/svg">
+          <rect x="20" y="20" width="360" height="140" rx="8" fill="#fff" stroke="#d8d5ce"/>
+          <rect x="50" y="50" width="46" height="38" rx="6" fill="#fee2e2" stroke="#dc2626"/>
+          <circle cx="73" cy="69" r="8" fill="#dc2626"/>
+          <rect x="36" y="96" width="18" height="14" fill="#fecaca" stroke="#b91c1c"/>
+          <rect x="92" y="96" width="18" height="14" fill="#fecaca" stroke="#b91c1c"/>
+          <rect x="177" y="50" width="46" height="38" rx="6" fill="#ffedd5" stroke="#ea580c"/>
+          <circle cx="200" cy="69" r="8" fill="#ea580c"/>
+          <rect x="164" y="96" width="18" height="14" fill="#fed7aa" stroke="#c2410c"/>
+          <rect x="304" y="50" width="46" height="38" rx="6" fill="#dbeafe" stroke="#2563eb"/>
+          <circle cx="327" cy="69" r="8" fill="#2563eb"/>
+          <rect x="348" y="96" width="18" height="14" fill="#bfdbfe" stroke="#1d4ed8"/>
+          <text x="200" y="150" text-anchor="middle" font-size="11" fill="#6b6b6b">bin di sisi pekerja, bukan jauh di gudang</text>
+        </svg>
+      </div>
+      <div class="panel">
+        <h2>Konstruksi · stok tulangan habis, tinggal bekisting</h2>
+        <svg viewBox="0 0 400 180" xmlns="http://www.w3.org/2000/svg">
+          <rect x="20" y="20" width="360" height="140" rx="8" fill="#fff" stroke="#d8d5ce"/>
+          <rect x="118" y="36" width="164" height="108" fill="none" stroke="#94a3b8" stroke-dasharray="4 3"/>
+          <rect x="178" y="70" width="44" height="64" fill="#e5e7eb" stroke="#64748b"/>
+          <rect x="188" y="78" width="24" height="48" fill="none" stroke="#334155" stroke-width="2"/>
+          <circle cx="148" cy="118" r="8" fill="#2563eb"/>
+          <text x="148" y="142" text-anchor="middle" font-size="10" fill="#2563eb">TUL</text>
+          <rect x="292" y="96" width="16" height="22" fill="#ffedd5" stroke="#ea580c"/>
+          <rect x="312" y="96" width="16" height="22" fill="#ffedd5" stroke="#ea580c"/>
+          <text x="310" y="142" text-anchor="middle" font-size="10" fill="#ea580c">stok BEK</text>
+          <text x="200" y="58" text-anchor="middle" font-size="11" fill="#6b6b6b">tidak ada stok cor</text>
+        </svg>
+      </div>
+    </div>
+    <p class="cap">Inventory = bahan di samping proses. COR tidak punya stok; ia datang membawa kerja.</p>
+  </div>
+  <div id="wait" class="stage">
+    <div class="grid">
+      <div class="panel">
+        <h2>Manufaktur · lihat orangnya</h2>
+        <svg viewBox="0 0 400 180" xmlns="http://www.w3.org/2000/svg">
+          <rect x="20" y="20" width="360" height="140" rx="8" fill="#fff" stroke="#d8d5ce"/>
+          <rect x="36" y="48" width="50" height="40" rx="6" fill="#fee2e2" stroke="#dc2626"/>
+          <circle cx="61" cy="68" r="8" fill="#dc2626"/>
+          <rect x="175" y="48" width="50" height="40" rx="6" fill="#fff7ed" stroke="#fdba74"/>
+          <circle class="waitbek" cx="200" cy="68" r="8" fill="#fdba74"/>
+          <rect x="314" y="48" width="50" height="40" rx="6" fill="#eff6ff" stroke="#93c5fd"/>
+          <circle cx="339" cy="68" r="8" fill="#93c5fd"/>
+          <rect x="28" y="108" width="344" height="14" rx="4" fill="#e5e7eb"/>
+          <text x="200" y="150" text-anchor="middle" font-size="11" fill="#b45309">S2 siap, inbound kosong</text>
+        </svg>
+      </div>
+      <div class="panel">
+        <h2>Konstruksi · BEK sudah masuk, TUL masih kerja</h2>
+        <svg viewBox="0 0 400 180" xmlns="http://www.w3.org/2000/svg">
+          <rect x="20" y="20" width="360" height="140" rx="8" fill="#fff" stroke="#d8d5ce"/>
+          <rect x="118" y="36" width="164" height="108" fill="none" stroke="#94a3b8" stroke-dasharray="4 3"/>
+          <rect x="178" y="70" width="44" height="64" fill="#e5e7eb" stroke="#64748b"/>
+          <rect x="188" y="90" width="24" height="36" fill="none" stroke="#334155" stroke-width="2"/>
+          <circle cx="148" cy="118" r="8" fill="#2563eb"/>
+          <text x="148" y="142" text-anchor="middle" font-size="10" fill="#2563eb">TUL kerja</text>
+          <circle class="waitbek" cx="232" cy="118" r="8" fill="#ea580c"/>
+          <text x="232" y="142" text-anchor="middle" font-size="10" fill="#b45309">BEK di site</text>
+          <circle cx="330" cy="118" r="8" fill="#cbd5e1"/>
+          <text x="330" y="142" text-anchor="middle" font-size="10" fill="#94a3b8">COR luar</text>
+        </svg>
+      </div>
+    </div>
+    <p class="cap">Waste menunggu: BEK sudah masuk batas site, TUL belum melepas tempat kerja. COR tetap di luar.</p>
+  </div>
+  <p class="note">Tidak ada stok cor. COR datang membawa kerja.</p>
+</div>
+<script>
+const sub={inversi:"Clip 0 = parade TUL \u2192 BEK \u2192 COR. Pabrik: stasiun diam, benda berjalan.",wip:"WIP = lihat produknya. Kolom setelah TUL, sebelum BEK.",stock:"Inventory = lihat bahan. Stok tulangan habis, tinggal panel bekisting.",wait:"Menunggu = lihat orangnya. BEK di dalam, TUL masih kerja, COR di luar."};
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("active",x===b));
+  document.querySelectorAll(".stage").forEach(s=>s.classList.toggle("on",s.id===b.dataset.id));
+  document.getElementById("s").textContent=sub[b.dataset.id];
+});
+</script>
 </body>
 </html>
