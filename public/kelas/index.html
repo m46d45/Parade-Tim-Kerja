@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Animasi kelas — Parade Tim Kerja</title>
+  <link rel="icon" href="/favicon.ico" />
+  <style>
+    html,body{margin:0;background:#f3f2ee;color:#1d1d1d;font-family:"Segoe UI","Noto Sans",sans-serif}
+    .bar{max-width:1220px;margin:0 auto;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+    .bar a{color:#1d1d1d;text-decoration:none;font-size:13px;font-weight:600;border:1px solid #d8d5ce;border-radius:999px;padding:6px 12px;background:#fff}
+    .bar a.sim{background:#202020;color:#fff;border-color:#202020}
+    .bar .brand{border:0;padding:0;color:#8a8a8a;letter-spacing:.06em;text-transform:uppercase;font-size:12px}
+    .wrap{max-width:1220px;margin:0 auto 24px;background:#fff;border:1px solid #e4e1da;border-radius:16px;padding:18px}
+    .kicker{margin:0 0 4px;color:#8a8a8a;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+    h1{margin:0 0 8px;font-size:22px}
+    .sub{margin:0 0 16px;color:#5c5c5c;font-size:14px;line-height:1.45}
+    nav{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+    nav button{background:#fff;border:1px solid #ccc;border-radius:999px;padding:7px 12px;cursor:pointer;font:inherit}
+    nav button.active{background:#202020;color:#fff;border-color:#202020}
+    .stage img{width:100%;display:none;background:#fff;border:1px solid #e4e1da;border-radius:10px}
+    .stage img.on{display:block}
+    .note{margin:12px 0 0;color:#8a8a8a;font-size:12px}
+  </style>
+</head>
+<body>
+  <div class="bar">
+    <a class="brand" href="/">Parade Tim Kerja</a>
+    <div>
+      <a href="/">Landing</a>
+      <a class="sim" href="https://parade-tim-kerja.streamlit.app/" target="_blank" rel="noopener">Buka simulasi</a>
+    </div>
+  </div>
+  <div class="wrap">
+    <p class="kicker">Empat clip kelas · GIF looping</p>
+    <h1>Manufaktur vs konstruksi</h1>
+    <p class="sub">Clip 0 = parade TUL → BEK → COR. Clip 1–3 = WIP, inventory, menunggu.</p>
+    <nav>
+      <button data-id="inversi" class="active">0 · Inversi</button>
+      <button data-id="wip">1 · WIP</button>
+      <button data-id="stock">2 · Inventory</button>
+      <button data-id="wait">3 · Menunggu</button>
+    </nav>
+    <div class="stage">
+      <img id="inversi" class="on" src="00-inversi.gif" alt="Inversi" />
+      <img id="wip" src="01-wip.gif" alt="WIP" />
+      <img id="stock" src="02-inventory.gif" alt="Inventory" />
+      <img id="wait" src="03-menunggu.gif" alt="Menunggu" />
+    </div>
+    <p class="note">Tidak ada stok cor. COR datang membawa kerja.</p>
+  </div>
+  <script>
+    document.querySelectorAll("nav button").forEach(b=>b.addEventListener("click",()=>{
+      document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("active",x===b));
+      document.querySelectorAll(".stage img").forEach(img=>img.classList.toggle("on",img.id===b.dataset.id));
+    }));
+  </script>
+</body>
+</html>
