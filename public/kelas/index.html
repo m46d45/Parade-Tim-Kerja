@@ -18,6 +18,7 @@
     nav{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
     nav button{background:#fff;border:1px solid #ccc;border-radius:999px;padding:7px 12px;cursor:pointer;font:inherit}
     nav button.active{background:#202020;color:#fff;border-color:#202020}
+    .stage{min-height:200px}
     .stage img{width:100%;display:none;background:#fff;border:1px solid #e4e1da;border-radius:10px}
     .stage img.on{display:block}
     .note{margin:12px 0 0;color:#8a8a8a;font-size:12px}
@@ -42,18 +43,32 @@
       <button data-id="wait">3 · Menunggu</button>
     </nav>
     <div class="stage">
-      <img id="inversi" class="on" src="00-inversi.gif" alt="Inversi" />
-      <img id="wip" src="01-wip.gif" alt="WIP" />
-      <img id="stock" src="02-inventory.gif" alt="Inventory" />
-      <img id="wait" src="03-menunggu.gif" alt="Menunggu" />
+      <img id="inversi" class="on" alt="Inversi" />
+      <img id="wip" alt="WIP" />
+      <img id="stock" alt="Inventory" />
+      <img id="wait" alt="Menunggu" />
     </div>
     <p class="note">Tidak ada stok cor. COR datang membawa kerja.</p>
   </div>
+  <script src="gifs-wip.js"></script>
+  <script src="gifs-inv.js"></script>
+  <script src="gifs-wait.js"></script>
+  <script src="gifs-inversi.js"></script>
   <script>
-    document.querySelectorAll("nav button").forEach(b=>b.addEventListener("click",()=>{
-      document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("active",x===b));
-      document.querySelectorAll(".stage img").forEach(img=>img.classList.toggle("on",img.id===b.dataset.id));
-    }));
+    function applyGifs(){
+      var g = window.KELAS_GIF || {};
+      if (g.inversi) document.getElementById("inversi").src = g.inversi;
+      if (g.wip) document.getElementById("wip").src = g.wip;
+      if (g.inv) document.getElementById("stock").src = g.inv;
+      if (g.wait) document.getElementById("wait").src = g.wait;
+    }
+    applyGifs();
+    document.querySelectorAll("nav button").forEach(function(b){
+      b.addEventListener("click", function(){
+        document.querySelectorAll("nav button").forEach(function(x){ x.classList.toggle("active", x===b); });
+        document.querySelectorAll(".stage img").forEach(function(img){ img.classList.toggle("on", img.id===b.dataset.id); });
+      });
+    });
   </script>
 </body>
 </html>
