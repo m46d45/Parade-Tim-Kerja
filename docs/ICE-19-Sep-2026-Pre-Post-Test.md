@@ -1,14 +1,11 @@
 # Pre-Test dan Post-Test — ICE Center Seri 01 Parade Tim Kerja
 
-Status per Minggu, 13 September 2026 · Versi 1  
-Sesi: Sabtu, 19 September 2026, 08.00–09.30 WIB  
-Berkas meja: `Pre-Post-Test-ICE-Parade-Tim-Kerja-19Sep2026.docx`
-
-Bukan Form 1 / Form 2 paper KoNTekS20.
+Status per Minggu, 13 September 2026 · Versi 2  
+Sesi: Sabtu, 19 September 2026, 08.00–09.30 WIB
 
 ## Pemasangan
 
-Satu bank 10 soal, dua kuis LMS, tautan berbeda. Soal identik. Identitas LMS. Benar/Salah. Urutan tetap. Kunci tidak ditampilkan di Pre-Test. Lulus e-sertifikat: Presensi + Post-Test ≥ 6/10. Pre-Test tidak menggugurkan.
+Satu bank 10 soal, dua kuis LMS, tautan berbeda. Soal identik. Identitas mengikuti akun LMS. Benar/Salah. Urutan tetap. Kunci tidak ditampilkan pada Pre-Test. E-sertifikat: hadir dan Post-Test ≥ 6/10. Pre-Test tidak menjadi ambang kelulusan.
 
 ## Naskah
 
@@ -23,6 +20,6 @@ Satu bank 10 soal, dua kuis LMS, tautan berbeda. Soal identik. Identitas LMS. Be
 9. Jika finishing terlambat, langkah pertama yang paling tepat adalah menambah orang di tim finishing.
 10. Aturan melepas pekerjaan (kapan zona diserahkan) memengaruhi durasi proyek, bukan hanya kecepatan kerja tiap tim.
 
-## Kunci (petugas)
+## Kunci
 
 1 Salah · 2 Salah · 3 Benar · 4 Benar · 5 Salah · 6 Salah · 7 Benar · 8 Benar · 9 Salah · 10 Benar
