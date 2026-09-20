@@ -15,6 +15,7 @@ import {
   type ParadeResult,
 } from "../core";
 import { drawLobChart } from "./lobChart";
+import { downloadCanvasPng } from "./download";
 import {
   drawInventoryVsTos,
   drawTimeInventoryPareto,
@@ -41,6 +42,23 @@ function metric(label: string, value: string): HTMLElement {
     el("span", {}, [label]),
     el("strong", {}, [value]),
   ]);
+}
+
+function field(
+  labelText: string,
+  forId: string,
+  control: HTMLElement,
+): HTMLElement {
+  return el("div", { className: "field" }, [
+    el("label", { for: forId }, [labelText]),
+    control,
+  ]);
+}
+
+function fileStamp(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
 }
 
 export function mountTimeBuffer(
@@ -73,13 +91,26 @@ export function mountTimeBuffer(
   const oneHost = el("div", { className: "buf-one hidden" });
   const oneMetrics = el("div", { className: "metrics" });
   const oneTitle = el("h3", { className: "subchart-title" }, ["Hasil"]);
+  const oneDl = el("div", { className: "download-bar" });
+  const oneDlPng = el("button", { type: "button", className: "ghost" }, [
+    "Unduh chart PNG",
+  ]);
+  oneDl.append(oneDlPng);
   const lobWrap = el("div", { className: "chart-wrap" });
   const lobCanvas = el("canvas", { id: "buf-lob" }) as HTMLCanvasElement;
   lobWrap.append(lobCanvas);
-  oneHost.append(oneTitle, oneMetrics, lobWrap);
+  oneHost.append(oneTitle, oneMetrics, oneDl, lobWrap);
 
   const mapHost = el("div", { className: "buf-map hidden" });
   const mapCap = el("p", { className: "note" });
+  const mapDl = el("div", { className: "download-bar" });
+  const mapDlPareto = el("button", { type: "button", className: "ghost" }, [
+    "Unduh pareto PNG",
+  ]);
+  const mapDlPair = el("button", { type: "button", className: "ghost" }, [
+    "Unduh INV vs TOS PNG",
+  ]);
+  mapDl.append(mapDlPareto, mapDlPair);
   const paretoWrap = el("div", { className: "chart-wrap" });
   const paretoCanvas = el("canvas", { id: "buf-pareto" }) as HTMLCanvasElement;
   paretoWrap.append(paretoCanvas);
@@ -95,6 +126,7 @@ export function mountTimeBuffer(
       "Waktu di lapangan & inventory vs durasi",
     ]),
     mapCap,
+    mapDl,
     paretoWrap,
     fitTable,
     el("h3", { className: "subchart-title" }, [
@@ -116,10 +148,8 @@ export function mountTimeBuffer(
         "variability. Analog kuliah Iris (5–5 / 4–6 / 3–7), tanpa dadu.",
       ]),
       el("div", { className: "takt-grid" }, [
-        el("label", { for: "buf-var" }, ["Variability (per zona)"]),
-        varSel,
-        el("label", { for: "buf-mob" }, ["Buffer waktu (tunda masuk T1…T5)"]),
-        mobSel,
+        field("Variability (per zona)", "buf-var", varSel),
+        field("Buffer waktu (tunda masuk T1…T5)", "buf-mob", mobSel),
       ]),
       el("div", { className: "btn-row" }, [runOne, runMap]),
       err,
@@ -221,6 +251,19 @@ export function mountTimeBuffer(
       ),
     );
   }
+
+  oneDlPng.addEventListener("click", () => {
+    if (!oneResult) return;
+    downloadCanvasPng(lobCanvas, `parade-buffer-lbs-${fileStamp()}.png`);
+  });
+  mapDlPareto.addEventListener("click", () => {
+    if (!mapRows) return;
+    downloadCanvasPng(paretoCanvas, `parade-buffer-pareto-${fileStamp()}.png`);
+  });
+  mapDlPair.addEventListener("click", () => {
+    if (!mapRows) return;
+    downloadCanvasPng(pairCanvas, `parade-buffer-inv-tos-${fileStamp()}.png`);
+  });
 
   runOne.addEventListener("click", () => {
     err.textContent = "";

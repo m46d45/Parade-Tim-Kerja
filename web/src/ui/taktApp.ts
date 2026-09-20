@@ -7,6 +7,7 @@ import {
   computeTaktClassroom,
   taktTzOptions,
 } from "../core";
+import { downloadCanvasPng } from "./download";
 import { drawTaktWagonChart } from "./taktChart";
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -30,6 +31,23 @@ function metric(label: string, value: string): HTMLElement {
     el("span", {}, [label]),
     el("strong", {}, [value]),
   ]);
+}
+
+function field(
+  labelText: string,
+  forId: string,
+  control: HTMLElement,
+): HTMLElement {
+  return el("div", { className: "field" }, [
+    el("label", { for: forId }, [labelText]),
+    control,
+  ]);
+}
+
+function fileStamp(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
 }
 
 export function mountTakt(root: HTMLElement): void {
@@ -91,17 +109,19 @@ export function mountTakt(root: HTMLElement): void {
   const canvas = el("canvas", { id: "takt-wagon" }) as HTMLCanvasElement;
   chartWrap.append(canvas);
 
+  const dlBar = el("div", { className: "download-bar" });
+  const dlPng = el("button", { type: "button", className: "ghost" }, [
+    "Unduh chart PNG",
+  ]);
+  dlBar.append(dlPng);
+
   const controls = el("div", { className: "takt-controls" }, [
     el("h3", { className: "subchart-title" }, ["Pengaturan"]),
     el("div", { className: "takt-grid" }, [
-      el("label", { for: "takt-floors" }, ["Jumlah lantai (n)"]),
-      floorsIn,
-      el("label", { for: "takt-tz" }, ["Jumlah zona / lantai (TZ)"]),
-      tzSel,
-      el("label", { for: "takt-days" }, ["Waktu tersedia per lantai (hari)"]),
-      daysIn,
-      el("label", { for: "takt-cap" }, ["Kapasitas (bay / hari / tim)"]),
-      capIn,
+      field("Jumlah lantai (n)", "takt-floors", floorsIn),
+      field("Jumlah zona / lantai (TZ)", "takt-tz", tzSel),
+      field("Waktu tersedia per lantai (hari)", "takt-days", daysIn),
+      field("Kapasitas (bay / hari / tim)", "takt-cap", capIn),
     ]),
   ]);
 
@@ -117,6 +137,7 @@ export function mountTakt(root: HTMLElement): void {
       formula,
       status,
       el("h3", { className: "subchart-title" }, ["Wagon chart (satu lantai)"]),
+      dlBar,
       chartWrap,
     ]),
   );
@@ -159,6 +180,9 @@ export function mountTakt(root: HTMLElement): void {
     );
   }
 
+  dlPng.addEventListener("click", () => {
+    downloadCanvasPng(canvas, `parade-takt-wagon-${fileStamp()}.png`);
+  });
   floorsIn.addEventListener("change", render);
   tzSel.addEventListener("change", render);
   daysIn.addEventListener("change", render);
