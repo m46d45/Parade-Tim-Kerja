@@ -105,7 +105,7 @@ export function drawTaktWagonChart(
   ctx.save();
   ctx.translate(12, pad.t + plotH / 2);
   ctx.rotate(-Math.PI / 2);
-  ctx.fillText("Zona", 0, 0);
+  ctx.fillText("Zona (1…TZ)", 0, 0);
   ctx.restore();
 
   if (title) {

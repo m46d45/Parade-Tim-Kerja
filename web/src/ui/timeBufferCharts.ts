@@ -9,6 +9,7 @@ import {
   type BufferFit,
   type BufferSweepRow,
 } from "../core";
+import { niceStep } from "./chartAxis";
 
 const DIE_STYLE: Record<string, { color: string; marker: string; label: string }> = {
   no_variability: { color: "#2563eb", marker: "s", label: "Waktu di lapangan · tanpa var" },
@@ -73,7 +74,7 @@ function setup(
   ctx.clearRect(0, 0, cssW, cssH);
   ctx.fillStyle = "#fff";
   ctx.fillRect(0, 0, cssW, cssH);
-  return { ctx, cssW, cssH, pad: { l: 52, r: 52, t: 28, b: 44 } };
+  return { ctx, cssW, cssH, pad: { l: 58, r: 58, t: 28, b: 48 } };
 }
 
 function linspace(a: number, b: number, n: number): number[] {
@@ -121,17 +122,52 @@ export function drawTimeInventoryPareto(
   const yT = (y: number) => pad.t + plotH - ((y - t0) / (t1 - t0)) * plotH;
   const yI = (y: number) => pad.t + plotH - ((y - i0) / (i1 - i0)) * plotH;
 
-  // grid
-  ctx.strokeStyle = "rgba(100,116,139,0.25)";
-  ctx.setLineDash([4, 4]);
-  for (let i = 0; i <= 4; i++) {
-    const y = pad.t + (plotH * i) / 4;
+  // X ticks (Durasi)
+  const xStep = niceStep(x1 - x0);
+  for (let v = Math.ceil(x0 / xStep) * xStep; v <= x1 + 1e-9; v += xStep) {
+    const xx = xScale(v);
+    ctx.strokeStyle = "rgba(100,116,139,0.12)";
     ctx.beginPath();
-    ctx.moveTo(pad.l, y);
-    ctx.lineTo(pad.l + plotW, y);
+    ctx.moveTo(xx, pad.t);
+    ctx.lineTo(xx, pad.t + plotH);
     ctx.stroke();
+    ctx.fillStyle = "#475569";
+    ctx.font = "10px DM Sans, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText(String(Math.round(v)), xx, pad.t + plotH + 6);
   }
-  ctx.setLineDash([]);
+  // Left Y ticks (TOS)
+  const tStep = niceStep(t1 - t0);
+  for (let v = Math.ceil(t0 / tStep) * tStep; v <= t1 + 1e-9; v += tStep) {
+    const yy = yT(v);
+    ctx.strokeStyle = "rgba(100,116,139,0.12)";
+    ctx.beginPath();
+    ctx.moveTo(pad.l, yy);
+    ctx.lineTo(pad.l + plotW, yy);
+    ctx.stroke();
+    ctx.fillStyle = "#1d4ed8";
+    ctx.font = "10px DM Sans, sans-serif";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    ctx.fillText(String(Math.round(v)), pad.l - 8, yy);
+  }
+  // Right Y ticks (INV)
+  const iStep = niceStep(i1 - i0);
+  for (let v = Math.ceil(i0 / iStep) * iStep; v <= i1 + 1e-9; v += iStep) {
+    const yy = yI(v);
+    ctx.fillStyle = "#c2410c";
+    ctx.font = "10px DM Sans, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(String(Math.round(v)), pad.l + plotW + 8, yy);
+  }
+  ctx.strokeStyle = "rgba(26,54,93,0.35)";
+  ctx.beginPath();
+  ctx.moveTo(pad.l, pad.t);
+  ctx.lineTo(pad.l, pad.t + plotH);
+  ctx.lineTo(pad.l + plotW, pad.t + plotH);
+  ctx.stroke();
 
   const order = ["no_variability", "low", "medium"].filter((d) => byDie.has(d));
   const plottedT = new Set<string>();
@@ -205,17 +241,17 @@ export function drawTimeInventoryPareto(
   ctx.fillStyle = "#1d4ed8";
   ctx.font = "11px DM Sans, system-ui, sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("Durasi  D", pad.l + plotW / 2, cssH - 8);
+  ctx.fillText("Durasi D (periode)", pad.l + plotW / 2, cssH - 4);
   ctx.save();
   ctx.translate(14, pad.t + plotH / 2);
   ctx.rotate(-Math.PI / 2);
-  ctx.fillText("Waktu di lapangan  TOS", 0, 0);
+  ctx.fillText("Waktu di lapangan TOS (periode·tim)", 0, 0);
   ctx.restore();
   ctx.fillStyle = "#c2410c";
   ctx.save();
   ctx.translate(cssW - 12, pad.t + plotH / 2);
   ctx.rotate(Math.PI / 2);
-  ctx.fillText("Inventory time  INV", 0, 0);
+  ctx.fillText("Inventory time INV (zona·periode)", 0, 0);
   ctx.restore();
 
   // legend
@@ -273,16 +309,40 @@ export function drawInventoryVsTos(
   const xScale = (x: number) => pad.l + ((x - x0) / (x1 - x0)) * plotW;
   const yScale = (y: number) => pad.t + plotH - ((y - y0) / (y1 - y0)) * plotH;
 
-  ctx.strokeStyle = "rgba(100,116,139,0.3)";
-  ctx.setLineDash([4, 4]);
-  for (let i = 0; i <= 4; i++) {
-    const y = pad.t + (plotH * i) / 4;
+  const xStep = niceStep(x1 - x0);
+  for (let v = Math.ceil(x0 / xStep) * xStep; v <= x1 + 1e-9; v += xStep) {
+    const xx = xScale(v);
+    ctx.strokeStyle = "rgba(100,116,139,0.12)";
     ctx.beginPath();
-    ctx.moveTo(pad.l, y);
-    ctx.lineTo(pad.l + plotW, y);
+    ctx.moveTo(xx, pad.t);
+    ctx.lineTo(xx, pad.t + plotH);
     ctx.stroke();
+    ctx.fillStyle = "#475569";
+    ctx.font = "10px DM Sans, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText(String(Math.round(v)), xx, pad.t + plotH + 6);
   }
-  ctx.setLineDash([]);
+  const yStep = niceStep(y1 - y0);
+  for (let v = Math.ceil(y0 / yStep) * yStep; v <= y1 + 1e-9; v += yStep) {
+    const yy = yScale(v);
+    ctx.strokeStyle = "rgba(100,116,139,0.12)";
+    ctx.beginPath();
+    ctx.moveTo(pad.l, yy);
+    ctx.lineTo(pad.l + plotW, yy);
+    ctx.stroke();
+    ctx.fillStyle = "#475569";
+    ctx.font = "10px DM Sans, sans-serif";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    ctx.fillText(String(Math.round(v)), pad.l - 8, yy);
+  }
+  ctx.strokeStyle = "rgba(26,54,93,0.35)";
+  ctx.beginPath();
+  ctx.moveTo(pad.l, pad.t);
+  ctx.lineTo(pad.l, pad.t + plotH);
+  ctx.lineTo(pad.l + plotW, pad.t + plotH);
+  ctx.stroke();
 
   const order = ["no_variability", "low", "medium"].filter((d) => byDie.has(d));
   for (const die of order) {
@@ -350,10 +410,11 @@ export function drawInventoryVsTos(
   ctx.fillStyle = "#64748b";
   ctx.font = "11px DM Sans, system-ui, sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("Waktu di lapangan  TOS", pad.l + plotW / 2, cssH - 8);
+  ctx.fillText("Waktu di lapangan TOS (periode·tim)", pad.l + plotW / 2, cssH - 4);
   ctx.save();
   ctx.translate(14, pad.t + plotH / 2);
   ctx.rotate(-Math.PI / 2);
-  ctx.fillText("Inventory time  INV", 0, 0);
+  ctx.fillStyle = "#1a365d";
+  ctx.fillText("Inventory time INV (zona·periode)", 0, 0);
   ctx.restore();
 }

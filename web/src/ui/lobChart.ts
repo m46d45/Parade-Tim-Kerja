@@ -228,7 +228,7 @@ export function drawLobChart(
   ctx.rotate(-Math.PI / 2);
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
-  ctx.fillText("Zona kumulatif (diskrit)", 0, 0);
+  ctx.fillText("Zona kumulatif (zona)", 0, 0);
   ctx.restore();
 
   // store layout for hit testing via canvas dataset

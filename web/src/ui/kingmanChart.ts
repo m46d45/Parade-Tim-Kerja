@@ -63,11 +63,32 @@ export function drawKingmanChart(
     ctx.moveTo(x, padL.t);
     ctx.lineTo(x, padL.t + cH);
     ctx.stroke();
-    ctx.fillStyle = "#64748b";
+    ctx.fillStyle = "#475569";
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     ctx.fillText(u.toFixed(2), x, padL.t + cH + 6);
   }
+  // CT ticks (left panel Y)
+  for (let i = 0; i <= 4; i++) {
+    const v = (maxCt * i) / 4;
+    const y = cy(v);
+    ctx.strokeStyle = "rgba(26,54,93,0.08)";
+    ctx.beginPath();
+    ctx.moveTo(padL.l, y);
+    ctx.lineTo(padL.l + cW, y);
+    ctx.stroke();
+    ctx.fillStyle = "#475569";
+    ctx.font = "10px DM Sans, sans-serif";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    ctx.fillText(v.toFixed(1), padL.l - 6, y);
+  }
+  ctx.strokeStyle = "rgba(26,54,93,0.35)";
+  ctx.beginPath();
+  ctx.moveTo(padL.l, padL.t);
+  ctx.lineTo(padL.l, padL.t + cH);
+  ctx.lineTo(padL.l + cW, padL.t + cH);
+  ctx.stroke();
 
   ctx.strokeStyle = "#1a365d";
   ctx.lineWidth = 2.2;
@@ -98,7 +119,12 @@ export function drawKingmanChart(
   ctx.fillStyle = "#1a365d";
   ctx.font = "11px DM Sans, sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("Utilisasi u", padL.l + cW / 2, cssH - 4);
+  ctx.fillText("Utilisasi u (fraksi)", padL.l + cW / 2, cssH - 4);
+  ctx.save();
+  ctx.translate(12, padL.t + cH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText("CT (periode)", 0, 0);
+  ctx.restore();
 
   // --- Bars panel ---
   const n = kg.stations.length;
@@ -108,10 +134,11 @@ export function drawKingmanChart(
   const groupW = bW / Math.max(n, 1);
   const barW = groupW * 0.32;
 
-  ctx.fillStyle = "#64748b";
+  ctx.fillStyle = "#1a365d";
+  ctx.font = "11px DM Sans, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "bottom";
-  ctx.fillText("CT per tim", bx0 + bW / 2, padR.t - 8);
+  ctx.fillText("CT (periode)", bx0 + bW / 2, padR.t - 8);
 
   const maxBar = Math.max(
     1,
@@ -123,6 +150,21 @@ export function drawKingmanChart(
     ),
   );
   const by = (v: number) => padR.t + bH - (v / maxBar) * bH;
+
+  for (let i = 0; i <= 4; i++) {
+    const v = (maxBar * i) / 4;
+    const y = by(v);
+    ctx.strokeStyle = "rgba(26,54,93,0.08)";
+    ctx.beginPath();
+    ctx.moveTo(bx0, y);
+    ctx.lineTo(bx0 + bW, y);
+    ctx.stroke();
+    ctx.fillStyle = "#475569";
+    ctx.font = "9px DM Sans, sans-serif";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    ctx.fillText(v.toFixed(1), bx0 - 4, y);
+  }
 
   kg.stations.forEach((s, i) => {
     const cx0 = bx0 + groupW * i + groupW / 2;

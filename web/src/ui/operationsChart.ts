@@ -3,6 +3,7 @@ import {
   littlesOperationsCurve,
   type ParadeResult,
 } from "../core";
+import { niceStep } from "./chartAxis";
 
 const COLOR_TH = "#2563eb";
 const COLOR_CT = "#dc2626";
@@ -30,7 +31,7 @@ export function drawOperationsChart(
 
   const d = littlesOperationsCurve(result);
   const conwip = conwipLevel;
-  const pad = { l: 48, r: 48, t: 28, b: 48 };
+  const pad = { l: 52, r: 52, t: 28, b: 52 };
   const plotW = cssW - pad.l - pad.r;
   const plotH = cssH - pad.t - pad.b;
 
@@ -65,15 +66,52 @@ export function drawOperationsChart(
   g.textBaseline = "bottom";
   g.fillText("Kurva operasi WIP–TH–CT (Little + Kingman)", pad.l + plotW / 2, pad.t - 8);
 
-  // grid
-  for (let i = 0; i <= 4; i++) {
-    const y = pad.t + (plotH * i) / 4;
-    g.strokeStyle = "rgba(26,54,93,0.08)";
+  // Y ticks (left = TH)
+  const thStep = niceStep(maxTh);
+  for (let v = 0; v <= maxTh + 1e-9; v += thStep) {
+    const y = yTh(v);
+    g.strokeStyle = v === 0 ? "rgba(26,54,93,0.28)" : "rgba(26,54,93,0.08)";
     g.beginPath();
     g.moveTo(pad.l, y);
     g.lineTo(pad.l + plotW, y);
     g.stroke();
+    g.fillStyle = COLOR_TH;
+    g.font = "10px DM Sans, sans-serif";
+    g.textAlign = "right";
+    g.textBaseline = "middle";
+    g.fillText(v.toFixed(2), pad.l - 8, y);
   }
+  // Y ticks right = CT
+  const ctStep = niceStep(maxCt);
+  for (let v = 0; v <= maxCt + 1e-9; v += ctStep) {
+    const y = yCt(v);
+    g.fillStyle = COLOR_CT;
+    g.font = "10px DM Sans, sans-serif";
+    g.textAlign = "left";
+    g.textBaseline = "middle";
+    g.fillText(v.toFixed(1), pad.l + plotW + 8, y);
+  }
+  // X ticks
+  const xStep = niceStep(xRight);
+  for (let v = 0; v <= xRight + 1e-9; v += xStep) {
+    const x = xScale(v);
+    g.strokeStyle = "rgba(26,54,93,0.07)";
+    g.beginPath();
+    g.moveTo(x, pad.t);
+    g.lineTo(x, pad.t + plotH);
+    g.stroke();
+    g.fillStyle = "#475569";
+    g.font = "10px DM Sans, sans-serif";
+    g.textAlign = "center";
+    g.textBaseline = "top";
+    g.fillText(String(Math.round(v)), x, pad.t + plotH + 6);
+  }
+  g.strokeStyle = "rgba(26,54,93,0.35)";
+  g.beginPath();
+  g.moveTo(pad.l, pad.t);
+  g.lineTo(pad.l, pad.t + plotH);
+  g.lineTo(pad.l + plotW, pad.t + plotH);
+  g.stroke();
 
   function strokeXY(
     xs: number[],
@@ -180,10 +218,10 @@ export function drawOperationsChart(
   g.font = "11px DM Sans, sans-serif";
   g.textAlign = "left";
   g.textBaseline = "middle";
-  g.fillText("TH", 8, pad.t + 12);
+  g.fillText("TH (zona/periode)", 6, pad.t + 12);
   g.fillStyle = COLOR_CT;
   g.textAlign = "right";
-  g.fillText("CT", cssW - 8, pad.t + 12);
+  g.fillText("CT (periode)", cssW - 6, pad.t + 12);
 
   g.fillStyle = "#1a365d";
   g.textAlign = "center";
