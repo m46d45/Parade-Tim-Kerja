@@ -2,9 +2,12 @@ import {
   bufferSeries,
   classroomConfig,
   computeCostMetrics,
+  evaluateAtWip,
+  inventoryFillRateMetrics,
   kingmanCombined,
   kingmanMetrics,
   littlesLawMetrics,
+  littlesOperationsCurve,
   runParade,
   type CostMetrics,
   type ParadeResult,
@@ -15,9 +18,11 @@ import { shortTradeName, tradeColor } from "../theme";
 import {
   buildBufferLegend,
   drawBufferChart,
+  drawBufferStackedChart,
   hitTestBuffer,
   type BufferHit,
 } from "./bufferChart";
+import { buildInventoryLegend, drawInventoryChart } from "./inventoryChart";
 import { buildKingmanLegend, drawKingmanChart } from "./kingmanChart";
 import {
   buildLegendItems,
@@ -26,9 +31,18 @@ import {
   type LobHit,
 } from "./lobChart";
 import { buildLittlesLegend, drawLittlesChart } from "./littlesChart";
+import { drawOperationsChart, snapConwip } from "./operationsChart";
 import { buildUtilLegend, drawUtilChart } from "./utilChart";
 
-type TabId = "lob" | "buffer" | "util" | "cost" | "little" | "kingman";
+type TabId =
+  | "lob"
+  | "buffer"
+  | "util"
+  | "cost"
+  | "little"
+  | "kingman"
+  | "inventory";
+
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
   attrs: Record<string, string> = {},
@@ -77,19 +91,27 @@ function fmtF(n: number, d = 2): string {
   return n.toFixed(d);
 }
 
+function paintSwatches(tbody: HTMLElement): void {
+  tbody.querySelectorAll("tr").forEach((tr, i) => {
+    const sw = tr.querySelector(".row-swatch") as HTMLElement | null;
+    if (sw) sw.style.background = tradeColor(i);
+  });
+}
+
 function renderCostTable(host: HTMLElement, cm: CostMetrics): void {
   host.replaceChildren();
   const table = el("table", { className: "data-table" });
-  const thead = el("thead");
-  thead.append(
-    el("tr", {}, [
-      el("th", {}, ["Tim"]),
-      el("th", {}, ["Tarif"]),
-      el("th", {}, ["Aktif"]),
-      el("th", {}, ["Idle"]),
-      el("th", {}, ["Biaya aktif"]),
-      el("th", {}, ["Biaya idle"]),
-      el("th", {}, ["Total"]),
+  table.append(
+    el("thead", {}, [
+      el("tr", {}, [
+        el("th", {}, ["Tim"]),
+        el("th", {}, ["Tarif"]),
+        el("th", {}, ["Aktif"]),
+        el("th", {}, ["Idle"]),
+        el("th", {}, ["Biaya aktif"]),
+        el("th", {}, ["Biaya idle"]),
+        el("th", {}, ["Total"]),
+      ]),
     ]),
   );
   const tbody = el("tbody");
@@ -108,10 +130,9 @@ function renderCostTable(host: HTMLElement, cm: CostMetrics): void {
         el("td", {}, [fmtNum(t.costTotal)]),
       ]),
     );
-    const sw = tbody.lastElementChild?.querySelector(".row-swatch") as HTMLElement | null;
-    if (sw) sw.style.background = tradeColor(t.tradeIndex);
   }
-  table.append(thead, tbody);
+  paintSwatches(tbody);
+  table.append(tbody);
   host.append(table);
   host.append(
     el("p", { className: "note table-note" }, [
@@ -123,18 +144,19 @@ function renderCostTable(host: HTMLElement, cm: CostMetrics): void {
 function renderUtilTable(host: HTMLElement, result: ParadeResult): void {
   host.replaceChildren();
   const table = el("table", { className: "data-table" });
-  const thead = el("thead");
-  thead.append(
-    el("tr", {}, [
-      el("th", {}, ["Tim"]),
-      el("th", {}, ["Produksi"]),
-      el("th", {}, ["Idle"]),
-      el("th", {}, ["Utilisasi"]),
+  table.append(
+    el("thead", {}, [
+      el("tr", {}, [
+        el("th", {}, ["Tim"]),
+        el("th", {}, ["Produksi"]),
+        el("th", {}, ["Kapasitas efektif"]),
+        el("th", {}, ["Idle"]),
+        el("th", {}, ["Utilisasi"]),
+      ]),
     ]),
   );
   const tbody = el("tbody");
-  for (let i = 0; i < result.tradeMetrics.length; i++) {
-    const m = result.tradeMetrics[i];
+  result.tradeMetrics.forEach((m, i) => {
     tbody.append(
       el("tr", {}, [
         el("td", {}, [
@@ -142,14 +164,40 @@ function renderUtilTable(host: HTMLElement, result: ParadeResult): void {
           `T${i + 1}: ${shortTradeName(m.name, 18)}`,
         ]),
         el("td", {}, [String(m.totalProduction)]),
+        el("td", {}, [String(m.totalEffectiveCapacity)]),
         el("td", {}, [String(m.totalIdle)]),
         el("td", {}, [`${(100 * m.utilization).toFixed(1)}%`]),
       ]),
     );
-    const sw = tbody.lastElementChild?.querySelector(".row-swatch") as HTMLElement | null;
-    if (sw) sw.style.background = tradeColor(i);
-  }
-  table.append(thead, tbody);
+  });
+  paintSwatches(tbody);
+  table.append(tbody);
+  host.append(table);
+}
+
+function renderBufferPeakTable(host: HTMLElement, result: ParadeResult): void {
+  host.replaceChildren();
+  const table = el("table", { className: "data-table" });
+  table.append(
+    el("thead", {}, [
+      el("tr", {}, [el("th", {}, ["Buffer"]), el("th", {}, ["Puncak WIP"])]),
+    ]),
+  );
+  const tbody = el("tbody");
+  result.config.trades.slice(0, -1).forEach((t, j) => {
+    const down = result.config.trades[j + 1];
+    tbody.append(
+      el("tr", {}, [
+        el("td", {}, [
+          el("span", { className: "row-swatch" }, []),
+          `B${j + 1}: ${shortTradeName(t.name, 12)} → ${shortTradeName(down.name, 12)}`,
+        ]),
+        el("td", {}, [String(result.maxBuffer[j] ?? 0)]),
+      ]),
+    );
+  });
+  paintSwatches(tbody);
+  table.append(tbody);
   host.append(table);
 }
 
@@ -169,7 +217,11 @@ function renderLittlesTable(host: HTMLElement, result: ParadeResult): void {
   const table = el("table", { className: "data-table" });
   table.append(
     el("thead", {}, [
-      el("tr", {}, [el("th", {}, ["Metrik"]), el("th", {}, ["Nilai"]), el("th", {}, ["Keterangan"])]),
+      el("tr", {}, [
+        el("th", {}, ["Metrik"]),
+        el("th", {}, ["Nilai"]),
+        el("th", {}, ["Keterangan"]),
+      ]),
     ]),
   );
   const tbody = el("tbody");
@@ -178,11 +230,6 @@ function renderLittlesTable(host: HTMLElement, result: ParadeResult): void {
   }
   table.append(tbody);
   host.append(table);
-  host.append(
-    el("p", { className: "note table-note" }, [
-      "Little: WIP = TH × CT (tanpa yield loss). Naikkan variability agar WIP/CT bergerak.",
-    ]),
-  );
 }
 
 function renderKingmanTable(host: HTMLElement, result: ParadeResult): void {
@@ -195,7 +242,11 @@ function renderKingmanTable(host: HTMLElement, result: ParadeResult): void {
         el("th", {}, ["Tim"]),
         el("th", {}, ["u"]),
         el("th", {}, ["tₑ"]),
+        el("th", {}, ["cₑ"]),
+        el("th", {}, ["cₐ"]),
         el("th", {}, ["V"]),
+        el("th", {}, ["U"]),
+        el("th", {}, ["Wait"]),
         el("th", {}, ["CT Kingman"]),
         el("th", {}, ["CT amati"]),
       ]),
@@ -207,33 +258,71 @@ function renderKingmanTable(host: HTMLElement, result: ParadeResult): void {
       el("tr", {}, [
         el("td", {}, [
           el("span", { className: "row-swatch" }, []),
-          `T${s.tradeIndex + 1}: ${shortTradeName(s.name, 14)}`,
+          `T${s.tradeIndex + 1}: ${shortTradeName(s.name, 12)}`,
         ]),
         el("td", {}, [fmtF(s.utilization, 3)]),
         el("td", {}, [fmtF(s.tE, 3)]),
+        el("td", {}, [fmtF(s.cE, 3)]),
+        el("td", {}, [fmtF(s.cA, 3)]),
         el("td", {}, [fmtF(s.vFactor, 3)]),
+        el("td", {}, [fmtF(s.uFactor, 3)]),
+        el("td", {}, [fmtF(s.waitKingman)]),
         el("td", {}, [fmtF(s.ctKingman)]),
         el("td", {}, [fmtF(s.ctObserved)]),
       ]),
     );
-    const sw = tbody.lastElementChild?.querySelector(".row-swatch") as HTMLElement | null;
-    if (sw) sw.style.background = tradeColor(s.tradeIndex);
   }
+  paintSwatches(tbody);
   table.append(tbody);
   host.append(table);
   host.append(el("p", { className: "note table-note" }, [kg.note]));
 }
 
+function renderInventoryTable(host: HTMLElement, result: ParadeResult): void {
+  const fr = inventoryFillRateMetrics(result);
+  host.replaceChildren();
+  const table = el("table", { className: "data-table" });
+  table.append(
+    el("thead", {}, [
+      el("tr", {}, [
+        el("th", {}, ["Buffer"]),
+        el("th", {}, ["Dari"]),
+        el("th", {}, ["Ke"]),
+        el("th", {}, ["Inventory ⌀"]),
+        el("th", {}, ["Puncak"]),
+        el("th", {}, ["Fill rate %"]),
+        el("th", {}, ["Idle hilir"]),
+      ]),
+    ]),
+  );
+  const tbody = el("tbody");
+  fr.interfaces.forEach((row) => {
+    tbody.append(
+      el("tr", {}, [
+        el("td", {}, [el("span", { className: "row-swatch" }, []), row.buffer]),
+        el("td", {}, [shortTradeName(row.from, 16)]),
+        el("td", {}, [shortTradeName(row.to, 16)]),
+        el("td", {}, [fmtF(row.avgInventory, 3)]),
+        el("td", {}, [String(row.peakInventory)]),
+        el("td", {}, [fmtF(100 * row.fillRate, 1)]),
+        el("td", {}, [String(row.downstreamIdle)]),
+      ]),
+    );
+  });
+  paintSwatches(tbody);
+  table.append(tbody);
+  host.append(table);
+  host.append(
+    el("p", { className: "note table-note" }, [
+      "Fill rate ≈ produksi / (produksi+idle) tim hilir. Kurva = base-stock teoritis.",
+    ]),
+  );
+}
+
 export function mountApp(root: HTMLElement): void {
   root.replaceChildren();
 
-  const zones = el("input", {
-    type: "number",
-    id: "zones",
-    value: "10",
-    min: "1",
-    max: "100",
-  });
+  const zones = el("input", { type: "number", id: "zones", value: "10", min: "1", max: "100" });
   const batch = el("select", { id: "batch" }, [
     el("option", { value: "1" }, ["1 — one-piece flow"]),
     el("option", { value: "4" }, ["4 — batch handoff"]),
@@ -251,27 +340,34 @@ export function mountApp(root: HTMLElement): void {
     el("option", { value: "medium" }, ["Tinggi (±50%)"]),
   ]);
   (variability as HTMLSelectElement).value = "none";
-  const seed = el("input", {
-    type: "number",
-    id: "seed",
-    value: "12345",
-    step: "1",
-  });
-  const tarif = el("input", {
-    type: "number",
-    id: "tarif",
-    value: "100",
-    min: "0",
-    step: "10",
-  });
-  const runBtn = el("button", { className: "run", type: "button" }, [
-    "Jalankan simulasi",
-  ]);
+  const seed = el("input", { type: "number", id: "seed", value: "12345", step: "1" });
+  const tarif = el("input", { type: "number", id: "tarif", value: "100", min: "0", step: "10" });
+  const runBtn = el("button", { className: "run", type: "button" }, ["Jalankan simulasi"]);
 
   const metrics = el("div", { className: "metrics" });
+  const metrics2 = el("div", { className: "metrics hidden" });
   const legend = el("div", { className: "legend" });
   const title = el("h2", { id: "chart-title" }, ["Line of Balance"]);
   const tableHost = el("div", { className: "table-host hidden" });
+  const littleControls = el("div", { className: "little-controls hidden" });
+  const conwipLabel = el("label", { for: "conwip" }, ["CONWIP — batas WIP konstan"]);
+  const conwip = el("input", {
+    type: "range",
+    id: "conwip",
+    min: "0.5",
+    max: "40",
+    step: "0.5",
+    value: "5",
+  }) as HTMLInputElement;
+  const conwipVal = el("span", { className: "conwip-val" }, ["5.0"]);
+  const conwipPred = el("div", { className: "metrics conwip-pred" });
+  const conwipCaption = el("p", { className: "note" }, [""]);
+  littleControls.append(
+    conwipLabel,
+    el("div", { className: "conwip-row" }, [conwip, conwipVal]),
+    conwipPred,
+    conwipCaption,
+  );
 
   const tabDefs: { id: TabId; label: string }[] = [
     { id: "lob", label: "Line of Balance" },
@@ -280,7 +376,9 @@ export function mountApp(root: HTMLElement): void {
     { id: "cost", label: "Biaya" },
     { id: "little", label: "Little's Law" },
     { id: "kingman", label: "Kingman" },
-  ];  const tabBtns = new Map<TabId, HTMLButtonElement>();
+    { id: "inventory", label: "Inventory / FR" },
+  ];
+  const tabBtns = new Map<TabId, HTMLButtonElement>();
   const tabs = el("div", { className: "tabs" });
   for (const t of tabDefs) {
     const btn = el(
@@ -301,8 +399,13 @@ export function mountApp(root: HTMLElement): void {
   const tip = el("div", { className: "tooltip hidden", id: "tip" }, ["—"]);
   chartWrap.append(canvas, tip);
 
+  const chartWrap2 = el("div", { className: "chart-wrap hidden" });
+  const canvas2 = el("canvas", { id: "chart2" }) as HTMLCanvasElement;
+  const subTitle = el("h3", { className: "subchart-title hidden" }, [""]);
+  chartWrap2.append(canvas2);
+
   const note = el("p", { className: "note" }, [
-    "Palet & rumus Streamlit: utilisasi, biaya, Little (WIP=TH×CT), Kingman (VUT). ",
+    "Parity Streamlit: LoB (detail+penuh), Buffer (garis+stacked), Utilisasi, Biaya, Little (CONWIP+kurva), Kingman, Inventory/FR. ",
     el(
       "a",
       {
@@ -314,9 +417,7 @@ export function mountApp(root: HTMLElement): void {
     ),
     ".",
   ]);
-  const statsLine = el("p", { className: "note", id: "stats" }, [
-    "Memuat statistik…",
-  ]);
+  const statsLine = el("p", { className: "note", id: "stats" }, ["Memuat statistik…"]);
 
   const chips = el("div", { className: "chips" });
   for (let i = 0; i < 5; i++) {
@@ -348,8 +449,12 @@ export function mountApp(root: HTMLElement): void {
     tabs,
     title,
     metrics,
+    metrics2,
+    littleControls,
     legend,
+    subTitle,
     chartWrap,
+    chartWrap2,
     tableHost,
     note,
   ]);
@@ -369,10 +474,43 @@ export function mountApp(root: HTMLElement): void {
   let activeTab: TabId = "lob";
   let lobHits: LobHit[] = [];
   let bufHits: BufferHit[] = [];
+  let conwipLevel = 5;
 
   function rates(): number[] {
     const rate = Math.max(0, Number(tarif.value) || 100);
     return Array(5).fill(rate);
+  }
+
+  function syncConwipBounds(r: ParadeResult): void {
+    const d = littlesOperationsCurve(r);
+    const cmin = 0.5;
+    const cmax = Math.max(r.config.totalUnits, d.wOpt * 4, d.wMin * 4, 20);
+    conwip.min = String(cmin);
+    conwip.max = String(cmax);
+    conwipLevel = snapConwip(Math.min(cmax, Math.max(cmin, d.conwip)));
+    conwip.value = String(conwipLevel);
+    conwipVal.textContent = conwipLevel.toFixed(1);
+  }
+
+  function renderConwipPred(r: ParadeResult): void {
+    const pred = evaluateAtWip(r, conwipLevel);
+    const d = littlesOperationsCurve(r);
+    conwipPred.replaceChildren(
+      metric("TH @ CONWIP", fmtF(pred.th, 3)),
+      metric("CT @ CONWIP", fmtF(pred.ct)),
+      metric("Δ WIP", fmtF(pred.dWip)),
+      metric("TH batas @ WIP", fmtF(pred.thBest, 3)),
+    );
+    if (pred.dWip < -0.25) {
+      conwipCaption.textContent =
+        `CONWIP di bawah operasi (${d.opWip.toFixed(1)}): inventory lebih ketat → CT cenderung turun, TH bisa turun jika jauh di bawah W_opt (${d.wOpt.toFixed(1)}).`;
+    } else if (pred.dWip > 0.25) {
+      conwipCaption.textContent =
+        `CONWIP di atas operasi (${d.opWip.toFixed(1)}): lebih longgar → CT cenderung naik, TH mendekati plafon (TH_max=${d.thMax.toFixed(2)}).`;
+    } else {
+      conwipCaption.textContent =
+        `CONWIP ≈ WIP operasi (${d.opWip.toFixed(1)}): prediksi dekat hasil run (TH=${d.opTh.toFixed(3)}, CT=${d.opCt.toFixed(2)}).`;
+    }
   }
 
   function setMetrics(r: ParadeResult, cm: CostMetrics): void {
@@ -387,6 +525,8 @@ export function mountApp(root: HTMLElement): void {
     const avgUtil =
       r.tradeMetrics.reduce((s, m) => s + m.utilization, 0) /
       Math.max(r.tradeMetrics.length, 1);
+    metrics2.classList.add("hidden");
+    metrics2.replaceChildren();
 
     if (activeTab === "cost") {
       metrics.replaceChildren(
@@ -408,11 +548,21 @@ export function mountApp(root: HTMLElement): void {
     }
     if (activeTab === "little") {
       const ll = littlesLawMetrics(r);
+      const d = littlesOperationsCurve(r);
       metrics.replaceChildren(
         metric("Throughput (TH)", fmtF(ll.throughput, 3)),
         metric("WIP pipeline ⌀", fmtF(ll.avgPipelineWip)),
         metric("CT pipeline", fmtF(ll.cycleTimePipeline)),
+        metric("WIP buffer ⌀", fmtF(ll.avgBufferWip)),
+        metric("CT buffer", fmtF(ll.cycleTimeBuffer)),
         metric("TH × CT (cek)", fmtF(ll.checkPipeline)),
+      );
+      metrics2.classList.remove("hidden");
+      metrics2.replaceChildren(
+        metric("W_min (kritis)", fmtF(d.wMin)),
+        metric("W_opt", fmtF(d.wOpt)),
+        metric("WIP operasi", fmtF(d.opWip)),
+        metric("V (var factor)", fmtF(d.vFactor, 3)),
       );
       return;
     }
@@ -424,6 +574,16 @@ export function mountApp(root: HTMLElement): void {
         metric("V gabungan", fmtF(comb.v, 3)),
         metric("CT Kingman (u̅)", fmtF(comb.ct)),
         metric("CT Little", fmtF(kg.systemCtLittle)),
+      );
+      return;
+    }
+    if (activeTab === "inventory") {
+      const fr = inventoryFillRateMetrics(r);
+      metrics.replaceChildren(
+        metric("Inventory ⌀ (buffer)", fmtF(fr.avgInventorySystem)),
+        metric("Fill rate sistem", `${(100 * fr.fillRateSystem).toFixed(1)}%`),
+        metric("Fill rate T1", `${(100 * fr.fillRateT1).toFixed(1)}%`),
+        metric("Puncak Σ buffer", String(fr.peakBufferTotal)),
       );
       return;
     }
@@ -442,13 +602,12 @@ export function mountApp(root: HTMLElement): void {
     cost: "Biaya",
     little: "Little's Law",
     kingman: "Kingman (VUT)",
+    inventory: "Inventory / Fill Rate",
   };
 
   function setTab(tab: TabId): void {
     activeTab = tab;
-    for (const [id, btn] of tabBtns) {
-      btn.classList.toggle("active", id === tab);
-    }
+    for (const [id, btn] of tabBtns) btn.classList.toggle("active", id === tab);
     title.textContent = titles[tab];
     if (lastResult && lastCost) setMetrics(lastResult, lastCost);
     redraw();
@@ -459,6 +618,9 @@ export function mountApp(root: HTMLElement): void {
     tip.classList.add("hidden");
     lobHits = [];
     bufHits = [];
+    littleControls.classList.add("hidden");
+    chartWrap2.classList.add("hidden");
+    subTitle.classList.add("hidden");
 
     if (activeTab === "cost") {
       chartWrap.classList.add("hidden");
@@ -471,33 +633,74 @@ export function mountApp(root: HTMLElement): void {
     chartWrap.classList.remove("hidden");
     tableHost.classList.remove("hidden");
 
+    if (activeTab === "lob") {
+      const detailMax = Math.min(16, lastResult.duration + 1);
+      subTitle.classList.remove("hidden");
+      subTitle.textContent = `Detail awal (periode 0–${detailMax})`;
+      chartWrap2.classList.remove("hidden");
+      lobHits = drawLobChart(canvas, lastResult, { maxPeriod: detailMax, cssHeight: 280 });
+      drawLobChart(canvas2, lastResult, { cssHeight: 340 });
+      renderLegendItems(legend, buildLegendItems(lastResult));
+      tableHost.classList.add("hidden");
+      tableHost.replaceChildren();
+      return;
+    }
+
+    if (activeTab === "buffer") {
+      subTitle.classList.remove("hidden");
+      subTitle.textContent = "Garis per buffer · lalu stacked";
+      chartWrap2.classList.remove("hidden");
+      bufHits = drawBufferChart(canvas, lastResult, { cssHeight: 280 });
+      drawBufferStackedChart(canvas2, lastResult, { cssHeight: 260 });
+      renderLegendItems(legend, buildBufferLegend(lastResult));
+      renderBufferPeakTable(tableHost, lastResult);
+      return;
+    }
+
     if (activeTab === "util") {
       drawUtilChart(canvas, lastResult);
       renderLegendItems(legend, buildUtilLegend(lastResult));
       renderUtilTable(tableHost, lastResult);
       return;
     }
+
     if (activeTab === "little") {
-      drawLittlesChart(canvas, lastResult);
+      littleControls.classList.remove("hidden");
+      renderConwipPred(lastResult);
+      subTitle.classList.remove("hidden");
+      subTitle.textContent = "Kurva operasi · lalu WIP pipeline/buffer vs waktu";
+      chartWrap2.classList.remove("hidden");
+      drawOperationsChart(canvas, lastResult, conwipLevel, { cssHeight: 340 });
+      drawLittlesChart(canvas2, lastResult, { cssHeight: 280 });
       renderLegendItems(legend, buildLittlesLegend());
       renderLittlesTable(tableHost, lastResult);
+      const d = littlesOperationsCurve(lastResult);
+      const noteEl = el("p", { className: "note table-note" }, [
+        `W_min=W0=TH_max×T0=${d.wMin.toFixed(2)} · W_opt=${d.wOpt.toFixed(2)} (V=${d.vFactor.toFixed(3)}) · CONWIP=${conwipLevel.toFixed(1)} · TH_max=${d.thMax.toFixed(3)} · T0=${d.t0.toFixed(2)}.`,
+      ]);
+      if (Math.abs(d.wOpt - d.wMin) < 1e-6) {
+        tableHost.append(
+          el("p", { className: "note table-note" }, [
+            "W_min = W_opt karena variability ≈ 0 (deterministik). Naikkan variability agar W_opt > W_min.",
+          ]),
+        );
+      }
+      tableHost.append(noteEl);
       return;
     }
+
     if (activeTab === "kingman") {
-      drawKingmanChart(canvas, lastResult);
+      drawKingmanChart(canvas, lastResult, { cssHeight: 340 });
       renderLegendItems(legend, buildKingmanLegend(lastResult));
       renderKingmanTable(tableHost, lastResult);
       return;
     }
 
-    tableHost.classList.add("hidden");
-    tableHost.replaceChildren();
-    if (activeTab === "lob") {
-      lobHits = drawLobChart(canvas, lastResult);
-      renderLegendItems(legend, buildLegendItems(lastResult));
-    } else {
-      bufHits = drawBufferChart(canvas, lastResult);
-      renderLegendItems(legend, buildBufferLegend(lastResult));
+    if (activeTab === "inventory") {
+      drawInventoryChart(canvas, lastResult, { cssHeight: 340 });
+      renderLegendItems(legend, buildInventoryLegend(lastResult));
+      renderInventoryTable(tableHost, lastResult);
+      return;
     }
   }
 
@@ -511,6 +714,7 @@ export function mountApp(root: HTMLElement): void {
     });
     lastResult = runParade(cfg);
     lastCost = computeCostMetrics(lastResult, rates());
+    syncConwipBounds(lastResult);
     setMetrics(lastResult, lastCost);
     redraw();
     void recordSimRun();
@@ -577,6 +781,15 @@ export function mountApp(root: HTMLElement): void {
     lastCost = computeCostMetrics(lastResult, rates());
     setMetrics(lastResult, lastCost);
     if (activeTab === "cost") redraw();
+  });
+  conwip.addEventListener("input", () => {
+    conwipLevel = snapConwip(Number(conwip.value) || 5);
+    conwipVal.textContent = conwipLevel.toFixed(1);
+    if (lastResult && activeTab === "little") {
+      renderConwipPred(lastResult);
+      setMetrics(lastResult, lastCost!);
+      redraw();
+    }
   });
   window.addEventListener("resize", () => redraw());
 

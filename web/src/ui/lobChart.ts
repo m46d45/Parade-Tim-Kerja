@@ -89,7 +89,7 @@ function xTickStep(maxX: number): number {
 export function drawLobChart(
   canvas: HTMLCanvasElement,
   result: ParadeResult,
-  opts?: { cssHeight?: number },
+  opts?: { cssHeight?: number; maxPeriod?: number },
 ): LobHit[] {
   const dpr = window.devicePixelRatio || 1;
   const cssW = canvas.clientWidth || 640;
@@ -102,9 +102,13 @@ export function drawLobChart(
   if (!ctx) return [];
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  const cum = cumulativeSeries(result);
-  const ideal = result.idealLastTradeCumulative;
-  const maxX = Math.max(result.duration, ideal.length - 1, 1);
+  const cumFull = cumulativeSeries(result);
+  const idealFull = result.idealLastTradeCumulative;
+  const fullMaxX = Math.max(result.duration, idealFull.length - 1, 1);
+  const maxX =
+    opts?.maxPeriod != null ? Math.min(opts.maxPeriod, fullMaxX) : fullMaxX;
+  const cum = cumFull.map((s) => s.slice(0, maxX + 1));
+  const ideal = idealFull.slice(0, maxX + 1);
   const maxY = result.config.totalUnits;
   const L = buildLayout(cssW, cssH, maxX, maxY);
   const hits: LobHit[] = [];

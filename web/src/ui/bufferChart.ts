@@ -220,3 +220,108 @@ export function buildBufferLegend(
     };
   });
 }
+
+/** Stacked area buffer chart (Streamlit plot_buffer_profile stacked=True). */
+export function drawBufferStackedChart(
+  canvas: HTMLCanvasElement,
+  result: ParadeResult,
+  opts?: { cssHeight?: number },
+): void {
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = canvas.clientWidth || 640;
+  const cssH = opts?.cssHeight ?? 280;
+  canvas.width = Math.floor(cssW * dpr);
+  canvas.height = Math.floor(cssH * dpr);
+  canvas.style.height = `${cssH}px`;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const series = bufferSeries(result);
+  if (!series.length) {
+    ctx.clearRect(0, 0, cssW, cssH);
+    ctx.fillStyle = "#64748b";
+    ctx.font = "13px DM Sans, sans-serif";
+    ctx.fillText("Tidak ada buffer (satu tim)", 24, 40);
+    return;
+  }
+
+  const maxX = Math.max(result.duration, series[0].length - 1, 1);
+  const totals = series[0].map((_, t) =>
+    series.reduce((s, row) => s + row[t], 0),
+  );
+  const maxY = Math.max(1, ...totals);
+  const L = buildLayout(cssW, cssH, maxX, maxY);
+
+  ctx.clearRect(0, 0, cssW, cssH);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, cssW, cssH);
+
+  const yStep = yTickStep(maxY);
+  ctx.font = "11px DM Sans, sans-serif";
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
+  for (let z = 0; z <= maxY; z += yStep) {
+    const yy = L.yScale(z);
+    ctx.strokeStyle = z === 0 ? "rgba(26, 54, 93, 0.28)" : "rgba(26, 54, 93, 0.12)";
+    ctx.beginPath();
+    ctx.moveTo(L.pad.l, yy);
+    ctx.lineTo(L.pad.l + L.plotW, yy);
+    ctx.stroke();
+    ctx.fillStyle = "#64748b";
+    ctx.fillText(String(z), L.pad.l - 8, yy);
+  }
+
+  const xStep = xTickStep(maxX);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  for (let p = 0; p <= maxX; p += xStep) {
+    const xx = L.xScale(p);
+    ctx.strokeStyle = "rgba(26, 54, 93, 0.1)";
+    ctx.beginPath();
+    ctx.moveTo(xx, L.pad.t);
+    ctx.lineTo(xx, L.pad.t + L.plotH);
+    ctx.stroke();
+    ctx.fillStyle = "#64748b";
+    ctx.fillText(String(p), xx, L.pad.t + L.plotH + 8);
+  }
+
+  // stack from bottom
+  const nT = series[0].length;
+  const cumLow = Array(nT).fill(0);
+  for (let j = 0; j < series.length; j++) {
+    const color = bufferColor(j);
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.82;
+    ctx.beginPath();
+    for (let i = 0; i < nT; i++) {
+      const X = L.xScale(i);
+      const Y = L.yScale(cumLow[i] + series[j][i]);
+      if (i === 0) ctx.moveTo(X, Y);
+      else ctx.lineTo(X, Y);
+    }
+    for (let i = nT - 1; i >= 0; i--) {
+      const X = L.xScale(i);
+      const Y = L.yScale(cumLow[i]);
+      ctx.lineTo(X, Y);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    for (let i = 0; i < nT; i++) cumLow[i] += series[j][i];
+  }
+
+  ctx.fillStyle = "#1a365d";
+  ctx.font = "12px DM Sans, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "bottom";
+  ctx.fillText("Periode (0 = awal)", L.pad.l + L.plotW / 2, cssH - 4);
+  ctx.save();
+  ctx.translate(14, L.pad.t + L.plotH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.fillText("WIP (zona, ditumpuk)", 0, 0);
+  ctx.restore();
+}

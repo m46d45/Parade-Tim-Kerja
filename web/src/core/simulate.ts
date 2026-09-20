@@ -308,6 +308,7 @@ class ParadeOfTrades {
         meanCapacity: tradeMean(t),
         totalProduction: prod,
         totalIdle: this.totalIdle[i],
+        totalEffectiveCapacity: eff,
         utilization: util,
         periodsToFinish: finish ?? this.period,
         timeOnSite,

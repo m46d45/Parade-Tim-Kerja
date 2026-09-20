@@ -40,6 +40,7 @@ export interface TradeMetrics {
   meanCapacity: number;
   totalProduction: number;
   totalIdle: number;
+  totalEffectiveCapacity: number;
   utilization: number;
   periodsToFinish: number;
   timeOnSite: number;

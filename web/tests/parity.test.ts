@@ -3,9 +3,11 @@ import {
   classroomConfig,
   computeCostMetrics,
   cumulativeSeries,
+  inventoryFillRateMetrics,
   kingmanCombined,
   kingmanMetrics,
   littlesLawMetrics,
+  littlesOperationsCurve,
   runParade,
 } from "../src/core";
 import batch1 from "../fixtures/zf_novar_batch1_z10.json";
@@ -168,5 +170,61 @@ describe("Little's Law + Kingman (parity vs Python no-var batch=4)", () => {
     expect(comb.cE).toBeCloseTo(0.5, 6);
     expect(comb.v).toBeGreaterThan(0);
     expect(comb.ct).toBeGreaterThan(comb.tE);
+  });
+});
+
+describe("Inventory/FR + operations curve (parity vs Python no-var batch=4)", () => {
+  it("Inventory fill rate: I̅=1, FR=100%, peak per buffer=4", () => {
+    const r = runParade(
+      classroomConfig({
+        totalUnits: 10,
+        batchSize: 4,
+        baseSpeed: 1,
+        seed: 12345,
+        deterministic: true,
+      }),
+    );
+    const fr = inventoryFillRateMetrics(r);
+    expect(fr.avgInventorySystem).toBeCloseTo(1, 10);
+    expect(fr.fillRateSystem).toBeCloseTo(1, 10);
+    expect(fr.fillRateT1).toBeCloseTo(1, 10);
+    expect(fr.peakBufferTotal).toBe(10);
+    expect(fr.interfaces).toHaveLength(4);
+    for (const row of fr.interfaces) {
+      expect(row.avgInventory).toBeCloseTo(1, 10);
+      expect(row.peakInventory).toBe(4);
+      expect(row.fillRate).toBeCloseTo(1, 10);
+      expect(row.downstreamIdle).toBe(0);
+    }
+  });
+
+  it("operations curve: W_min=W_opt=5, TH_max=1, T0=5", () => {
+    const r = runParade(
+      classroomConfig({
+        totalUnits: 10,
+        batchSize: 4,
+        baseSpeed: 1,
+        seed: 12345,
+        deterministic: true,
+      }),
+    );
+    const d = littlesOperationsCurve(r);
+    expect(d.wMin).toBeCloseTo(5, 10);
+    expect(d.wOpt).toBeCloseTo(5, 10);
+    expect(d.conwip).toBeCloseTo(5, 10);
+    expect(d.thMax).toBeCloseTo(1, 10);
+    expect(d.t0).toBeCloseTo(5, 10);
+    expect(d.vFactor).toBeCloseTo(0, 10);
+    expect(d.opWip).toBeCloseTo(5.925925925925926, 10);
+  });
+
+  it("utilisasi exposes kapasitas efektif", () => {
+    const r = runParade(
+      classroomConfig({ totalUnits: 10, batchSize: 4, deterministic: true }),
+    );
+    for (const m of r.tradeMetrics) {
+      expect(m.totalEffectiveCapacity).toBe(10);
+      expect(m.totalProduction).toBe(10);
+    }
   });
 });
