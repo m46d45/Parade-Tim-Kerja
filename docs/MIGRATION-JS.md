@@ -71,7 +71,18 @@ Regenerate golden (Python oracle):
 python3 scripts/export_golden_fixtures.py
 ```
 
-## Aturan parity
+## Palet (sumber kebenaran)
+
+Ikuti **Streamlit app**, bukan landing gelap:
+
+| Token | Nilai | Sumber |
+|-------|-------|--------|
+| Background | `#ffffff` / `#f0f4f8` | `.streamlit/config.toml` |
+| Primary / teks | `#1a365d` / `#1a202c` | config.toml |
+| Header navy | `#0f2744` → `#1a365d` → `#234e76` | banner `app.py` |
+| Tim T1–T5 | `#3b82f6` `#f59e0b` `#10b981` `#ef4444` `#8b5cf6` | banner `app.py` |
+
+Lihat `web/src/theme.ts`.
 
 - Python = sumber kebenaran selama migrasi.
 - Fase 1 fokus **zone_flow + deterministic** (tanpa ketergantungan RNG Python).

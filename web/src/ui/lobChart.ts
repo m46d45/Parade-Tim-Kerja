@@ -47,8 +47,8 @@ function drawMarker(
   size = 4.2,
 ): void {
   ctx.fillStyle = color;
-  ctx.strokeStyle = "#0c1222";
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 1.2;
   ctx.beginPath();
   if (kind === "s") {
     ctx.rect(x - size, y - size, size * 2, size * 2);
@@ -111,7 +111,7 @@ export function drawLobChart(
 
   // background
   ctx.clearRect(0, 0, cssW, cssH);
-  ctx.fillStyle = "rgba(255,255,255,0.035)";
+  ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, cssW, cssH);
 
   // Y grid + labels (every zone)
@@ -120,13 +120,13 @@ export function drawLobChart(
   ctx.textBaseline = "middle";
   for (let z = 0; z <= maxY; z++) {
     const yy = L.yScale(z);
-    ctx.strokeStyle = z === 0 || z === maxY ? "rgba(148,163,184,0.45)" : "rgba(148,163,184,0.22)";
+    ctx.strokeStyle = z === 0 || z === maxY ? "rgba(26, 54, 93, 0.28)" : "rgba(26, 54, 93, 0.12)";
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(L.pad.l, yy);
     ctx.lineTo(L.pad.l + L.plotW, yy);
     ctx.stroke();
-    ctx.fillStyle = "#94a3b8";
+    ctx.fillStyle = "#64748b";
     ctx.fillText(String(z), L.pad.l - 8, yy);
   }
 
@@ -136,12 +136,12 @@ export function drawLobChart(
   ctx.textBaseline = "top";
   for (let p = 0; p <= maxX; p += xStep) {
     const xx = L.xScale(p);
-    ctx.strokeStyle = "rgba(148,163,184,0.18)";
+    ctx.strokeStyle = "rgba(26, 54, 93, 0.1)";
     ctx.beginPath();
     ctx.moveTo(xx, L.pad.t);
     ctx.lineTo(xx, L.pad.t + L.plotH);
     ctx.stroke();
-    ctx.fillStyle = "#94a3b8";
+    ctx.fillStyle = "#64748b";
     ctx.fillText(String(p), xx, L.pad.t + L.plotH + 8);
   }
   // minor period ticks (no label) when major > 1
@@ -149,7 +149,7 @@ export function drawLobChart(
     for (let p = 0; p <= maxX; p++) {
       if (p % xStep === 0) continue;
       const xx = L.xScale(p);
-      ctx.strokeStyle = "rgba(148,163,184,0.10)";
+      ctx.strokeStyle = "rgba(26, 54, 93, 0.12)";
       ctx.beginPath();
       ctx.moveTo(xx, L.pad.t + L.plotH);
       ctx.lineTo(xx, L.pad.t + L.plotH + 4);
@@ -214,7 +214,7 @@ export function drawLobChart(
   });
 
   // Axis titles
-  ctx.fillStyle = "#cbd5e1";
+  ctx.fillStyle = "#1a365d";
   ctx.font = "12px DM Sans, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "bottom";

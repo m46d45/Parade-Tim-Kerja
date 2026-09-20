@@ -1,21 +1,38 @@
 /**
- * Visual tokens aligned with parade_of_trades_plots.py (Streamlit charts).
+ * App visual tokens — match Streamlit Parade Tim Kerja.
+ *
+ * Shell: .streamlit/config.toml (light theme)
+ * Team chips / UI accents: parade banner in app.py
+ *   --t1:#3b82f6 --t2:#f59e0b --t3:#10b981 --t4:#ef4444 --t5:#8b5cf6
+ *   --bg0:#0f2744 --bg1:#1a365d (banner strip only)
  */
 
-/** Matplotlib trade palette used in Streamlit LoB. */
+/** Primary UI trade colors (Streamlit banner / classroom chips). */
 export const TRADE_COLORS = [
-  "#1f77b4", // T1 blue
-  "#ff7f0e", // T2 orange
-  "#2ca02c", // T3 green
-  "#d62728", // T4 red
-  "#9467bd", // T5 purple
+  "#3b82f6", // T1
+  "#f59e0b", // T2
+  "#10b981", // T3
+  "#ef4444", // T4
+  "#8b5cf6", // T5
   "#8c564b",
   "#e377c2",
 ] as const;
 
-export const IDEAL_COLOR = "#555555";
+/** Ideal baseline on light charts */
+export const IDEAL_COLOR = "#64748b";
 
-export const MARKERS = ["o", "s", "^", "D", "v"] as const;
+/** Streamlit theme (config.toml) */
+export const APP = {
+  primary: "#1a365d",
+  background: "#ffffff",
+  secondaryBackground: "#f0f4f8",
+  text: "#1a202c",
+  muted: "#64748b",
+  border: "#d0d7e2",
+  banner0: "#0f2744",
+  banner1: "#1a365d",
+  banner2: "#234e76",
+} as const;
 
 export function tradeColor(i: number): string {
   return TRADE_COLORS[i % TRADE_COLORS.length];

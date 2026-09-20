@@ -81,7 +81,7 @@ export function mountApp(root: HTMLElement): void {
   chartWrap.append(canvas, tip);
 
   const note = el("p", { className: "note" }, [
-    "Warna T1–T5 sama dengan grafik Streamlit. Arahkan kursor ke titik untuk lihat periode & zona. ",
+    "Palet mengikuti Streamlit (latar terang + header navy + warna tim banner). Hover titik untuk periode & zona. ",
     el(
       "a",
       {
@@ -97,10 +97,10 @@ export function mountApp(root: HTMLElement): void {
     "Memuat statistik…",
   ]);
 
-  // Color chips matching Streamlit palette
+  // Color chips matching Streamlit banner
   const chips = el("div", { className: "chips" });
   for (let i = 0; i < 5; i++) {
-    const c = el("span", { className: "chip" }, [`T${i + 1}`]);
+    const c = el("span", { className: i === 1 ? "chip t2" : "chip" }, [`T${i + 1}`]);
     c.style.background = tradeColor(i);
     chips.append(c);
   }
@@ -128,7 +128,7 @@ export function mountApp(root: HTMLElement): void {
 
   root.append(
     el("div", { className: "wrap" }, [
-      el("header", {}, [
+      el("header", { className: "app-header" }, [
         el("div", { className: "brand" }, ["Parade Tim Kerja"]),
         el("span", { className: "badge" }, ["JS · browser"]),
       ]),

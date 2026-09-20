@@ -1,18 +1,26 @@
+/**
+ * Global app chrome — Streamlit light theme (+ navy banner accent).
+ * Source: .streamlit/config.toml + parade banner in app.py
+ */
+
 :root {
-  --bg: #0c1222;
-  --bg2: #141c2f;
-  --card: rgba(255, 255, 255, 0.04);
-  --border: rgba(255, 255, 255, 0.1);
-  --text: #e8eef8;
-  --muted: #94a3b8;
-  --accent: #1f77b4;
-  --ok: #22c55e;
-  /* Streamlit / matplotlib trade palette */
-  --t1: #1f77b4;
-  --t2: #ff7f0e;
-  --t3: #2ca02c;
-  --t4: #d62728;
-  --t5: #9467bd;
+  --bg: #ffffff;
+  --bg2: #f0f4f8;
+  --card: #ffffff;
+  --border: #d0d7e2;
+  --text: #1a202c;
+  --muted: #64748b;
+  --accent: #1a365d;
+  --accent-soft: #2b6cb0;
+  --ok: #10b981;
+  --banner0: #0f2744;
+  --banner1: #1a365d;
+  --banner2: #234e76;
+  --t1: #3b82f6;
+  --t2: #f59e0b;
+  --t3: #10b981;
+  --t4: #ef4444;
+  --t5: #8b5cf6;
 }
 
 * {
@@ -23,7 +31,7 @@
 
 body {
   font-family: "DM Sans", system-ui, sans-serif;
-  background: var(--bg);
+  background: var(--bg2);
   color: var(--text);
   min-height: 100vh;
   line-height: 1.5;
@@ -36,8 +44,9 @@ body::before {
   pointer-events: none;
   z-index: 0;
   background:
-    radial-gradient(900px 500px at 10% -10%, rgba(31, 119, 180, 0.28), transparent 55%),
-    radial-gradient(700px 400px at 90% 10%, rgba(148, 103, 189, 0.18), transparent 50%);
+    linear-gradient(180deg, rgba(15, 39, 68, 0.06), transparent 220px),
+    radial-gradient(800px 360px at 0% 0%, rgba(59, 130, 246, 0.12), transparent 55%),
+    radial-gradient(700px 320px at 100% 0%, rgba(139, 92, 246, 0.1), transparent 50%);
 }
 
 .wrap {
@@ -45,31 +54,37 @@ body::before {
   z-index: 1;
   max-width: 1100px;
   margin: 0 auto;
-  padding: 1.5rem 1.25rem 3rem;
+  padding: 1.25rem 1.25rem 3rem;
 }
 
-header {
+header.app-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
+  padding: 0.85rem 1.1rem;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--banner0) 0%, var(--banner1) 55%, var(--banner2) 100%);
+  color: #e8eef7;
+  box-shadow: 0 8px 28px rgba(15, 39, 68, 0.28);
 }
 
 .brand {
   font-family: "Instrument Serif", Georgia, serif;
-  font-size: 1.45rem;
+  font-size: 1.35rem;
   letter-spacing: -0.02em;
+  color: #e8eef7;
 }
 
 .badge {
   font-size: 0.72rem;
   font-weight: 600;
-  color: var(--muted);
-  border: 1px solid var(--border);
+  color: rgba(232, 238, 247, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   padding: 0.3rem 0.65rem;
   border-radius: 999px;
-  background: var(--card);
+  background: rgba(0, 0, 0, 0.14);
 }
 
 .layout {
@@ -89,6 +104,7 @@ header {
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: 1rem 1.1rem;
+  box-shadow: 0 4px 18px rgba(15, 39, 68, 0.06);
 }
 
 .panel h2 {
@@ -112,6 +128,10 @@ header {
   color: #fff;
   padding: 0.2rem 0.5rem;
   border-radius: 999px;
+}
+
+.chip.t2 {
+  color: #1a1200;
 }
 
 label {
@@ -150,7 +170,7 @@ button.run {
 }
 
 button.run:hover {
-  filter: brightness(1.08);
+  background: var(--accent-soft);
 }
 
 .metrics {
@@ -175,6 +195,7 @@ button.run:hover {
 
 .metric strong {
   font-size: 1.15rem;
+  color: var(--accent);
 }
 
 .legend {
@@ -196,14 +217,13 @@ button.run:hover {
   width: 14px;
   height: 3px;
   border-radius: 2px;
-  background: var(--sw, #fff);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+  background: var(--sw, #1a365d);
 }
 
 .swatch.dashed {
   background: repeating-linear-gradient(
     90deg,
-    var(--sw, #555) 0 4px,
+    var(--sw, #64748b) 0 4px,
     transparent 4px 7px
   );
 }
@@ -216,7 +236,7 @@ canvas {
   width: 100%;
   height: auto;
   display: block;
-  background: rgba(0, 0, 0, 0.22);
+  background: #ffffff;
   border-radius: 12px;
   border: 1px solid var(--border);
 }
@@ -228,12 +248,12 @@ canvas {
   max-width: 220px;
   padding: 0.5rem 0.65rem;
   border-radius: 10px;
-  background: rgba(15, 23, 42, 0.95);
+  background: #ffffff;
   border: 1px solid var(--border);
   font-size: 0.78rem;
   color: var(--text);
   pointer-events: none;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 8px 24px rgba(15, 39, 68, 0.14);
 }
 
 .tooltip.hidden {
@@ -252,5 +272,5 @@ canvas {
 }
 
 .note a {
-  color: #93c5fd;
+  color: var(--accent-soft);
 }
