@@ -2,6 +2,9 @@ import {
   bufferSeries,
   classroomConfig,
   computeCostMetrics,
+  kingmanCombined,
+  kingmanMetrics,
+  littlesLawMetrics,
   runParade,
   type CostMetrics,
   type ParadeResult,
@@ -15,16 +18,17 @@ import {
   hitTestBuffer,
   type BufferHit,
 } from "./bufferChart";
+import { buildKingmanLegend, drawKingmanChart } from "./kingmanChart";
 import {
   buildLegendItems,
   drawLobChart,
   hitTestLob,
   type LobHit,
 } from "./lobChart";
+import { buildLittlesLegend, drawLittlesChart } from "./littlesChart";
 import { buildUtilLegend, drawUtilChart } from "./utilChart";
 
-type TabId = "lob" | "buffer" | "util" | "cost";
-
+type TabId = "lob" | "buffer" | "util" | "cost" | "little" | "kingman";
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
   attrs: Record<string, string> = {},
@@ -66,6 +70,11 @@ function renderLegendItems(
 
 function fmtNum(n: number): string {
   return Math.round(n).toLocaleString("id-ID");
+}
+
+function fmtF(n: number, d = 2): string {
+  if (!Number.isFinite(n)) return "∞";
+  return n.toFixed(d);
 }
 
 function renderCostTable(host: HTMLElement, cm: CostMetrics): void {
@@ -144,6 +153,77 @@ function renderUtilTable(host: HTMLElement, result: ParadeResult): void {
   host.append(table);
 }
 
+function renderLittlesTable(host: HTMLElement, result: ParadeResult): void {
+  const ll = littlesLawMetrics(result);
+  host.replaceChildren();
+  const rows: [string, string, string][] = [
+    ["Throughput (TH)", fmtF(ll.throughput, 3), "zona / periode"],
+    ["WIP pipeline ⌀", fmtF(ll.avgPipelineWip), "zona · T1−T5"],
+    ["WIP buffer ⌀", fmtF(ll.avgBufferWip), "zona · Σ buffer"],
+    ["CT pipeline", fmtF(ll.cycleTimePipeline), "periode · WIP÷TH"],
+    ["CT buffer", fmtF(ll.cycleTimeBuffer), "periode"],
+    ["TH × CT (cek)", fmtF(ll.checkPipeline), "≈ WIP pipeline"],
+    ["WIP puncak pipeline", fmtF(ll.peakPipelineWip), "zona"],
+    ["WIP puncak buffer", fmtF(ll.peakBufferWip), "zona"],
+  ];
+  const table = el("table", { className: "data-table" });
+  table.append(
+    el("thead", {}, [
+      el("tr", {}, [el("th", {}, ["Metrik"]), el("th", {}, ["Nilai"]), el("th", {}, ["Keterangan"])]),
+    ]),
+  );
+  const tbody = el("tbody");
+  for (const [a, b, c] of rows) {
+    tbody.append(el("tr", {}, [el("td", {}, [a]), el("td", {}, [b]), el("td", {}, [c])]));
+  }
+  table.append(tbody);
+  host.append(table);
+  host.append(
+    el("p", { className: "note table-note" }, [
+      "Little: WIP = TH × CT (tanpa yield loss). Naikkan variability agar WIP/CT bergerak.",
+    ]),
+  );
+}
+
+function renderKingmanTable(host: HTMLElement, result: ParadeResult): void {
+  const kg = kingmanMetrics(result);
+  host.replaceChildren();
+  const table = el("table", { className: "data-table" });
+  table.append(
+    el("thead", {}, [
+      el("tr", {}, [
+        el("th", {}, ["Tim"]),
+        el("th", {}, ["u"]),
+        el("th", {}, ["tₑ"]),
+        el("th", {}, ["V"]),
+        el("th", {}, ["CT Kingman"]),
+        el("th", {}, ["CT amati"]),
+      ]),
+    ]),
+  );
+  const tbody = el("tbody");
+  for (const s of kg.stations) {
+    tbody.append(
+      el("tr", {}, [
+        el("td", {}, [
+          el("span", { className: "row-swatch" }, []),
+          `T${s.tradeIndex + 1}: ${shortTradeName(s.name, 14)}`,
+        ]),
+        el("td", {}, [fmtF(s.utilization, 3)]),
+        el("td", {}, [fmtF(s.tE, 3)]),
+        el("td", {}, [fmtF(s.vFactor, 3)]),
+        el("td", {}, [fmtF(s.ctKingman)]),
+        el("td", {}, [fmtF(s.ctObserved)]),
+      ]),
+    );
+    const sw = tbody.lastElementChild?.querySelector(".row-swatch") as HTMLElement | null;
+    if (sw) sw.style.background = tradeColor(s.tradeIndex);
+  }
+  table.append(tbody);
+  host.append(table);
+  host.append(el("p", { className: "note table-note" }, [kg.note]));
+}
+
 export function mountApp(root: HTMLElement): void {
   root.replaceChildren();
 
@@ -198,8 +278,9 @@ export function mountApp(root: HTMLElement): void {
     { id: "buffer", label: "Buffer / WIP" },
     { id: "util", label: "Utilisasi" },
     { id: "cost", label: "Biaya" },
-  ];
-  const tabBtns = new Map<TabId, HTMLButtonElement>();
+    { id: "little", label: "Little's Law" },
+    { id: "kingman", label: "Kingman" },
+  ];  const tabBtns = new Map<TabId, HTMLButtonElement>();
   const tabs = el("div", { className: "tabs" });
   for (const t of tabDefs) {
     const btn = el(
@@ -221,7 +302,7 @@ export function mountApp(root: HTMLElement): void {
   chartWrap.append(canvas, tip);
 
   const note = el("p", { className: "note" }, [
-    "Palet Streamlit. Utilisasi & biaya mengikuti rumus Streamlit (aktif/idle × tarif). ",
+    "Palet & rumus Streamlit: utilisasi, biaya, Little (WIP=TH×CT), Kingman (VUT). ",
     el(
       "a",
       {
@@ -325,6 +406,27 @@ export function mountApp(root: HTMLElement): void {
       );
       return;
     }
+    if (activeTab === "little") {
+      const ll = littlesLawMetrics(r);
+      metrics.replaceChildren(
+        metric("Throughput (TH)", fmtF(ll.throughput, 3)),
+        metric("WIP pipeline ⌀", fmtF(ll.avgPipelineWip)),
+        metric("CT pipeline", fmtF(ll.cycleTimePipeline)),
+        metric("TH × CT (cek)", fmtF(ll.checkPipeline)),
+      );
+      return;
+    }
+    if (activeTab === "kingman") {
+      const comb = kingmanCombined(r);
+      const kg = kingmanMetrics(r);
+      metrics.replaceChildren(
+        metric("u̅ gabungan", fmtF(comb.uBar, 3)),
+        metric("V gabungan", fmtF(comb.v, 3)),
+        metric("CT Kingman (u̅)", fmtF(comb.ct)),
+        metric("CT Little", fmtF(kg.systemCtLittle)),
+      );
+      return;
+    }
     metrics.replaceChildren(
       metric("Durasi", String(r.duration)),
       metric("Ideal (tanpa var)", String(r.idealDuration)),
@@ -338,6 +440,8 @@ export function mountApp(root: HTMLElement): void {
     buffer: "Buffer / WIP",
     util: "Utilisasi",
     cost: "Biaya",
+    little: "Little's Law",
+    kingman: "Kingman (VUT)",
   };
 
   function setTab(tab: TabId): void {
@@ -355,9 +459,7 @@ export function mountApp(root: HTMLElement): void {
     tip.classList.add("hidden");
     lobHits = [];
     bufHits = [];
-    const showCanvas = activeTab === "lob" || activeTab === "buffer" || activeTab === "util";
-    chartWrap.classList.toggle("hidden", !showCanvas && activeTab === "cost");
-    // Cost still shows a small stacked summary via canvas? Use table only for cost.
+
     if (activeTab === "cost") {
       chartWrap.classList.add("hidden");
       tableHost.classList.remove("hidden");
@@ -365,14 +467,29 @@ export function mountApp(root: HTMLElement): void {
       renderCostTable(tableHost, lastCost);
       return;
     }
+
     chartWrap.classList.remove("hidden");
+    tableHost.classList.remove("hidden");
+
     if (activeTab === "util") {
-      tableHost.classList.remove("hidden");
       drawUtilChart(canvas, lastResult);
       renderLegendItems(legend, buildUtilLegend(lastResult));
       renderUtilTable(tableHost, lastResult);
       return;
     }
+    if (activeTab === "little") {
+      drawLittlesChart(canvas, lastResult);
+      renderLegendItems(legend, buildLittlesLegend());
+      renderLittlesTable(tableHost, lastResult);
+      return;
+    }
+    if (activeTab === "kingman") {
+      drawKingmanChart(canvas, lastResult);
+      renderLegendItems(legend, buildKingmanLegend(lastResult));
+      renderKingmanTable(tableHost, lastResult);
+      return;
+    }
+
     tableHost.classList.add("hidden");
     tableHost.replaceChildren();
     if (activeTab === "lob") {
