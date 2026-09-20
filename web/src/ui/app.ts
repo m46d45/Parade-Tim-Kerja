@@ -561,7 +561,21 @@ export function mountApp(root: HTMLElement): void {
 
   const headerStats = el("button", { className: "header-link", type: "button" }, ["Statistik"]);
   const headerManual = el("button", { className: "header-link", type: "button" }, ["Manual"]);
-  const headerNav = el("div", { className: "header-nav" }, [headerStats, headerManual]);
+  const headerKelas = el(
+    "a",
+    {
+      className: "header-link",
+      href: "/kelas",
+      target: "_blank",
+      rel: "noopener",
+    },
+    ["Animasi Kelas"],
+  );
+  const headerNav = el("div", { className: "header-nav" }, [
+    headerStats,
+    headerManual,
+    headerKelas,
+  ]);
 
   const brandBlock = el("div", { className: "brand-block" }, [
     el("img", {

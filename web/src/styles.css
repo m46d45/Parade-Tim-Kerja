@@ -118,6 +118,8 @@ header.app-header {
 }
 
 .header-link {
+  display: inline-flex;
+  align-items: center;
   font: inherit;
   font-size: 0.85rem;
   font-weight: 700;
@@ -127,6 +129,11 @@ header.app-header {
   background: rgba(0, 0, 0, 0.14);
   color: rgba(232, 238, 247, 0.92);
   cursor: pointer;
+  text-decoration: none;
+}
+
+a.header-link {
+  color: rgba(232, 238, 247, 0.92);
 }
 
 .header-link:hover {
