@@ -403,8 +403,8 @@ export function mountApp(root: HTMLElement): void {
     tarifSliders.push(slider);
     tarifVals.push(val);
     const row = el("div", { className: "slider-row" }, [
-      el("span", { className: "slider-label" }, [
-        `T${i + 1} ${DEFAULT_TRADE_NAMES[i]}`,
+      el("span", { className: "slider-label", title: `T${i + 1} ${DEFAULT_TRADE_NAMES[i]}` }, [
+        DEFAULT_TRADE_NAMES[i],
       ]),
       slider,
       val,

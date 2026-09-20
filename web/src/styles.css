@@ -505,8 +505,8 @@ canvas {
 }
 
 .slider-label {
-  flex: 0 1 auto;
-  max-width: 5rem;
+  flex: 0 0 4.6rem;
+  max-width: 4.6rem;
   font-weight: 700;
   font-size: 0.68rem;
   white-space: nowrap;
