@@ -11,6 +11,7 @@ import {
   runParade,
   shortVariabilityLabel,
   VARIABILITY_LEVELS,
+  type ParadeResult,
   type VariabilityLevel,
 } from "../core";
 import { recordCompareRun } from "../stats";
@@ -161,7 +162,7 @@ export function mountCompare(
   ]);
 
   const tabDefs: { id: CmpTab; label: string }[] = [
-    { id: "lob", label: "Line of Balance" },
+    { id: "lob", label: "Location-based Schedule" },
     { id: "buffer", label: "Buffer / WIP" },
     { id: "util_cost", label: "Utilisasi & Biaya" },
     { id: "little", label: "Little's Law" },

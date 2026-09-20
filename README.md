@@ -29,7 +29,7 @@ Mahasiswa **tidak perlu menginstal Python** — cukup buka link di browser.
 
 | Tab | Fungsi |
 |-----|--------|
-| **Simulasi** | Satu skenario zone-flow: kecepatan + variability **per zona**, LOB / WIP / utilization |
+| **Simulasi** | Satu skenario zone-flow: kecepatan + variability **per zona**, Location-based Schedule / WIP / utilization |
 | **Perbandingan** | Bandingkan **2–5** skenario (mis. kelima level variability) |
 | **Manual** | Panduan belajar + tentang model |
 

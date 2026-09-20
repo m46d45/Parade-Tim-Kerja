@@ -60,7 +60,7 @@ export function drawCompareLob(
   ctx.textAlign = "center";
   ctx.textBaseline = "bottom";
   ctx.fillText(
-    "Line of Balance — tim terakhir per skenario",
+    "Location-based Schedule — tim terakhir per skenario",
     pad.l + plotW / 2,
     pad.t - 10,
   );

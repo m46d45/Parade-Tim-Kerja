@@ -359,11 +359,11 @@ export function mountApp(root: HTMLElement): void {
   }) as HTMLInputElement;
   const zonesVal = el("span", { className: "slider-val" }, ["10"]);
   const batch = el("select", { id: "batch" }, [
-    el("option", { value: "4" }, ["4 — Handoff tiap 4 zona (standar)"]),
-    el("option", { value: "5" }, ["5 — Handoff tiap 5 zona"]),
-    el("option", { value: "3" }, ["3 — Handoff tiap 3 zona"]),
-    el("option", { value: "2" }, ["2 — Handoff tiap 2 zona"]),
-    el("option", { value: "1" }, ["1 — One-piece flow (zona per zona)"]),
+    el("option", { value: "4" }, ["4 — tiap 4 zona (standar)"]),
+    el("option", { value: "5" }, ["5 — tiap 5 zona"]),
+    el("option", { value: "3" }, ["3 — tiap 3 zona"]),
+    el("option", { value: "2" }, ["2 — tiap 2 zona"]),
+    el("option", { value: "1" }, ["1 — one-piece flow"]),
   ]);
   (batch as HTMLSelectElement).value = "4";
   const speed = el("select", { id: "speed" }, [
@@ -419,7 +419,7 @@ export function mountApp(root: HTMLElement): void {
   const metrics = el("div", { className: "metrics" });
   const metrics2 = el("div", { className: "metrics hidden" });
   const legend = el("div", { className: "legend" });
-  const title = el("h2", { id: "chart-title" }, ["Line of Balance"]);
+  const title = el("h2", { id: "chart-title" }, ["Location-based Schedule"]);
   const tableHost = el("div", { className: "table-host hidden" });
   const littleControls = el("div", { className: "little-controls hidden" });
   const conwipLabel = el("label", { for: "conwip" }, ["CONWIP — batas WIP konstan"]);
@@ -442,7 +442,7 @@ export function mountApp(root: HTMLElement): void {
   );
 
   const tabDefs: { id: TabId; label: string }[] = [
-    { id: "lob", label: "Line of Balance" },
+    { id: "lob", label: "Location-based Schedule" },
     { id: "buffer", label: "Buffer / WIP" },
     { id: "util_cost", label: "Utilisasi & Biaya" },
     { id: "little", label: "Little's Law" },
@@ -512,7 +512,7 @@ export function mountApp(root: HTMLElement): void {
   dlBar.append(dlCsv, dlPng, dlPng2);
 
   const sidebar = el("aside", { className: "panel" }, [
-    el("h2", {}, ["Kontrol"]),
+    el("h2", {}, ["Papan Kendali"]),
     chips,
     el("label", { for: "zones" }, ["Total zona"]),
     el("div", { className: "slider-row" }, [zones, zonesVal]),
@@ -764,7 +764,7 @@ export function mountApp(root: HTMLElement): void {
   }
 
   const titles: Record<TabId, string> = {
-    lob: "Line of Balance",
+    lob: "Location-based Schedule",
     buffer: "Buffer / WIP",
     util_cost: "Utilisasi & Biaya",
     little: "Little's Law",

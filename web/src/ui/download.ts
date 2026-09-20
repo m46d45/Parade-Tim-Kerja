@@ -204,7 +204,7 @@ export function resultWorkbookCsv(
   parts.push("### RIWAYAT");
   parts.push(rowsToCsv(resultHistoryRows(result)));
   parts.push("");
-  parts.push("### KUMULATIF (LoB)");
+  parts.push("### KUMULATIF (LBS)");
   const cum = cumulativeSeries(result);
   const n = result.config.trades.length;
   const lobHeader = [

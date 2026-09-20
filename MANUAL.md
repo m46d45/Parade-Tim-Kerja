@@ -24,7 +24,7 @@ Panduan untuk mahasiswa, dosen, dan workshop Lean Construction / Project Product
 7. [Tab Perbandingan](#6-tab-perbandingan)
 8. [Tab Takt plan](#7-tab-takt-plan)
 9. [Tab Buffer](#8-tab-buffer)
-10. [Line of Balance (LOB)](#9-line-of-balance-lob)
+10. [Location-based Schedule (LBS)](#9-location-based-schedule-lbs)
 11. [Buffer / WIP](#10-buffer--wip)
 12. [Utilisasi](#11-utilisasi)
 13. [Little's Law & kurva WIP–TH–CT](#12-littles-law-kurva-wipthct)
@@ -42,7 +42,7 @@ Panduan untuk mahasiswa, dosen, dan workshop Lean Construction / Project Product
 1. Menjelaskan **parade tim kerja** (5 trade berurutan di zona).
 2. Membedakan **kapasitas produksi**, **variability**, dan **batch handoff**.
 3. Membedakan **durasi proyek** vs **periode aktif/idle** dan menghitung **biaya**.
-4. Membaca **LOB**, **WIP**, **utilisasi**.
+4. Membaca **LBS**, **WIP**, **utilisasi**.
 5. Menerapkan **Little's Law**, **Kingman**, inventory–fill rate.
 6. Menyusun **takt plan** dari kasus gedung: **bay ≠ zona**, TT pelanggan, TD train.
 
@@ -80,7 +80,7 @@ Default **4**; **1** = one-piece flow.
 
 ## 3. Navigasi sidebar
 
-| Kontrol | Default |
+| Papan Kendali | Default |
 |---------|---------|
 | Total zona | **10** (selaras TZ default takt) |
 | Seed | **12345** |
@@ -104,7 +104,7 @@ Menampilkan **kunjungan** (landing + aplikasi) dan **berapa kali simulasi dijala
 2. Kapasitas + variability.  
 3. **Jalankan**.
 
-Keluaran: metrik, LOB, buffer, utilisasi, biaya, analisis (Little, Kingman, FR), unduh.
+Keluaran: metrik, LBS, buffer, utilisasi, biaya, analisis (Little, Kingman, FR), unduh.
 
 ---
 
@@ -127,7 +127,7 @@ Window per tim: **mulai → selesai kerja sendiri**.
 
 2–5 skenario (variability / batch / kapasitas). Tombol cepat: 5× var, tanpa var vs sedang, batch 1 vs 4.
 
-Sub-tab: LOB, Buffer, Utilisasi, **Biaya**, Little, Kingman, Inventory/FR.
+Sub-tab: LBS, Buffer, Utilisasi, **Biaya**, Little, Kingman, Inventory/FR.
 
 ---
 
@@ -199,7 +199,7 @@ Laboratorium **time–inventory buffer** pada **parade zona–tim** (bukan dadu)
 
 ---
 
-## 9. Line of Balance (LOB)
+## 9. Location-based Schedule (LBS)
 
 X = **periode** (0 = awal; boleh pecahan) · Y = **zona kumulatif diskrit** (bilangan bulat dari 0). Titik data = zona selesai di engine (bukan progress parsial). Tick Y tiap zona; kisi zona dipakai untuk cek akurasi. Kemiringan chord ≈ laju.
 

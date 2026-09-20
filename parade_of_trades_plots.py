@@ -248,7 +248,7 @@ def plot_line_of_balance(
         x_end = max(x_end, len(ideal_ys) - 1)
     ax.set_xlim(0, x_end)
     ax.set_ylim(0, total * 1.06)
-    ax.set_title(title or "Line of Balance — zona diskrit vs periode")
+    ax.set_title(title or "Location-based Schedule — zona diskrit vs periode")
     _style_lob_axes(ax, n_periods=x_end + 1, total_zones=total)
 
     # Speed legend callout
@@ -299,7 +299,7 @@ def plot_line_of_balance_detail(
     ax.set_ylim(0, min(total, ymax + 2) * 1.1)
     ax.set_title(
         title
-        or f"Detail LOB — periode 0–{end} (titik = zona bulat selesai)"
+        or f"Detail Location-based Schedule — periode 0–{end} (titik = zona bulat selesai)"
     )
     _style_lob_axes(
         ax,
@@ -457,7 +457,7 @@ def plot_run(
     )
     fig.suptitle(header, fontsize=12, fontweight="semibold")
 
-    plot_line_of_balance(result, ax=ax_lob, title="Line of Balance")
+    plot_line_of_balance(result, ax=ax_lob, title="Location-based Schedule")
     plot_buffer_profile(result, ax=ax_buf, title="Buffer / WIP Profile")
     plot_utilization(result, ax=ax_util, title="Utilization & Idle Capacity")
 
@@ -580,7 +580,7 @@ def plot_comparison_lob(
     ax.axhline(total, color="0.7", linestyle="--", linewidth=1.0, label=None)
     ax.set_xlim(0, max(max_period, 1) * 1.02)
     ax.set_ylim(0, total * 1.08)
-    ax.set_title(title or "Line of Balance — perbandingan skenario (dari 0,0)")
+    ax.set_title(title or "Location-based Schedule — perbandingan skenario (dari 0,0)")
     ax.legend(loc="lower right", fontsize=8, framealpha=0.92)
     _style_lob_axes(
         ax,
@@ -1706,7 +1706,7 @@ def plot_tommelein_scenario_lobs(
         )
         if ax is not axes[0]:
             ax.set_ylabel("")
-    fig.suptitle(title or "Tommelein (2020) — LOB per skenario (semua tim)", fontsize=11, y=1.02)
+    fig.suptitle(title or "Tommelein (2020) — Location-based Schedule per skenario (semua tim)", fontsize=11, y=1.02)
     fig.tight_layout()
     return fig
 
@@ -1735,7 +1735,7 @@ def plot_tommelein_last_trade_lob(
     ax.axhline(total, color="0.7", linestyle="--", linewidth=1.0)
     ax.set_xlim(0, max_p * 1.05)
     ax.set_ylim(0, total * 1.08)
-    ax.set_title(title or "Tommelein (2020) — LOB tim terakhir")
+    ax.set_title(title or "Tommelein (2020) — Location-based Schedule tim terakhir")
     ax.legend(loc="lower right", fontsize=8, framealpha=0.92)
     _style_lob_axes(
         ax,
@@ -1778,7 +1778,7 @@ def plot_single_scenario_lob(
     ax.axhline(total, color="0.75", linestyle=":", linewidth=0.9)
     ax.set_xlim(left=0)
     ax.set_ylim(0, total * 1.08)
-    ax.set_title(title or "Line of Balance")
+    ax.set_title(title or "Location-based Schedule")
     ax.legend(loc="lower right", fontsize=8, framealpha=0.92, ncol=2)
     _style_lob_axes(
         ax,

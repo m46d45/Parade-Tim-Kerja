@@ -761,7 +761,7 @@ def _export_takt_block(
 
 def _plot_single_result(result: ParadeResult) -> None:
     tab_lob, tab_buf, tab_util, tab_ll, tab_kg, tab_fr = st.tabs(
-        ["Line of Balance", "Buffer / WIP", "Utilisasi", "Little's Law", "Kingman", "Inventory / FR"]
+        ["Location-based Schedule", "Buffer / WIP", "Utilisasi", "Little's Law", "Kingman", "Inventory / FR"]
     )
     with tab_lob:
         fig, ax = plt.subplots(figsize=(10, 4.5))
@@ -1298,14 +1298,14 @@ def tab_compare(total_units: int, seed: Optional[int], n_trades: int) -> None:
         cost_rows_map[name] = cm.trades
 
     tab_lob, tab_buf, tab_util, tab_cost, tab_ll, tab_kg, tab_fr = st.tabs(
-        ["Line of Balance", "Buffer / WIP", "Utilisasi", "Biaya", "Little's Law", "Kingman", "Inventory / FR"]
+        ["Location-based Schedule", "Buffer / WIP", "Utilisasi", "Biaya", "Little's Law", "Kingman", "Inventory / FR"]
     )
     with tab_lob:
         fig, ax = plt.subplots(figsize=(10, 5.5))
         plot_comparison_lob(
             results,
             ax=ax,
-            title="Line of Balance — perbandingan skenario",
+            title="Location-based Schedule — perbandingan skenario",
             last_trade_only=True,
         )
         fig.tight_layout()
@@ -1729,7 +1729,7 @@ def tab_buffer(total_units: int, seed: Optional[int], n_trades: int) -> None:
         c2.metric("Waktu di lapangan", f"{one.total_time_on_site}")
         c3.metric("Inventory time", f"{one.total_inventory_time}")
         fig, ax = plt.subplots(figsize=(8.5, 3.8))
-        plot_line_of_balance(one, ax=ax, title="Line of Balance")
+        plot_line_of_balance(one, ax=ax, title="Location-based Schedule")
         fig.tight_layout()
         _fig_to_st(fig)
 
