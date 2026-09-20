@@ -45,4 +45,19 @@ describe("zone-flow parity vs Python golden fixtures", () => {
     expect(r.duration).toBe(r.idealDuration);
     expect(r.idealLastTradeCumulative).toEqual(cumulativeSeries(r)[4]);
   });
+
+  it("medium variability runs and is >= ideal duration", () => {
+    const r = runParade(
+      classroomConfig({
+        totalUnits: 10,
+        batchSize: 4,
+        baseSpeed: 1,
+        seed: 12345,
+        variability: "medium",
+      }),
+    );
+    expect(r.duration).toBeGreaterThanOrEqual(r.idealDuration);
+    expect(r.idealDuration).toBe(26);
+    expect(cumulativeSeries(r)[0][0]).toBe(0);
+  });
 });

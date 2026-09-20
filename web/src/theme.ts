@@ -34,6 +34,20 @@ export const APP = {
   banner2: "#234e76",
 } as const;
 
+/** Buffer / interface colors (parade_of_trades_plots.BUFFER_COLORS) */
+export const BUFFER_COLORS = [
+  "#4c78a8",
+  "#f58518",
+  "#54a24b",
+  "#e45756",
+  "#b279a2",
+  "#9d755d",
+] as const;
+
+export function bufferColor(i: number): string {
+  return BUFFER_COLORS[i % BUFFER_COLORS.length];
+}
+
 export function tradeColor(i: number): string {
   return TRADE_COLORS[i % TRADE_COLORS.length];
 }

@@ -71,6 +71,21 @@ export function makeParadeConfig(opts: {
 }
 
 /** Classroom helper: 5 Indonesian floor-cycle trades, zone-flow. */
+export type VariabilityLevel = "none" | "low" | "medium";
+
+const VAR_FACTORS: Record<
+  VariabilityLevel,
+  { lo: number; hi: number; deterministic: boolean; label: string }
+> = {
+  none: { lo: 1, hi: 1, deterministic: true, label: "Tanpa variability" },
+  low: { lo: 0.75, hi: 1.25, deterministic: false, label: "Sedang (±25%)" },
+  medium: { lo: 0.5, hi: 1.5, deterministic: false, label: "Tinggi (±50%)" },
+};
+
+export function variabilityLabel(level: VariabilityLevel): string {
+  return VAR_FACTORS[level].label;
+}
+
 export function classroomConfig(opts: {
   totalUnits?: number;
   batchSize?: number;
@@ -79,11 +94,14 @@ export function classroomConfig(opts: {
   deterministic?: boolean;
   low?: number;
   high?: number;
+  variability?: VariabilityLevel;
 }): ParadeConfig {
   const speed = opts.baseSpeed ?? 1;
-  const deterministic = opts.deterministic ?? true;
-  const low = opts.low ?? speed;
-  const high = opts.high ?? speed;
+  const level = opts.variability ?? (opts.deterministic === false ? "medium" : "none");
+  const profile = VAR_FACTORS[level];
+  const low = opts.low ?? speed * profile.lo;
+  const high = opts.high ?? speed * profile.hi;
+  const deterministic = opts.deterministic ?? profile.deterministic;
   const trades = DEFAULT_TRADE_NAMES.map((name) =>
     makeTrade({
       name,
