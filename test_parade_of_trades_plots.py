@@ -53,49 +53,49 @@ class TestPlotsSmoke(unittest.TestCase):
         plot_utilization(self.result, ax=axes[2])
         plt.close(fig)
 
-    def test_lob_axes_are_zero_based(self):
-        """LoB labels must match engine series (period 0 = start, zona from 0)."""
+    def test_lob_axes_zone_discrete_period_flexible(self):
+        """LoB: Y = integer zones (accuracy lattice); X may be continuous."""
         import matplotlib.pyplot as plt
         import matplotlib.ticker as mticker
+        import numpy as np
+
+        small = run_preset("no_variability", seed=12345, total_units=10, verbose=False)
 
         fig, ax = plt.subplots()
-        plot_line_of_balance(self.result, ax=ax)
-        xlabel = ax.get_xlabel()
-        ylabel = ax.get_ylabel()
-        self.assertIn("0 = awal", xlabel)
-        self.assertNotIn("1, 2, 3", xlabel)
-        self.assertIn("dari 0", ylabel)
-        self.assertNotIn("1, 2, 3", ylabel)
-        self.assertIsInstance(ax.xaxis.get_minor_locator(), mticker.MultipleLocator)
-        # Minor step = 1 period (MultipleLocator stores interval as .base in some versions)
-        minor = ax.xaxis.get_minor_locator()
-        step = getattr(minor, "base", None) or getattr(minor, "_base", None)
-        if step is None:
-            ticks = minor.tick_values(0, 5)
-            self.assertAlmostEqual(float(ticks[1] - ticks[0]), 1.0)
-        else:
-            self.assertEqual(float(step), 1.0)
-        # Series starts at origin
-        cum = self.result.cumulative_series()
+        plot_line_of_balance(small, ax=ax)
+        self.assertIn("0 = awal", ax.get_xlabel())
+        self.assertIn("diskrit", ax.get_ylabel())
+        self.assertIsInstance(ax.yaxis.get_major_locator(), mticker.MultipleLocator)
+        self.assertIsInstance(ax.yaxis.get_minor_locator(), mticker.NullLocator)
+        # Plotted trade lines use integer Y only (skip ideal/guide lines)
+        for line in ax.lines:
+            label = line.get_label() or ""
+            if label.startswith("_") or "Ideal" in label:
+                continue
+            ys = np.asarray(line.get_ydata(), dtype=float)
+            self.assertTrue(np.allclose(ys, np.round(ys)), msg=f"non-integer Y in {label}")
+        # Engine series is integer and starts at 0
+        cum = small.cumulative_series()
         self.assertEqual(cum[0][0], 0)
+        self.assertTrue(all(isinstance(v, int) for v in cum[0]))
         plt.close(fig)
 
         fig, ax = plt.subplots()
-        plot_line_of_balance_detail(self.result, ax=ax, max_period=8)
-        self.assertIn("0 = awal", ax.get_xlabel())
-        self.assertIn("dari 0", ax.get_ylabel())
+        plot_line_of_balance_detail(small, ax=ax, max_period=8)
+        self.assertIn("diskrit", ax.get_ylabel())
+        for line in ax.lines:
+            ys = np.asarray(line.get_ydata(), dtype=float)
+            self.assertTrue(np.allclose(ys, np.round(ys)))
         plt.close(fig)
 
         fig, ax = plt.subplots()
         plot_comparison_lob(self.results, ax=ax)
-        self.assertIn("0 = awal", ax.get_xlabel())
-        self.assertIn("dari 0", ax.get_ylabel())
+        self.assertIn("diskrit", ax.get_ylabel())
         plt.close(fig)
 
         fig, ax = plt.subplots()
         plot_single_scenario_lob(self.result, ax=ax)
-        self.assertIn("0 = awal", ax.get_xlabel())
-        self.assertIn("dari 0", ax.get_ylabel())
+        self.assertIn("diskrit", ax.get_ylabel())
         plt.close(fig)
 
     def test_plot_comparison_saves(self):

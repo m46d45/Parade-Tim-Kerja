@@ -103,40 +103,48 @@ def _style_lob_axes(
     *,
     n_periods: Optional[int] = None,
     total_zones: Optional[int] = None,
-    xlabel: str = "Periode (0 = awal)",
-    ylabel: str = "Zona kumulatif (dari 0)",
+    xlabel: str = "Periode (0 = awal; boleh pecahan)",
+    ylabel: str = "Zona kumulatif (diskrit, dari 0)",
 ) -> None:
     """
-    Label and tick LoB axes to match the 0-based engine series.
+    Style LoB axes: **zona (Y) is the discrete truth**; periode (X) may be continuous.
 
-    Series index 0 is period 0 (all zeros). Major ticks stay readable;
-    minor ticks mark every period so slopes are easier to read.
+    Y ticks are integers only (every zone when the scale fits). X majors stay
+    readable and may show fractional positions when data uses continuous time.
     """
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
 
-    if n_periods is not None and n_periods <= 50:
-        major_step = 1 if n_periods <= 24 else 2
-        ax.xaxis.set_major_locator(mticker.MultipleLocator(major_step))
+    # X = time: flexible; not the accuracy lattice
+    if n_periods is not None and n_periods <= 24:
+        ax.xaxis.set_major_locator(mticker.MultipleLocator(1))
+        ax.xaxis.set_minor_locator(mticker.AutoMinorLocator(2))
+    elif n_periods is not None and n_periods <= 50:
+        ax.xaxis.set_major_locator(mticker.MultipleLocator(2))
+        ax.xaxis.set_minor_locator(mticker.MultipleLocator(1))
     else:
-        ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True, nbins=16))
-    # Always mark every period on the minor grid (matches engine discrete steps).
-    ax.xaxis.set_minor_locator(mticker.MultipleLocator(1))
+        ax.xaxis.set_major_locator(mticker.MaxNLocator(nbins=12))
+        ax.xaxis.set_minor_locator(mticker.AutoMinorLocator())
 
+    # Y = zones: always integer labels; one tick per zone when readable
     if total_zones is not None and total_zones <= 40:
         ax.yaxis.set_major_locator(mticker.MultipleLocator(1))
-        if total_zones <= 24:
-            ax.yaxis.set_minor_locator(mticker.MultipleLocator(1))
-        else:
-            ax.yaxis.set_minor_locator(mticker.AutoMinorLocator())
     else:
         ax.yaxis.set_major_locator(mticker.MaxNLocator(integer=True, nbins=12))
-        ax.yaxis.set_minor_locator(mticker.AutoMinorLocator())
+    ax.yaxis.set_major_formatter(mticker.FormatStrFormatter("%d"))
+    ax.yaxis.set_minor_locator(mticker.NullLocator())
 
-    ax.grid(True, which="major", linestyle="--", alpha=0.5)
-    ax.grid(True, which="minor", linestyle=":", alpha=0.28)
+    # Emphasize zone grid (accuracy); period grid secondary
+    ax.grid(True, which="major", axis="y", linestyle="-", alpha=0.48)
+    ax.grid(True, which="major", axis="x", linestyle="--", alpha=0.32)
+    ax.grid(True, which="minor", axis="x", linestyle=":", alpha=0.2)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
+
+
+def _lob_integer_cumulative(result: ParadeResult) -> List[List[int]]:
+    """Finished zones per trade vs period — integer Y only (no partial-zone decimals)."""
+    return result.cumulative_series()
 
 
 def _ensure_parent(path: Union[str, Path]) -> Path:
@@ -172,19 +180,16 @@ def plot_line_of_balance(
     show_ideal: bool = True,
 ) -> Axes:
     """
-    Line of Balance: cumulative zones vs period as **straight lines**.
+    Line of Balance: cumulative **integer zones** vs period.
 
-    Slope of each line = speed (zona/periode). Deterministic paces use
-    continuous progress so lambat (0.5) is a clean diagonal, not a staircase.
+    Y is discrete finished zones (engine ``cumulative``). Partial-zone
+    progress is not plotted on Y — periode (X) may be read as continuous time.
+    Vertices sit on integer zona; chord slopes approximate pace.
     """
     if ax is None:
         _, ax = plt.subplots(figsize=(9, 5.2))
 
-    # Prefer continuous progress (straight pace); else integer cumulative
-    if hasattr(result, "fractional_cumulative_series"):
-        cum = result.fractional_cumulative_series()
-    else:
-        cum = result.cumulative_series()
+    cum = _lob_integer_cumulative(result)
     n = result.config.n_trades
     total = result.config.total_units
     periods = list(range(len(cum[0])))
@@ -197,9 +202,10 @@ def plot_line_of_balance(
         label = f"T{i + 1}: {_short_name(trade.name)} ({trade.label()})"
         if getattr(trade, "deterministic", False) and speed > 0:
             label += f" · slope {speed:g}"
+        ys = [int(y) for y in cum[i]]
         ax.plot(
             periods,
-            cum[i],
+            ys,
             color=_trade_color(i),
             linewidth=2.4,
             linestyle="-",
@@ -214,6 +220,7 @@ def plot_line_of_balance(
     if show_ideal:
         mean_cap = min(t.mean for t in result.config.trades)
         if mean_cap > 0:
+            # Ideal guide: X may be fractional; endpoints on integer zona
             ax.plot(
                 [0, total / mean_cap], [0, total],
                 color="0.45", linestyle=":", linewidth=1.6,
@@ -223,7 +230,7 @@ def plot_line_of_balance(
     ax.axhline(total, color="0.7", linestyle="--", linewidth=1.0, alpha=0.8)
     ax.set_xlim(0, max(periods) if periods else 1)
     ax.set_ylim(0, total * 1.06)
-    ax.set_title(title or "Line of Balance — kemiringan = kecepatan")
+    ax.set_title(title or "Line of Balance — zona diskrit vs periode")
     _style_lob_axes(ax, n_periods=n_per, total_zones=total)
 
     # Speed legend callout
@@ -234,7 +241,7 @@ def plot_line_of_balance(
     if notes:
         ax.text(
             0.02, 0.98,
-            "Kecepatan (kemiringan garis):\n" + " · ".join(notes[:5]),
+            "Kecepatan (Δzona bulat / Δperiode):\n" + " · ".join(notes[:5]),
             transform=ax.transAxes, va="top", ha="left", fontsize=8,
             color="#1a365d",
             bbox=dict(boxstyle="round,pad=0.35", facecolor="#ebf8ff",
@@ -251,13 +258,10 @@ def plot_line_of_balance_detail(
     max_period: int = 12,
     title: Optional[str] = None,
 ) -> Axes:
-    """Early-period LOB with every period tick — straight pace lines."""
+    """Early-period LOB for accuracy checks: marker every period, integer zona."""
     if ax is None:
         _, ax = plt.subplots(figsize=(9, 4.2))
-    if hasattr(result, "fractional_cumulative_series"):
-        cum_full = result.fractional_cumulative_series()
-    else:
-        cum_full = result.cumulative_series()
+    cum_full = _lob_integer_cumulative(result)
     n = result.config.n_trades
     total = result.config.total_units
     end = min(max_period, len(cum_full[0]) - 1)
@@ -265,7 +269,7 @@ def plot_line_of_balance_detail(
     markers = ("o", "s", "^", "D", "v", "P", "X")
     for i in range(n):
         trade = result.config.trades[i]
-        ys = cum_full[i][: end + 1]
+        ys = [int(y) for y in cum_full[i][: end + 1]]
         ax.plot(
             periods, ys, color=_trade_color(i), linewidth=2.6,
             marker=markers[i % len(markers)], markersize=6.5, markevery=1,
@@ -275,12 +279,14 @@ def plot_line_of_balance_detail(
     ax.set_xlim(0, end)
     ymax = max(max(cum_full[i][end] for i in range(n)), 1)
     ax.set_ylim(0, min(total, ymax + 2) * 1.1)
-    ax.set_title(title or f"Detail LOB — periode 0–{end} (garis lurus = kecepatan konstan)")
+    ax.set_title(
+        title
+        or f"Detail LOB — periode 0–{end} (titik = zona bulat selesai)"
+    )
     _style_lob_axes(
         ax,
         n_periods=len(periods),
         total_zones=min(total, int(ymax) + 2),
-        ylabel="Zona kumulatif (dari 0)",
     )
     ax.legend(loc="upper left", fontsize=8, framealpha=0.92)
     return ax
@@ -550,7 +556,7 @@ def plot_comparison_lob(
         ax,
         n_periods=max_period + 1,
         total_zones=total,
-        ylabel="Zona kumulatif tim terakhir (dari 0)",
+        ylabel="Zona kumulatif tim terakhir (diskrit, dari 0)",
     )
     return ax
 
@@ -1705,7 +1711,7 @@ def plot_tommelein_last_trade_lob(
         ax,
         n_periods=max_p + 1,
         total_zones=total,
-        ylabel="Zona kumulatif tim terakhir (dari 0)",
+        ylabel="Zona kumulatif tim terakhir (diskrit, dari 0)",
     )
     return ax
 
