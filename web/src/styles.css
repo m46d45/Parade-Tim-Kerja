@@ -387,10 +387,47 @@ canvas {
   border: none;
 }
 
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0.25rem 0 0.45rem;
+}
+
+.slider-row input[type="range"] {
+  flex: 1;
+  padding: 0;
+  background: transparent;
+  border: none;
+  width: auto;
+}
+
+.slider-val,
 .conwip-val {
   font-weight: 700;
   color: var(--accent);
   min-width: 2.5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.slider-label {
+  font-weight: 700;
+  font-size: 0.8rem;
+  min-width: 1.6rem;
+}
+
+.tarif-block {
+  margin-top: 0.75rem;
+}
+
+.tarif-block > label {
+  margin-top: 0;
+}
+
+.sidebar-note {
+  margin: 0.15rem 0 0.35rem;
+  font-size: 0.72rem;
 }
 
 .conwip-pred {
@@ -644,4 +681,47 @@ button.primary:hover {
 
 .manual-body a {
   color: var(--accent-soft);
+}
+
+.manual-toc {
+  margin: 0.5rem 0 1.25rem;
+  padding: 0.85rem 1rem 0.85rem 1.1rem;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.manual-toc ol {
+  margin: 0;
+  padding-left: 1.25rem;
+  columns: 1;
+}
+
+@media (min-width: 720px) {
+  .manual-toc ol {
+    columns: 2;
+    column-gap: 1.5rem;
+  }
+}
+
+.manual-toc li {
+  break-inside: avoid;
+  margin: 0.2rem 0;
+  font-size: 0.9rem;
+}
+
+.manual-toc a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.manual-toc a:hover {
+  text-decoration: underline;
+  color: var(--accent-soft);
+}
+
+.manual-body h2[id],
+.manual-body h3[id] {
+  scroll-margin-top: 0.75rem;
 }

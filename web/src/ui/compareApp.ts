@@ -90,6 +90,7 @@ export function mountCompare(
   shared: {
     getZones: () => number;
     getSeed: () => number;
+    getRates?: () => number[];
     getTarif: () => number;
     getDefaultBatch: () => number;
   },
@@ -186,6 +187,7 @@ export function mountCompare(
   );
 
   function rates(): number[] {
+    if (shared.getRates) return shared.getRates();
     return Array(5).fill(Math.max(0, shared.getTarif() || 100));
   }
 

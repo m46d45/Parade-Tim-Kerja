@@ -329,7 +329,15 @@ function renderInventoryTable(host: HTMLElement, result: ParadeResult): void {
 export function mountApp(root: HTMLElement): void {
   root.replaceChildren();
 
-  const zones = el("input", { type: "number", id: "zones", value: "10", min: "1", max: "100" });
+  const zones = el("input", {
+    type: "range",
+    id: "zones",
+    min: "1",
+    max: "40",
+    step: "1",
+    value: "10",
+  }) as HTMLInputElement;
+  const zonesVal = el("span", { className: "slider-val" }, ["10"]);
   const batch = el("select", { id: "batch" }, [
     el("option", { value: "1" }, ["1 — one-piece flow"]),
     el("option", { value: "4" }, ["4 — batch handoff"]),
@@ -350,7 +358,37 @@ export function mountApp(root: HTMLElement): void {
   ]);
   (variability as HTMLSelectElement).value = "none";
   const seed = el("input", { type: "number", id: "seed", value: "12345", step: "1" });
-  const tarif = el("input", { type: "number", id: "tarif", value: "100", min: "0", step: "10" });
+
+  const tarifSliders: HTMLInputElement[] = [];
+  const tarifVals: HTMLElement[] = [];
+  const tarifBlock = el("div", { className: "tarif-block" }, [
+    el("label", {}, ["Tarif / periode per tim"]),
+    el("p", { className: "note sidebar-note" }, [
+      "Biaya = (periode aktif + idle) × tarif, per tim.",
+    ]),
+  ]);
+  for (let i = 0; i < 5; i++) {
+    const slider = el("input", {
+      type: "range",
+      id: `tarif-t${i + 1}`,
+      min: "0",
+      max: "500",
+      step: "10",
+      value: "100",
+    }) as HTMLInputElement;
+    const val = el("span", { className: "slider-val" }, ["100"]);
+    tarifSliders.push(slider);
+    tarifVals.push(val);
+    const row = el("div", { className: "slider-row" }, [
+      el("span", { className: "slider-label" }, [`T${i + 1}`]),
+      slider,
+      val,
+    ]);
+    const sw = row.querySelector(".slider-label") as HTMLElement;
+    sw.style.color = tradeColor(i);
+    tarifBlock.append(row);
+  }
+
   const runBtn = el("button", { className: "run", type: "button" }, ["Jalankan simulasi"]);
 
   const metrics = el("div", { className: "metrics" });
@@ -439,7 +477,7 @@ export function mountApp(root: HTMLElement): void {
     el("h2", {}, ["Kontrol"]),
     chips,
     el("label", { for: "zones" }, ["Total zona"]),
-    zones,
+    el("div", { className: "slider-row" }, [zones, zonesVal]),
     el("label", { for: "batch" }, ["Batch handoff"]),
     batch,
     el("label", { for: "speed" }, ["Kapasitas dasar"]),
@@ -448,8 +486,7 @@ export function mountApp(root: HTMLElement): void {
     variability,
     el("label", { for: "seed" }, ["Seed"]),
     seed,
-    el("label", { for: "tarif" }, ["Tarif / periode (semua tim)"]),
-    tarif,
+    tarifBlock,
     runBtn,
     statsLine,
   ]);
@@ -504,7 +541,9 @@ export function mountApp(root: HTMLElement): void {
   const sharedZonesSeed = {
     getZones: () => Math.max(1, Number(zones.value) || 10),
     getSeed: () => Number(seed.value) || 12345,
-    getTarif: () => Math.max(0, Number(tarif.value) || 100),
+    getRates: () =>
+      tarifSliders.map((s) => Math.max(0, Number(s.value) || 0)),
+    getTarif: () => Math.max(0, Number(tarifSliders[0]?.value) || 100),
     getDefaultBatch: () => Math.max(1, Number(batch.value) || 4),
   };
 
@@ -558,8 +597,7 @@ export function mountApp(root: HTMLElement): void {
   let conwipLevel = 5;
 
   function rates(): number[] {
-    const rate = Math.max(0, Number(tarif.value) || 100);
-    return Array(5).fill(rate);
+    return tarifSliders.map((s) => Math.max(0, Number(s.value) || 0));
   }
 
   function syncConwipBounds(r: ParadeResult): void {
@@ -715,12 +753,7 @@ export function mountApp(root: HTMLElement): void {
     tableHost.classList.remove("hidden");
 
     if (activeTab === "lob") {
-      const detailMax = Math.min(16, lastResult.duration + 1);
-      subTitle.classList.remove("hidden");
-      subTitle.textContent = `Detail awal (periode 0–${detailMax})`;
-      chartWrap2.classList.remove("hidden");
-      lobHits = drawLobChart(canvas, lastResult, { maxPeriod: detailMax, cssHeight: 280 });
-      drawLobChart(canvas2, lastResult, { cssHeight: 340 });
+      lobHits = drawLobChart(canvas, lastResult, { cssHeight: 380 });
       renderLegendItems(legend, buildLegendItems(lastResult));
       tableHost.classList.add("hidden");
       tableHost.replaceChildren();
@@ -858,12 +891,18 @@ export function mountApp(root: HTMLElement): void {
     btn.addEventListener("click", () => setTab(id));
   }
   runBtn.addEventListener("click", run);
-  tarif.addEventListener("change", () => {
-    if (!lastResult) return;
-    lastCost = computeCostMetrics(lastResult, rates());
-    setMetrics(lastResult, lastCost);
-    if (activeTab === "cost") redraw();
+  zones.addEventListener("input", () => {
+    zonesVal.textContent = String(zones.value);
   });
+  for (let i = 0; i < tarifSliders.length; i++) {
+    tarifSliders[i].addEventListener("input", () => {
+      tarifVals[i].textContent = String(tarifSliders[i].value);
+      if (!lastResult) return;
+      lastCost = computeCostMetrics(lastResult, rates());
+      setMetrics(lastResult, lastCost);
+      if (activeTab === "cost") redraw();
+    });
+  }
   conwip.addEventListener("input", () => {
     conwipLevel = snapConwip(Number(conwip.value) || 5);
     conwipVal.textContent = conwipLevel.toFixed(1);

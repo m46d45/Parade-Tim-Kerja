@@ -6,9 +6,9 @@ Panduan untuk mahasiswa, dosen, dan workshop Lean Construction / Project Product
 
 | | |
 |---|---|
-| Aplikasi | **Parade Tim Kerja** (Streamlit) |
+| Aplikasi | **Parade Tim Kerja** (browser JS · Streamlit jaring pengaman) |
 | Model | Zone-flow (zona demi zona, batch handoff) |
-| Default sidebar | Total zona **10** · Seed **12345** · Batch **4** · 5 tim · Tarif **100**/periode |
+| Default sidebar | Total zona **10** · Seed **12345** · Batch **4** · 5 tim · Tarif **100**/periode/tim |
 | Bahasa UI | Indonesia (istilah teknis: batch, WIP, takt, bay, dll. dipertahankan) |
 
 ---
@@ -16,32 +16,24 @@ Panduan untuk mahasiswa, dosen, dan workshop Lean Construction / Project Product
 ## Daftar isi
 
 1. [Tujuan pembelajaran](#1-tujuan-pembelajaran)
-2. [Model zone-flow & konsep dasar](#2-model-zone-flow--konsep-dasar)
+2. [Model zone-flow & konsep dasar](#2-model-zone-flow-konsep-dasar)
 3. [Navigasi sidebar](#3-navigasi-sidebar)
-4. [Tab Simulasi](#4-tab-simulasi)
-5. [Biaya aktif & idle](#5-biaya-aktif--idle)
-6. [Tab Perbandingan](#6-tab-perbandingan)
-7. [Tab Takt plan](#7-tab-takt-plan)
-8. [Tab Buffer](#8-tab-buffer)
-9. [Line of Balance (LOB)](#9-line-of-balance-lob)
-10. [Buffer / WIP](#10-buffer--wip)
-11. [Utilisasi](#11-utilisasi)
-12. [Little's Law & kurva WIP–TH–CT](#12-littles-law--kurva-wipthct)
-13. [Kingman (VUT)](#13-kingman-vut)
-14. [Inventory vs fill rate](#14-inventory-vs-fill-rate)
-15. [Unduh data](#15-unduh-data)
-16. [Skenario latihan](#16-skenario-latihan)
-17. [Batasan model](#17-batasan-model)
-18. [Literatur](#18-literatur)
-9. [Buffer / WIP](#9-buffer--wip)
-10. [Utilisasi](#10-utilisasi)
-11. [Little's Law & kurva WIP–TH–CT](#11-littles-law--kurva-wipthct)
-12. [Kingman (VUT)](#12-kingman-vut)
-13. [Inventory vs fill rate](#13-inventory-vs-fill-rate)
-14. [Unduh data](#14-unduh-data)
-15. [Skenario latihan](#15-skenario-latihan)
-16. [Batasan model](#16-batasan-model)
-17. [Literatur](#17-literatur)
+4. [Tab Statistik](#35-tab-statistik)
+5. [Tab Simulasi](#4-tab-simulasi)
+6. [Biaya aktif & idle](#5-biaya-aktif--idle)
+7. [Tab Perbandingan](#6-tab-perbandingan)
+8. [Tab Takt plan](#7-tab-takt-plan)
+9. [Tab Buffer](#8-tab-buffer)
+10. [Line of Balance (LOB)](#9-line-of-balance-lob)
+11. [Buffer / WIP](#10-buffer--wip)
+12. [Utilisasi](#11-utilisasi)
+13. [Little's Law & kurva WIP–TH–CT](#12-littles-law-kurva-wipthct)
+14. [Kingman (VUT)](#13-kingman-vut)
+15. [Inventory vs fill rate](#14-inventory-vs-fill-rate)
+16. [Unduh data](#15-unduh-data)
+17. [Skenario latihan](#16-skenario-latihan)
+18. [Batasan model](#17-batasan-model)
+19. [Literatur](#18-literatur)
 
 ---
 

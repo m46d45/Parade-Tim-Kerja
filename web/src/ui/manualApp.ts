@@ -18,6 +18,36 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
+/** Slug for header ids — match GitHub / MANUAL.md TOC anchors. */
+export function mdSlug(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[''`´]/g, "")
+    .replace(/[^\p{L}\p{N}\s-]/gu, "")
+    .trim()
+    .replace(/\s+/g, "-");
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function inline(s: string): string {
+  return escapeHtml(s)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label: string, href: string) => {
+      const safeHref = escapeHtml(href);
+      if (href.startsWith("http://") || href.startsWith("https://")) {
+        return `<a href="${safeHref}" target="_blank" rel="noopener">${label}</a>`;
+      }
+      return `<a href="${safeHref}">${label}</a>`;
+    });
+}
+
 /** Lightweight markdown → HTML for MANUAL.md (headers, lists, tables, links, code). */
 export function renderManualMarkdown(md: string): string {
   const lines = md.replace(/\r\n/g, "\n").split("\n");
@@ -27,6 +57,7 @@ export function renderManualMarkdown(md: string): string {
   let inOl = false;
   let inTable = false;
   let tableRows: string[][] = [];
+  let tocMode = false;
 
   const closeLists = () => {
     if (inUl) {
@@ -34,8 +65,9 @@ export function renderManualMarkdown(md: string): string {
       inUl = false;
     }
     if (inOl) {
-      out.push("</ol>");
+      out.push(tocMode ? '</ol></nav>' : "</ol>");
       inOl = false;
+      tocMode = false;
     }
   };
 
@@ -55,18 +87,6 @@ export function renderManualMarkdown(md: string): string {
     inTable = false;
     tableRows = [];
   };
-
-  const inline = (s: string): string =>
-    s
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/`([^`]+)`/g, "<code>$1</code>")
-      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-      .replace(
-        /\[([^\]]+)\]\((https?:[^)]+)\)/g,
-        '<a href="$2" target="_blank" rel="noopener">$1</a>',
-      );
 
   while (i < lines.length) {
     const line = lines[i];
@@ -90,7 +110,10 @@ export function renderManualMarkdown(md: string): string {
       closeLists();
       const level = line.match(/^#+/)![0].length;
       const text = line.replace(/^#+\s*/, "");
-      out.push(`<h${level}>${inline(text)}</h${level}>`);
+      const id = mdSlug(text);
+      const cls = text.toLowerCase() === "daftar isi" ? ' class="manual-toc-heading"' : "";
+      out.push(`<h${level} id="${id}"${cls}>${inline(text)}</h${level}>`);
+      if (text.toLowerCase() === "daftar isi") tocMode = true;
       i++;
       continue;
     }
@@ -102,8 +125,9 @@ export function renderManualMarkdown(md: string): string {
     }
     if (/^[-*]\s+/.test(line)) {
       if (inOl) {
-        out.push("</ol>");
+        out.push(tocMode ? '</ol></nav>' : "</ol>");
         inOl = false;
+        tocMode = false;
       }
       if (!inUl) {
         out.push("<ul>");
@@ -119,7 +143,11 @@ export function renderManualMarkdown(md: string): string {
         inUl = false;
       }
       if (!inOl) {
-        out.push("<ol>");
+        out.push(
+          tocMode
+            ? '<nav class="manual-toc" aria-label="Daftar isi"><ol>'
+            : "<ol>",
+        );
         inOl = true;
       }
       out.push(`<li>${inline(line.replace(/^\d+\.\s+/, ""))}</li>`);
@@ -161,6 +189,17 @@ export function mountManual(root: HTMLElement): void {
       ]),
     ]),
   );
+
+  body.addEventListener("click", (ev) => {
+    const a = (ev.target as HTMLElement).closest("a[href^='#']") as HTMLAnchorElement | null;
+    if (!a) return;
+    const id = decodeURIComponent(a.getAttribute("href")!.slice(1));
+    const target = document.getElementById(id);
+    if (target && body.contains(target)) {
+      ev.preventDefault();
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  });
 
   void (async () => {
     try {
