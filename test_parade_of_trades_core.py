@@ -353,5 +353,40 @@ class TestEdgeCases(unittest.TestCase):
         self.assertEqual(result.duration, 5)
 
 
+class TestIdealBaselineZoneFlow(unittest.TestCase):
+    """Ideal = no-var twin with same handoff/batch (option A)."""
+
+    def test_no_var_ideal_equals_actual(self):
+        names = ["T1", "T2", "T3", "T4", "T5"]
+        trades = [
+            TradeConfig(name=names[i], low=1.0, high=1.0, deterministic=True, base_speed=1.0)
+            for i in range(5)
+        ]
+        cfg = ParadeConfig(
+            trades=trades, total_units=10, seed=1, zone_flow=True, batch_size=4,
+        )
+        r = ParadeOfTrades(cfg).run()
+        self.assertEqual(r.duration, 26)
+        self.assertEqual(r.ideal_duration, 26.0)
+        self.assertEqual(r.ideal_last_trade_cumulative[-1], 10)
+        self.assertEqual(r.ideal_last_trade_cumulative, r.cumulative_series()[-1])
+
+    def test_variability_delay_vs_same_batch_ideal(self):
+        names = ["T1", "T2", "T3", "T4", "T5"]
+        trades = [
+            TradeConfig(name=names[i], low=0.5, high=1.5, p_high=0.5, base_speed=1.0)
+            for i in range(5)
+        ]
+        cfg = ParadeConfig(
+            trades=trades, total_units=10, seed=12345, zone_flow=True, batch_size=4,
+        )
+        r = ParadeOfTrades(cfg).run()
+        self.assertEqual(r.ideal_duration, 26.0)
+        self.assertGreater(r.duration, r.ideal_duration)
+        # Ideal last-trade series reaches total at ideal_duration
+        ideal = r.ideal_last_trade_cumulative
+        self.assertEqual(ideal[int(r.ideal_duration)], 10)
+
+
 if __name__ == "__main__":
     unittest.main()

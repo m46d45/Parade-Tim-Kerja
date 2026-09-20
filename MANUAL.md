@@ -209,7 +209,9 @@ Laboratorium **time–inventory buffer** pada **parade zona–tim** (bukan dadu)
 
 ## 9. Line of Balance (LOB)
 
-X = periode, Y = zona kumulatif; mulai (0,0); kemiringan ≈ laju.
+X = **periode** (0 = awal; boleh pecahan) · Y = **zona kumulatif diskrit** (bilangan bulat dari 0). Titik data = zona selesai di engine (bukan progress parsial). Tick Y tiap zona; kisi zona dipakai untuk cek akurasi. Kemiringan chord ≈ laju.
+
+**Ideal** = baseline **tanpa variability** dengan aturan sama (zone-flow, handoff, batch). Selisih vs actual ≈ dampak variability — bukan “kapasitas mentah tanpa batch”.
 
 ---
 

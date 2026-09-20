@@ -98,6 +98,55 @@ def _apply_axes_style(ax: Axes) -> None:
     ax.yaxis.set_major_locator(mticker.MaxNLocator(integer=True))
 
 
+def _style_lob_axes(
+    ax: Axes,
+    *,
+    n_periods: Optional[int] = None,
+    total_zones: Optional[int] = None,
+    xlabel: str = "Periode (0 = awal; boleh pecahan)",
+    ylabel: str = "Zona kumulatif (diskrit, dari 0)",
+) -> None:
+    """
+    Style LoB axes: **zona (Y) is the discrete truth**; periode (X) may be continuous.
+
+    Y ticks are integers only (every zone when the scale fits). X majors stay
+    readable and may show fractional positions when data uses continuous time.
+    """
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+
+    # X = time: flexible; not the accuracy lattice
+    if n_periods is not None and n_periods <= 24:
+        ax.xaxis.set_major_locator(mticker.MultipleLocator(1))
+        ax.xaxis.set_minor_locator(mticker.AutoMinorLocator(2))
+    elif n_periods is not None and n_periods <= 50:
+        ax.xaxis.set_major_locator(mticker.MultipleLocator(2))
+        ax.xaxis.set_minor_locator(mticker.MultipleLocator(1))
+    else:
+        ax.xaxis.set_major_locator(mticker.MaxNLocator(nbins=12))
+        ax.xaxis.set_minor_locator(mticker.AutoMinorLocator())
+
+    # Y = zones: always integer labels; one tick per zone when readable
+    if total_zones is not None and total_zones <= 40:
+        ax.yaxis.set_major_locator(mticker.MultipleLocator(1))
+    else:
+        ax.yaxis.set_major_locator(mticker.MaxNLocator(integer=True, nbins=12))
+    ax.yaxis.set_major_formatter(mticker.FormatStrFormatter("%d"))
+    ax.yaxis.set_minor_locator(mticker.NullLocator())
+
+    # Emphasize zone grid (accuracy); period grid secondary
+    ax.grid(True, which="major", axis="y", linestyle="-", alpha=0.48)
+    ax.grid(True, which="major", axis="x", linestyle="--", alpha=0.32)
+    ax.grid(True, which="minor", axis="x", linestyle=":", alpha=0.2)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+
+def _lob_integer_cumulative(result: ParadeResult) -> List[List[int]]:
+    """Finished zones per trade vs period — integer Y only (no partial-zone decimals)."""
+    return result.cumulative_series()
+
+
 def _ensure_parent(path: Union[str, Path]) -> Path:
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -131,19 +180,16 @@ def plot_line_of_balance(
     show_ideal: bool = True,
 ) -> Axes:
     """
-    Line of Balance: cumulative zones vs period as **straight lines**.
+    Line of Balance: cumulative **integer zones** vs period.
 
-    Slope of each line = speed (zona/periode). Deterministic paces use
-    continuous progress so lambat (0.5) is a clean diagonal, not a staircase.
+    Y is discrete finished zones (engine ``cumulative``). Partial-zone
+    progress is not plotted on Y — periode (X) may be read as continuous time.
+    Vertices sit on integer zona; chord slopes approximate pace.
     """
     if ax is None:
         _, ax = plt.subplots(figsize=(9, 5.2))
 
-    # Prefer continuous progress (straight pace); else integer cumulative
-    if hasattr(result, "fractional_cumulative_series"):
-        cum = result.fractional_cumulative_series()
-    else:
-        cum = result.cumulative_series()
+    cum = _lob_integer_cumulative(result)
     n = result.config.n_trades
     total = result.config.total_units
     periods = list(range(len(cum[0])))
@@ -156,9 +202,10 @@ def plot_line_of_balance(
         label = f"T{i + 1}: {_short_name(trade.name)} ({trade.label()})"
         if getattr(trade, "deterministic", False) and speed > 0:
             label += f" · slope {speed:g}"
+        ys = [int(y) for y in cum[i]]
         ax.plot(
             periods,
-            cum[i],
+            ys,
             color=_trade_color(i),
             linewidth=2.4,
             linestyle="-",
@@ -171,30 +218,38 @@ def plot_line_of_balance(
         )
 
     if show_ideal:
-        mean_cap = min(t.mean for t in result.config.trades)
-        if mean_cap > 0:
+        ideal_ys = list(getattr(result, "ideal_last_trade_cumulative", None) or [])
+        if len(ideal_ys) >= 2:
+            ideal_xs = list(range(len(ideal_ys)))
+            batch = getattr(result.config, "batch_size", 1)
             ax.plot(
-                [0, total / mean_cap], [0, total],
-                color="0.45", linestyle=":", linewidth=1.6,
-                label=f"Ideal (bottleneck {mean_cap:g} zona/periode)",
+                ideal_xs,
+                ideal_ys,
+                color="0.35",
+                linestyle=":",
+                linewidth=1.8,
+                label=f"Ideal (tanpa var, batch={batch}, T terakhir)",
+                zorder=2,
             )
+        else:
+            # Fallback if baseline missing (partial run)
+            mean_cap = min(t.mean for t in result.config.trades)
+            if mean_cap > 0:
+                ax.plot(
+                    [0, total / mean_cap], [0, total],
+                    color="0.45", linestyle=":", linewidth=1.6,
+                    label=f"Ideal kapasitas ({mean_cap:g}/periode)",
+                )
 
     ax.axhline(total, color="0.7", linestyle="--", linewidth=1.0, alpha=0.8)
-    ax.set_xlim(0, max(periods) if periods else 1)
+    x_end = max(periods) if periods else 1
+    ideal_ys = list(getattr(result, "ideal_last_trade_cumulative", None) or [])
+    if show_ideal and ideal_ys:
+        x_end = max(x_end, len(ideal_ys) - 1)
+    ax.set_xlim(0, x_end)
     ax.set_ylim(0, total * 1.06)
-    ax.set_xlabel("Periode (1, 2, 3, …)")
-    ax.set_ylabel("Zona kumulatif (1, 2, 3, …)")
-    ax.set_title(title or "Line of Balance — kemiringan = kecepatan")
-
-    if n_per <= 50:
-        ax.xaxis.set_major_locator(mticker.MultipleLocator(1 if n_per <= 24 else 2))
-    else:
-        ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True, nbins=16))
-    if total <= 40:
-        ax.yaxis.set_major_locator(mticker.MultipleLocator(1))
-    else:
-        ax.yaxis.set_major_locator(mticker.MaxNLocator(integer=True, nbins=12))
-    ax.grid(True, which="major", linestyle="--", alpha=0.5)
+    ax.set_title(title or "Line of Balance — zona diskrit vs periode")
+    _style_lob_axes(ax, n_periods=x_end + 1, total_zones=total)
 
     # Speed legend callout
     notes = []
@@ -204,7 +259,7 @@ def plot_line_of_balance(
     if notes:
         ax.text(
             0.02, 0.98,
-            "Kecepatan (kemiringan garis):\n" + " · ".join(notes[:5]),
+            "Kecepatan (Δzona bulat / Δperiode):\n" + " · ".join(notes[:5]),
             transform=ax.transAxes, va="top", ha="left", fontsize=8,
             color="#1a365d",
             bbox=dict(boxstyle="round,pad=0.35", facecolor="#ebf8ff",
@@ -212,8 +267,6 @@ def plot_line_of_balance(
         )
 
     ax.legend(loc="lower right", fontsize=7.5, framealpha=0.92)
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
     return ax
 
 
@@ -223,13 +276,10 @@ def plot_line_of_balance_detail(
     max_period: int = 12,
     title: Optional[str] = None,
 ) -> Axes:
-    """Early-period LOB with every period tick — straight pace lines."""
+    """Early-period LOB for accuracy checks: marker every period, integer zona."""
     if ax is None:
         _, ax = plt.subplots(figsize=(9, 4.2))
-    if hasattr(result, "fractional_cumulative_series"):
-        cum_full = result.fractional_cumulative_series()
-    else:
-        cum_full = result.cumulative_series()
+    cum_full = _lob_integer_cumulative(result)
     n = result.config.n_trades
     total = result.config.total_units
     end = min(max_period, len(cum_full[0]) - 1)
@@ -237,7 +287,7 @@ def plot_line_of_balance_detail(
     markers = ("o", "s", "^", "D", "v", "P", "X")
     for i in range(n):
         trade = result.config.trades[i]
-        ys = cum_full[i][: end + 1]
+        ys = [int(y) for y in cum_full[i][: end + 1]]
         ax.plot(
             periods, ys, color=_trade_color(i), linewidth=2.6,
             marker=markers[i % len(markers)], markersize=6.5, markevery=1,
@@ -247,15 +297,16 @@ def plot_line_of_balance_detail(
     ax.set_xlim(0, end)
     ymax = max(max(cum_full[i][end] for i in range(n)), 1)
     ax.set_ylim(0, min(total, ymax + 2) * 1.1)
-    ax.set_xlabel("Periode")
-    ax.set_ylabel("Zona (kumulatif)")
-    ax.set_title(title or f"Detail LOB — periode 0–{end} (garis lurus = kecepatan konstan)")
-    ax.xaxis.set_major_locator(mticker.MultipleLocator(1))
-    ax.yaxis.set_major_locator(mticker.MultipleLocator(1))
-    ax.grid(True, which="major", linestyle="--", alpha=0.55)
+    ax.set_title(
+        title
+        or f"Detail LOB — periode 0–{end} (titik = zona bulat selesai)"
+    )
+    _style_lob_axes(
+        ax,
+        n_periods=len(periods),
+        total_zones=min(total, int(ymax) + 2),
+    )
     ax.legend(loc="upper left", fontsize=8, framealpha=0.92)
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
     return ax
 
 
@@ -416,8 +467,8 @@ def plot_run(
         0.01,
         -0.01,
         (
-            f"Ideal duration: {result.ideal_duration:.1f}  ·  "
-            f"Delay: {result.duration - result.ideal_duration:+.1f}  ·  "
+            f"Ideal (tanpa var): {result.ideal_duration:.1f}  ·  "
+            f"Delay vs ideal: {result.duration - result.ideal_duration:+.1f}  ·  "
             f"Total idle: {result.total_idle_capacity}  ·  "
             f"Peak simultaneous WIP: {peak_wip}  ·  "
             f"Max buffer per interface: {result.max_buffer}"
@@ -454,16 +505,28 @@ def plot_comparison_lob(
 
     first = next(iter(results.values()))
     total = max(r.config.total_units for r in results.values())
-    mean_cap = min(float(t.mean) for t in first.config.trades)
-    if mean_cap > 0:
+    ideal_ys = list(getattr(first, "ideal_last_trade_cumulative", None) or [])
+    if len(ideal_ys) >= 2:
+        batch = getattr(first.config, "batch_size", 1)
         ax.plot(
-            [0, total / mean_cap],
-            [0, total],
-            color="0.5",
+            list(range(len(ideal_ys))),
+            ideal_ys,
+            color="0.45",
             linestyle=":",
-            linewidth=1.5,
-            label=f"Ideal ({mean_cap:g}/periode) dari (0,0)",
+            linewidth=1.6,
+            label=f"Ideal (tanpa var, batch={batch})",
         )
+    else:
+        mean_cap = min(float(t.mean) for t in first.config.trades)
+        if mean_cap > 0:
+            ax.plot(
+                [0, total / mean_cap],
+                [0, total],
+                color="0.5",
+                linestyle=":",
+                linewidth=1.5,
+                label=f"Ideal kapasitas ({mean_cap:g}/periode)",
+            )
 
     # Distinct cycle if names are Skenario N (not in PRESET_COLORS)
     fallback_colors = ["#2563eb", "#ea580c", "#16a34a", "#dc2626", "#7c3aed", "#0891b2"]
@@ -517,11 +580,14 @@ def plot_comparison_lob(
     ax.axhline(total, color="0.7", linestyle="--", linewidth=1.0, label=None)
     ax.set_xlim(0, max(max_period, 1) * 1.02)
     ax.set_ylim(0, total * 1.08)
-    ax.set_xlabel("Periode (mulai 0)")
-    ax.set_ylabel("Zona kumulatif tim terakhir (mulai 0)")
     ax.set_title(title or "Line of Balance — perbandingan skenario (dari 0,0)")
     ax.legend(loc="lower right", fontsize=8, framealpha=0.92)
-    _apply_axes_style(ax)
+    _style_lob_axes(
+        ax,
+        n_periods=max_period + 1,
+        total_zones=total,
+        ylabel="Zona kumulatif tim terakhir (diskrit, dari 0)",
+    )
     return ax
 
 
@@ -1482,8 +1548,6 @@ def plot_takt_plan(
             ys = [0] + [rec.cumulative[i] for rec in result.history]
             ax.plot(xs, ys, color=colors[i], linewidth=2.2, label=f"Aktual T{i + 1}")
 
-    ax.set_xlabel("Periode")
-    ax.set_ylabel("Zona kumulatif")
     ax.set_xlim(left=0)
     ax.set_ylim(bottom=0, top=plan.n_zones * 1.05)
     ax.set_title(
@@ -1494,7 +1558,11 @@ def plot_takt_plan(
         )
     )
     ax.legend(loc="upper left", fontsize=7.5, framealpha=0.92, ncol=2)
-    _apply_axes_style(ax)
+    _style_lob_axes(
+        ax,
+        n_periods=int(plan.duration) + 1,
+        total_zones=int(plan.n_zones),
+    )
     return ax
 
 
@@ -1629,11 +1697,15 @@ def plot_tommelein_scenario_lobs(
         ax.axhline(total, color="0.75", linestyle=":", linewidth=0.9)
         ax.set_xlim(left=0)
         ax.set_ylim(0, total * 1.08)
-        ax.set_xlabel("Periode")
         ax.set_title(name, fontsize=10)
         ax.legend(loc="lower right", fontsize=7, framealpha=0.9, ncol=2)
-        _apply_axes_style(ax)
-    axes[0].set_ylabel("Zona kumulatif")
+        _style_lob_axes(
+            ax,
+            n_periods=len(cum[0]) if cum else None,
+            total_zones=total,
+        )
+        if ax is not axes[0]:
+            ax.set_ylabel("")
     fig.suptitle(title or "Tommelein (2020) — LOB per skenario (semua tim)", fontsize=11, y=1.02)
     fig.tight_layout()
     return fig
@@ -1663,11 +1735,14 @@ def plot_tommelein_last_trade_lob(
     ax.axhline(total, color="0.7", linestyle="--", linewidth=1.0)
     ax.set_xlim(0, max_p * 1.05)
     ax.set_ylim(0, total * 1.08)
-    ax.set_xlabel("Periode (mulai 0)")
-    ax.set_ylabel("Zona kumulatif tim terakhir")
     ax.set_title(title or "Tommelein (2020) — LOB tim terakhir")
     ax.legend(loc="lower right", fontsize=8, framealpha=0.92)
-    _apply_axes_style(ax)
+    _style_lob_axes(
+        ax,
+        n_periods=max_p + 1,
+        total_zones=total,
+        ylabel="Zona kumulatif tim terakhir (diskrit, dari 0)",
+    )
     return ax
 
 
@@ -1703,11 +1778,13 @@ def plot_single_scenario_lob(
     ax.axhline(total, color="0.75", linestyle=":", linewidth=0.9)
     ax.set_xlim(left=0)
     ax.set_ylim(0, total * 1.08)
-    ax.set_xlabel("Periode")
-    ax.set_ylabel("Zona kumulatif")
     ax.set_title(title or "Line of Balance")
     ax.legend(loc="lower right", fontsize=8, framealpha=0.92, ncol=2)
-    _apply_axes_style(ax)
+    _style_lob_axes(
+        ax,
+        n_periods=len(cum[0]) if cum else None,
+        total_zones=total,
+    )
     return ax
 
 
