@@ -5,13 +5,14 @@
   --border: rgba(255, 255, 255, 0.1);
   --text: #e8eef8;
   --muted: #94a3b8;
-  --accent: #3b82f6;
+  --accent: #1f77b4;
   --ok: #22c55e;
-  --t1: #2563eb;
-  --t2: #eab308;
-  --t3: #16a34a;
-  --t4: #dc2626;
-  --t5: #7c3aed;
+  /* Streamlit / matplotlib trade palette */
+  --t1: #1f77b4;
+  --t2: #ff7f0e;
+  --t3: #2ca02c;
+  --t4: #d62728;
+  --t5: #9467bd;
 }
 
 * {
@@ -35,8 +36,8 @@ body::before {
   pointer-events: none;
   z-index: 0;
   background:
-    radial-gradient(900px 500px at 10% -10%, rgba(37, 99, 235, 0.28), transparent 55%),
-    radial-gradient(700px 400px at 90% 10%, rgba(124, 58, 237, 0.18), transparent 50%);
+    radial-gradient(900px 500px at 10% -10%, rgba(31, 119, 180, 0.28), transparent 55%),
+    radial-gradient(700px 400px at 90% 10%, rgba(148, 103, 189, 0.18), transparent 50%);
 }
 
 .wrap {
@@ -98,6 +99,21 @@ header {
   margin-bottom: 0.85rem;
 }
 
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.35rem;
+}
+
+.chip {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #fff;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+}
+
 label {
   display: block;
   font-size: 0.82rem;
@@ -141,7 +157,7 @@ button.run:hover {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 0.65rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.85rem;
 }
 
 .metric {
@@ -161,12 +177,72 @@ button.run:hover {
   font-size: 1.15rem;
 }
 
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 1rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.swatch {
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--sw, #fff);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+
+.swatch.dashed {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--sw, #555) 0 4px,
+    transparent 4px 7px
+  );
+}
+
+.chart-wrap {
+  position: relative;
+}
+
 canvas {
   width: 100%;
   height: auto;
-  background: rgba(0, 0, 0, 0.2);
+  display: block;
+  background: rgba(0, 0, 0, 0.22);
   border-radius: 12px;
   border: 1px solid var(--border);
+}
+
+.tooltip {
+  position: absolute;
+  z-index: 5;
+  min-width: 140px;
+  max-width: 220px;
+  padding: 0.5rem 0.65rem;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid var(--border);
+  font-size: 0.78rem;
+  color: var(--text);
+  pointer-events: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.tooltip.hidden {
+  display: none;
+}
+
+.tip-title {
+  font-weight: 600;
+  margin-bottom: 0.2rem;
 }
 
 .note {

@@ -1,13 +1,17 @@
 import {
   bufferSeries,
   classroomConfig,
-  cumulativeSeries,
   runParade,
   type ParadeResult,
 } from "../core";
 import { readDashboard, recordAppSession, recordSimRun } from "../stats";
-
-const TRADE_COLORS = ["#2563eb", "#eab308", "#16a34a", "#dc2626", "#7c3aed"];
+import { tradeColor } from "../theme";
+import {
+  buildLegendItems,
+  drawLobChart,
+  hitTestLob,
+  type LobHit,
+} from "./lobChart";
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -25,85 +29,36 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-function drawLob(canvas: HTMLCanvasElement, result: ParadeResult): void {
-  const dpr = window.devicePixelRatio || 1;
-  const cssW = canvas.clientWidth || 640;
-  const cssH = 320;
-  canvas.width = Math.floor(cssW * dpr);
-  canvas.height = Math.floor(cssH * dpr);
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-  ctx.scale(dpr, dpr);
+function metric(label: string, value: string): HTMLElement {
+  return el("div", { className: "metric" }, [
+    el("span", {}, [label]),
+    el("strong", {}, [value]),
+  ]);
+}
 
-  const pad = { l: 44, r: 16, t: 16, b: 36 };
-  const w = cssW - pad.l - pad.r;
-  const h = cssH - pad.t - pad.b;
-  const cum = cumulativeSeries(result);
-  const maxX = Math.max(result.duration, result.idealLastTradeCumulative.length - 1, 1);
-  const maxY = result.config.totalUnits;
-
-  const xScale = (x: number) => pad.l + (x / maxX) * w;
-  const yScale = (y: number) => pad.t + h - (y / maxY) * h;
-
-  ctx.clearRect(0, 0, cssW, cssH);
-  ctx.fillStyle = "rgba(255,255,255,0.04)";
-  ctx.fillRect(0, 0, cssW, cssH);
-
-  // grid Y (integer zones)
-  ctx.strokeStyle = "rgba(148,163,184,0.25)";
-  ctx.lineWidth = 1;
-  for (let z = 0; z <= maxY; z++) {
-    const yy = yScale(z);
-    ctx.beginPath();
-    ctx.moveTo(pad.l, yy);
-    ctx.lineTo(pad.l + w, yy);
-    ctx.stroke();
-  }
-
-  // ideal last trade
-  const ideal = result.idealLastTradeCumulative;
-  if (ideal.length > 1) {
-    ctx.strokeStyle = "rgba(226,232,240,0.55)";
-    ctx.setLineDash([5, 4]);
-    ctx.beginPath();
-    ideal.forEach((y: number, i: number) => {
-      const X = xScale(i);
-      const Y = yScale(y);
-      if (i === 0) ctx.moveTo(X, Y);
-      else ctx.lineTo(X, Y);
+function renderLegend(host: HTMLElement, result: ParadeResult): void {
+  host.replaceChildren();
+  for (const item of buildLegendItems(result)) {
+    const swatch = el("span", {
+      className: item.dashed ? "swatch dashed" : "swatch",
     });
-    ctx.stroke();
-    ctx.setLineDash([]);
+    swatch.style.setProperty("--sw", item.color);
+    host.append(
+      el("div", { className: "legend-item" }, [swatch, el("span", {}, [item.text])]),
+    );
   }
-
-  // trades
-  cum.forEach((series: number[], ti: number) => {
-    ctx.strokeStyle = TRADE_COLORS[ti % TRADE_COLORS.length];
-    ctx.lineWidth = 2.2;
-    ctx.beginPath();
-    series.forEach((y: number, i: number) => {
-      const X = xScale(i);
-      const Y = yScale(y);
-      if (i === 0) ctx.moveTo(X, Y);
-      else ctx.lineTo(X, Y);
-    });
-    ctx.stroke();
-  });
-
-  ctx.fillStyle = "#94a3b8";
-  ctx.font = "12px DM Sans, sans-serif";
-  ctx.fillText("Periode (0 = awal)", pad.l, cssH - 10);
-  ctx.save();
-  ctx.translate(14, pad.t + h / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillText("Zona kumulatif (diskrit)", 0, 0);
-  ctx.restore();
 }
 
 export function mountApp(root: HTMLElement): void {
   root.replaceChildren();
 
-  const zones = el("input", { type: "number", id: "zones", value: "10", min: "1", max: "100" });
+  const zones = el("input", {
+    type: "number",
+    id: "zones",
+    value: "10",
+    min: "1",
+    max: "100",
+  });
   const batch = el("select", { id: "batch" }, [
     el("option", { value: "1" }, ["1 — one-piece flow"]),
     el("option", { value: "4" }, ["4 — batch handoff"]),
@@ -115,20 +70,44 @@ export function mountApp(root: HTMLElement): void {
     el("option", { value: "2" }, ["2 zona/periode"]),
   ]);
   (speed as HTMLSelectElement).value = "1";
-  const runBtn = el("button", { className: "run", type: "button" }, ["Jalankan simulasi"]);
-  const metrics = el("div", { className: "metrics" });
-  const canvas = el("canvas", { id: "lob" }) as HTMLCanvasElement;
-  const note = el("p", { className: "note" }, [
-    "Prototype migrasi JS (Fase 1–2). Engine zone-flow di browser. ",
-    el("a", { href: "https://parade-tim-kerja.streamlit.app/", target: "_blank", rel: "noopener" }, [
-      "Streamlit lengkap",
-    ]),
-    " tetap tersedia selama cutover.",
+  const runBtn = el("button", { className: "run", type: "button" }, [
+    "Jalankan simulasi",
   ]);
-  const statsLine = el("p", { className: "note", id: "stats" }, ["Memuat statistik…"]);
+  const metrics = el("div", { className: "metrics" });
+  const legend = el("div", { className: "legend" });
+  const chartWrap = el("div", { className: "chart-wrap" });
+  const canvas = el("canvas", { id: "lob" }) as HTMLCanvasElement;
+  const tip = el("div", { className: "tooltip hidden", id: "tip" }, ["—"]);
+  chartWrap.append(canvas, tip);
+
+  const note = el("p", { className: "note" }, [
+    "Warna T1–T5 sama dengan grafik Streamlit. Arahkan kursor ke titik untuk lihat periode & zona. ",
+    el(
+      "a",
+      {
+        href: "https://parade-tim-kerja.streamlit.app/",
+        target: "_blank",
+        rel: "noopener",
+      },
+      ["Streamlit lengkap"],
+    ),
+    " tetap tersedia selama migrasi.",
+  ]);
+  const statsLine = el("p", { className: "note", id: "stats" }, [
+    "Memuat statistik…",
+  ]);
+
+  // Color chips matching Streamlit palette
+  const chips = el("div", { className: "chips" });
+  for (let i = 0; i < 5; i++) {
+    const c = el("span", { className: "chip" }, [`T${i + 1}`]);
+    c.style.background = tradeColor(i);
+    chips.append(c);
+  }
 
   const sidebar = el("aside", { className: "panel" }, [
     el("h2", {}, ["Kontrol"]),
+    chips,
     el("label", { for: "zones" }, ["Total zona"]),
     zones,
     el("label", { for: "batch" }, ["Batch handoff"]),
@@ -142,7 +121,8 @@ export function mountApp(root: HTMLElement): void {
   const main = el("section", { className: "panel" }, [
     el("h2", {}, ["Line of Balance"]),
     metrics,
-    canvas,
+    legend,
+    chartWrap,
     note,
   ]);
 
@@ -155,6 +135,9 @@ export function mountApp(root: HTMLElement): void {
       el("div", { className: "layout" }, [sidebar, main]),
     ]),
   );
+
+  let lastResult: ParadeResult | null = null;
+  let hits: LobHit[] = [];
 
   function setMetrics(r: ParadeResult): void {
     const buf = bufferSeries(r);
@@ -173,11 +156,10 @@ export function mountApp(root: HTMLElement): void {
     );
   }
 
-  function metric(label: string, value: string): HTMLElement {
-    return el("div", { className: "metric" }, [
-      el("span", {}, [label]),
-      el("strong", {}, [value]),
-    ]);
+  function redraw(): void {
+    if (!lastResult) return;
+    hits = drawLobChart(canvas, lastResult);
+    renderLegend(legend, lastResult);
   }
 
   function run(): void {
@@ -188,16 +170,39 @@ export function mountApp(root: HTMLElement): void {
       seed: 12345,
       deterministic: true,
     });
-    const result = runParade(cfg);
-    setMetrics(result);
-    drawLob(canvas, result);
+    lastResult = runParade(cfg);
+    setMetrics(lastResult);
+    redraw();
     void recordSimRun();
   }
 
-  runBtn.addEventListener("click", run);
-  window.addEventListener("resize", () => {
-    // redraw last if any — simple: re-run with same inputs
+  canvas.addEventListener("mousemove", (ev) => {
+    const hit = hitTestLob(canvas, hits, ev.clientX, ev.clientY);
+    if (!hit) {
+      tip.classList.add("hidden");
+      canvas.style.cursor = "default";
+      return;
+    }
+    canvas.style.cursor = "crosshair";
+    tip.classList.remove("hidden");
+    tip.replaceChildren();
+    const row1 = el("div", { className: "tip-title" }, [hit.label]);
+    row1.style.color = hit.color;
+    tip.append(
+      row1,
+      el("div", {}, [`Periode: ${hit.period}`]),
+      el("div", {}, [`Zona kumulatif: ${hit.zone}`]),
+    );
+    const wrapRect = chartWrap.getBoundingClientRect();
+    const x = ev.clientX - wrapRect.left + 12;
+    const y = ev.clientY - wrapRect.top + 12;
+    tip.style.left = `${Math.min(x, wrapRect.width - 180)}px`;
+    tip.style.top = `${Math.min(y, wrapRect.height - 70)}px`;
   });
+  canvas.addEventListener("mouseleave", () => tip.classList.add("hidden"));
+
+  runBtn.addEventListener("click", run);
+  window.addEventListener("resize", () => redraw());
 
   void (async () => {
     await recordAppSession();
