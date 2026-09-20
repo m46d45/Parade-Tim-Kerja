@@ -29,8 +29,7 @@ import {
 type CmpTab =
   | "lob"
   | "buffer"
-  | "util"
-  | "cost"
+  | "util_cost"
   | "little"
   | "kingman"
   | "inventory";
@@ -143,8 +142,7 @@ export function mountCompare(
   const tabDefs: { id: CmpTab; label: string }[] = [
     { id: "lob", label: "Line of Balance" },
     { id: "buffer", label: "Buffer / WIP" },
-    { id: "util", label: "Utilisasi" },
-    { id: "cost", label: "Biaya" },
+    { id: "util_cost", label: "Utilisasi & Biaya" },
     { id: "little", label: "Little's Law" },
     { id: "kingman", label: "Kingman" },
     { id: "inventory", label: "Inventory / FR" },
@@ -202,10 +200,14 @@ export function mountCompare(
       varSel.value = d.variability;
 
       const batchSel = el("select", { id: `cmp-batch-${i}` }) as HTMLSelectElement;
-      for (const b of [1, 2, 3, 4, 5]) {
+      for (const b of [4, 5, 3, 2, 1]) {
         batchSel.append(
           el("option", { value: String(b) }, [
-            b === 1 ? "1 — One-piece" : b === 4 ? "4 — Standar" : `${b} — Handoff`,
+            b === 1
+              ? "1 — One-piece"
+              : b === 4
+                ? "4 — Standar"
+                : `${b} — Handoff tiap ${b} zona`,
           ]),
         );
       }
@@ -371,12 +373,10 @@ export function mountCompare(
       drawCompareLob(canvas, results);
     } else if (activeTab === "buffer") {
       drawCompareBuffers(canvas, results);
-    } else if (activeTab === "util") {
+    } else if (activeTab === "util_cost") {
       drawCompareUtil(canvas, results);
-    } else if (activeTab === "cost") {
-      drawCompareCosts(canvas, results, r);
       chartWrap2.classList.remove("hidden");
-      drawCompareMetricsBars(canvas2, results, "cost", r, { cssHeight: 220 });
+      drawCompareCosts(canvas2, results, r, { cssHeight: 240 });
       detailHost.classList.remove("hidden");
       const table = el("table", { className: "data-table" });
       table.append(

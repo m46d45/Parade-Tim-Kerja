@@ -52,7 +52,7 @@ body::before {
 .wrap {
   position: relative;
   z-index: 1;
-  max-width: 1100px;
+  max-width: 1180px;
   margin: 0 auto;
   padding: 1.25rem 1.25rem 3rem;
 }
@@ -70,11 +70,73 @@ header.app-header {
   box-shadow: 0 8px 28px rgba(15, 39, 68, 0.28);
 }
 
+.brand-block {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.brand-logo {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  object-fit: cover;
+  flex-shrink: 0;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+  background: #fff;
+}
+
+.brand-text {
+  min-width: 0;
+}
+
 .brand {
   font-family: "Instrument Serif", Georgia, serif;
   font-size: 1.35rem;
   letter-spacing: -0.02em;
   color: #e8eef7;
+  line-height: 1.15;
+}
+
+.brand-sub {
+  margin-top: 0.2rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: rgba(232, 238, 247, 0.82);
+  line-height: 1.35;
+  max-width: 36rem;
+}
+
+.header-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.header-link {
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(0, 0, 0, 0.14);
+  color: rgba(232, 238, 247, 0.92);
+  cursor: pointer;
+}
+
+.header-link:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.header-link.active {
+  background: #fff;
+  color: var(--accent);
+  border-color: #fff;
 }
 
 .badge {
@@ -85,6 +147,17 @@ header.app-header {
   padding: 0.3rem 0.65rem;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.14);
+}
+
+@media (max-width: 720px) {
+  header.app-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .brand-sub {
+    font-size: 0.72rem;
+  }
 }
 
 .layout {

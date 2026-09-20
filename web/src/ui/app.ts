@@ -39,16 +39,15 @@ import { bumpSessionRuns, mountStats } from "./statsApp";
 import { mountTakt } from "./taktApp";
 import { mountTimeBuffer } from "./timeBufferApp";
 
-type AppMode = "sim" | "compare" | "takt" | "buffer" | "stats" | "manual";
-
 type TabId =
   | "lob"
   | "buffer"
-  | "util"
-  | "cost"
+  | "util_cost"
   | "little"
   | "kingman"
   | "inventory";
+
+type AppMode = "sim" | "compare" | "takt" | "buffer" | "stats" | "manual";
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -105,10 +104,49 @@ function paintSwatches(tbody: HTMLElement): void {
   });
 }
 
-function renderCostTable(host: HTMLElement, cm: CostMetrics): void {
+function renderUtilCostTables(
+  host: HTMLElement,
+  result: ParadeResult,
+  cm: CostMetrics,
+): void {
   host.replaceChildren();
-  const table = el("table", { className: "data-table" });
-  table.append(
+  const utilTable = el("table", { className: "data-table" });
+  utilTable.append(
+    el("thead", {}, [
+      el("tr", {}, [
+        el("th", {}, ["Tim"]),
+        el("th", {}, ["Produksi"]),
+        el("th", {}, ["Kap. efektif"]),
+        el("th", {}, ["Idle kap."]),
+        el("th", {}, ["Utilisasi"]),
+        el("th", {}, ["Mulai"]),
+        el("th", {}, ["Selesai"]),
+      ]),
+    ]),
+  );
+  const utilBody = el("tbody");
+  for (let i = 0; i < result.tradeMetrics.length; i++) {
+    const m = result.tradeMetrics[i];
+    utilBody.append(
+      el("tr", {}, [
+        el("td", {}, [
+          el("span", { className: "row-swatch" }, []),
+          `T${i + 1}: ${shortTradeName(m.name, 16)}`,
+        ]),
+        el("td", {}, [String(m.totalProduction)]),
+        el("td", {}, [String(m.totalEffectiveCapacity)]),
+        el("td", {}, [String(m.totalIdle)]),
+        el("td", {}, [`${(100 * m.utilization).toFixed(1)}%`]),
+        el("td", {}, [m.startPeriod == null ? "—" : String(m.startPeriod)]),
+        el("td", {}, [String(m.periodsToFinish)]),
+      ]),
+    );
+  }
+  paintSwatches(utilBody);
+  utilTable.append(utilBody);
+
+  const costTable = el("table", { className: "data-table" });
+  costTable.append(
     el("thead", {}, [
       el("tr", {}, [
         el("th", {}, ["Tim"]),
@@ -121,9 +159,9 @@ function renderCostTable(host: HTMLElement, cm: CostMetrics): void {
       ]),
     ]),
   );
-  const tbody = el("tbody");
+  const costBody = el("tbody");
   for (const t of cm.trades) {
-    tbody.append(
+    costBody.append(
       el("tr", {}, [
         el("td", {}, [
           el("span", { className: "row-swatch" }, []),
@@ -138,48 +176,18 @@ function renderCostTable(host: HTMLElement, cm: CostMetrics): void {
       ]),
     );
   }
-  paintSwatches(tbody);
-  table.append(tbody);
-  host.append(table);
+  paintSwatches(costBody);
+  costTable.append(costBody);
+
   host.append(
+    el("h3", { className: "subchart-title" }, ["Utilisasi per tim"]),
+    utilTable,
+    el("h3", { className: "subchart-title" }, ["Biaya per tim"]),
+    costTable,
     el("p", { className: "note table-note" }, [
       "Aktif = periode berproduksi setelah mulai · Idle = menunggu zona · Biaya = periode × tarif.",
     ]),
   );
-}
-
-function renderUtilTable(host: HTMLElement, result: ParadeResult): void {
-  host.replaceChildren();
-  const table = el("table", { className: "data-table" });
-  table.append(
-    el("thead", {}, [
-      el("tr", {}, [
-        el("th", {}, ["Tim"]),
-        el("th", {}, ["Produksi"]),
-        el("th", {}, ["Kapasitas efektif"]),
-        el("th", {}, ["Idle"]),
-        el("th", {}, ["Utilisasi"]),
-      ]),
-    ]),
-  );
-  const tbody = el("tbody");
-  result.tradeMetrics.forEach((m, i) => {
-    tbody.append(
-      el("tr", {}, [
-        el("td", {}, [
-          el("span", { className: "row-swatch" }, []),
-          `T${i + 1}: ${shortTradeName(m.name, 18)}`,
-        ]),
-        el("td", {}, [String(m.totalProduction)]),
-        el("td", {}, [String(m.totalEffectiveCapacity)]),
-        el("td", {}, [String(m.totalIdle)]),
-        el("td", {}, [`${(100 * m.utilization).toFixed(1)}%`]),
-      ]),
-    );
-  });
-  paintSwatches(tbody);
-  table.append(tbody);
-  host.append(table);
 }
 
 function renderBufferPeakTable(host: HTMLElement, result: ParadeResult): void {
@@ -339,8 +347,11 @@ export function mountApp(root: HTMLElement): void {
   }) as HTMLInputElement;
   const zonesVal = el("span", { className: "slider-val" }, ["10"]);
   const batch = el("select", { id: "batch" }, [
-    el("option", { value: "1" }, ["1 — one-piece flow"]),
-    el("option", { value: "4" }, ["4 — batch handoff"]),
+    el("option", { value: "4" }, ["4 — Handoff tiap 4 zona (standar)"]),
+    el("option", { value: "5" }, ["5 — Handoff tiap 5 zona"]),
+    el("option", { value: "3" }, ["3 — Handoff tiap 3 zona"]),
+    el("option", { value: "2" }, ["2 — Handoff tiap 2 zona"]),
+    el("option", { value: "1" }, ["1 — One-piece flow (zona per zona)"]),
   ]);
   (batch as HTMLSelectElement).value = "4";
   const speed = el("select", { id: "speed" }, [
@@ -419,8 +430,7 @@ export function mountApp(root: HTMLElement): void {
   const tabDefs: { id: TabId; label: string }[] = [
     { id: "lob", label: "Line of Balance" },
     { id: "buffer", label: "Buffer / WIP" },
-    { id: "util", label: "Utilisasi" },
-    { id: "cost", label: "Biaya" },
+    { id: "util_cost", label: "Utilisasi & Biaya" },
     { id: "little", label: "Little's Law" },
     { id: "kingman", label: "Kingman" },
     { id: "inventory", label: "Inventory / FR" },
@@ -517,17 +527,32 @@ export function mountApp(root: HTMLElement): void {
     { id: "compare", label: "Perbandingan", btn: el("button", { className: "mode-tab", type: "button" }, ["Perbandingan"]) as HTMLButtonElement },
     { id: "takt", label: "Takt plan", btn: el("button", { className: "mode-tab", type: "button" }, ["Takt plan"]) as HTMLButtonElement },
     { id: "buffer", label: "Buffer", btn: el("button", { className: "mode-tab", type: "button" }, ["Buffer"]) as HTMLButtonElement },
-    { id: "stats", label: "Statistik", btn: el("button", { className: "mode-tab", type: "button" }, ["Statistik"]) as HTMLButtonElement },
-    { id: "manual", label: "Manual", btn: el("button", { className: "mode-tab", type: "button" }, ["Manual"]) as HTMLButtonElement },
   ];
   const modeTabs = el("div", { className: "mode-tabs" }, modeDefs.map((m) => m.btn));
 
+  const headerStats = el("button", { className: "header-link", type: "button" }, ["Statistik"]);
+  const headerManual = el("button", { className: "header-link", type: "button" }, ["Manual"]);
+  const headerNav = el("div", { className: "header-nav" }, [headerStats, headerManual]);
+
+  const brandBlock = el("div", { className: "brand-block" }, [
+    el("img", {
+      className: "brand-logo",
+      src: "/assets/logo_icon.png",
+      alt: "Parade Tim Kerja",
+      width: "48",
+      height: "48",
+    }),
+    el("div", { className: "brand-text" }, [
+      el("div", { className: "brand" }, ["Parade Tim Kerja"]),
+      el("div", { className: "brand-sub" }, [
+        "Simulasi Aliran Tim Kerja pada Pekerjaan Lantai Beton Bertulang",
+      ]),
+    ]),
+  ]);
+
   root.append(
     el("div", { className: "wrap" }, [
-      el("header", { className: "app-header" }, [
-        el("div", { className: "brand" }, ["Parade Tim Kerja"]),
-        el("span", { className: "badge" }, ["JS · browser"]),
-      ]),
+      el("header", { className: "app-header" }, [brandBlock, headerNav]),
       modeTabs,
       simLayout,
       compareHost,
@@ -557,6 +582,8 @@ export function mountApp(root: HTMLElement): void {
 
   function showMode(mode: AppMode): void {
     for (const m of modeDefs) m.btn.classList.toggle("active", m.id === mode);
+    headerStats.classList.toggle("active", mode === "stats");
+    headerManual.classList.toggle("active", mode === "manual");
     simLayout.classList.toggle("hidden", mode !== "sim");
     compareHost.classList.toggle("hidden", mode !== "compare");
     taktHost.classList.toggle("hidden", mode !== "takt");
@@ -588,6 +615,8 @@ export function mountApp(root: HTMLElement): void {
   for (const m of modeDefs) {
     m.btn.addEventListener("click", () => showMode(m.id));
   }
+  headerStats.addEventListener("click", () => showMode("stats"));
+  headerManual.addEventListener("click", () => showMode("manual"));
 
   let lastResult: ParadeResult | null = null;
   let lastCost: CostMetrics | null = null;
@@ -647,21 +676,12 @@ export function mountApp(root: HTMLElement): void {
     metrics2.classList.add("hidden");
     metrics2.replaceChildren();
 
-    if (activeTab === "cost") {
+    if (activeTab === "util_cost") {
       metrics.replaceChildren(
+        metric("Utilisasi ⌀", `${(100 * avgUtil).toFixed(1)}%`),
         metric("Biaya aktif", fmtNum(cm.totalActive)),
         metric("Biaya idle", fmtNum(cm.totalIdle)),
         metric("Total biaya", fmtNum(cm.totalCost)),
-        metric("Σ idle periode", String(cm.trades.reduce((s, t) => s + t.periodsIdle, 0))),
-      );
-      return;
-    }
-    if (activeTab === "util") {
-      metrics.replaceChildren(
-        metric("Utilisasi ⌀", `${(100 * avgUtil).toFixed(1)}%`),
-        metric("Idle kapasitas", String(r.totalIdleCapacity)),
-        metric("Throughput", r.systemThroughput.toFixed(3)),
-        metric("Peak WIP", String(peak)),
       );
       return;
     }
@@ -717,8 +737,7 @@ export function mountApp(root: HTMLElement): void {
   const titles: Record<TabId, string> = {
     lob: "Line of Balance",
     buffer: "Buffer / WIP",
-    util: "Utilisasi",
-    cost: "Biaya",
+    util_cost: "Utilisasi & Biaya",
     little: "Little's Law",
     kingman: "Kingman (VUT)",
     inventory: "Inventory / Fill Rate",
@@ -740,14 +759,6 @@ export function mountApp(root: HTMLElement): void {
     littleControls.classList.add("hidden");
     chartWrap2.classList.add("hidden");
     subTitle.classList.add("hidden");
-
-    if (activeTab === "cost") {
-      chartWrap.classList.add("hidden");
-      tableHost.classList.remove("hidden");
-      legend.replaceChildren();
-      renderCostTable(tableHost, lastCost);
-      return;
-    }
 
     chartWrap.classList.remove("hidden");
     tableHost.classList.remove("hidden");
@@ -771,10 +782,10 @@ export function mountApp(root: HTMLElement): void {
       return;
     }
 
-    if (activeTab === "util") {
+    if (activeTab === "util_cost") {
       drawUtilChart(canvas, lastResult);
       renderLegendItems(legend, buildUtilLegend(lastResult));
-      renderUtilTable(tableHost, lastResult);
+      renderUtilCostTables(tableHost, lastResult, lastCost);
       return;
     }
 
@@ -900,7 +911,7 @@ export function mountApp(root: HTMLElement): void {
       if (!lastResult) return;
       lastCost = computeCostMetrics(lastResult, rates());
       setMetrics(lastResult, lastCost);
-      if (activeTab === "cost") redraw();
+      if (activeTab === "util_cost") redraw();
     });
   }
   conwip.addEventListener("input", () => {
