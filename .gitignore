@@ -37,5 +37,9 @@ output/
 *.xlsx
 !requirements.txt
 
+# JS / Vite
+web/node_modules/
+web/dist/
+
 # Session / tooling noise
 .grok/

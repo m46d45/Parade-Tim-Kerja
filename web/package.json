@@ -1,0 +1,19 @@
+{
+  "name": "parade-tim-kerja-web",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Parade Tim Kerja — browser simulation (JS migration)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "vitest": "^2.1.4"
+  }
+}

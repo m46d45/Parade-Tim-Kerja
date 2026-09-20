@@ -1,0 +1,17 @@
+[
+  {
+    "name": "zf_novar_batch1_z10",
+    "file": "zf_novar_batch1_z10.json",
+    "duration": 14
+  },
+  {
+    "name": "zf_novar_batch4_z10",
+    "file": "zf_novar_batch4_z10.json",
+    "duration": 26
+  },
+  {
+    "name": "zf_novar_batch1_speed05_z6",
+    "file": "zf_novar_batch1_speed05_z6.json",
+    "duration": 20
+  }
+]

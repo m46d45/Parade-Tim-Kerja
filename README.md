@@ -12,11 +12,10 @@ https://YOUR-APP-NAME.streamlit.app
 
 ## Coba aplikasinya
 
-> Setelah deploy ke Streamlit Community Cloud, taruh link publik di sini:
->
 > **🌐 Simulasi (Streamlit):** https://parade-tim-kerja.streamlit.app/  
-> **🏠 Landing (Vercel):** hubungkan repo ini ke Vercel → menyajikan `index.html`  
-> **📖 Manual:** tab **Manual** di dalam app
+> **🏠 Landing (Vercel):** hubungkan repo ini ke Vercel → menyajikan `public/`  
+> **🧪 Web JS (migrasi, lokal):** `cd web && npm install && npm run dev` — lihat [docs/MIGRATION-JS.md](docs/MIGRATION-JS.md)  
+> **📖 Manual:** tab **Manual** di dalam app Streamlit
 
 Mahasiswa **tidak perlu menginstal Python** — cukup buka link di browser.
 
