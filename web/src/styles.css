@@ -171,16 +171,6 @@ header.app-header {
   overflow: hidden;
 }
 
-.layout > aside.panel label {
-  font-size: 0.75rem;
-}
-
-.layout > aside.panel input,
-.layout > aside.panel select {
-  font-size: 0.78rem;
-  padding: 0.4rem 0.55rem;
-}
-
 @media (max-width: 800px) {
   .layout {
     grid-template-columns: 1fr;
@@ -224,9 +214,9 @@ header.app-header {
 
 label {
   display: block;
-  font-size: 0.82rem;
+  font-size: 0.75rem;
   color: var(--muted);
-  margin: 0.65rem 0 0.25rem;
+  margin: 0.55rem 0 0.2rem;
 }
 
 input,
@@ -235,14 +225,38 @@ button {
   font: inherit;
 }
 
+/* Semua isian angka & pilihan default — font lebih ringkas */
 input,
 select {
   width: 100%;
+  font-size: 0.78rem;
+  line-height: 1.35;
   background: var(--bg2);
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 0.55rem 0.7rem;
+  padding: 0.4rem 0.55rem;
+}
+
+input[type="number"],
+input[type="text"],
+input[type="range"] {
+  font-size: 0.78rem;
+}
+
+select option {
+  font-size: 0.78rem;
+}
+
+.cmp-card select,
+.takt-grid input,
+.takt-grid select,
+.mode-host input,
+.mode-host select,
+.compare-host input,
+.compare-host select {
+  font-size: 0.78rem;
+  padding: 0.38rem 0.5rem;
 }
 
 button.run {
@@ -609,13 +623,14 @@ button.ghost:hover {
   align-items: center;
   gap: 0.4rem;
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   color: var(--accent);
   margin-bottom: 0.35rem;
 }
 
 .cmp-card label {
-  margin-top: 0.45rem;
+  margin-top: 0.4rem;
+  font-size: 0.72rem;
 }
 
 .compare-host {
