@@ -336,6 +336,12 @@ class ParadeOfTrades {
       idealLast = cum[n - 1] ?? [0];
     }
 
+    const invTime = this.history.reduce(
+      (acc, rec) => acc + rec.buffers.reduce((a, b) => a + b, 0),
+      0,
+    );
+    const tos = metrics.reduce((a, m) => a + m.timeOnSite, 0);
+
     return {
       config: this.config,
       duration,
@@ -346,6 +352,8 @@ class ParadeOfTrades {
       systemThroughput: throughput,
       idealDuration,
       idealLastTradeCumulative: idealLast,
+      totalInventoryTime: invTime | 0,
+      totalTimeOnSite: tos | 0,
     };
   }
 }

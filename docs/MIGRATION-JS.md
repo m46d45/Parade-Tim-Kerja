@@ -34,11 +34,22 @@ App JS memakai key yang sama (`src/stats.ts`).
 | Fase | Isi | Status |
 |------|-----|--------|
 | **0** | Dokumen, folder `web/`, tooling Vite/TS/Vitest | ✅ |
-| **1** | Port engine zone-flow + ideal baseline; golden parity vs Python | ✅ mulai (deterministik) |
+| **1** | Port engine zone-flow + ideal baseline; golden parity vs Python | ✅ |
 | **2** | UI shell: LoB detail, Buffer/WIP, seed + variability | ✅ |
-| **3** | Parity tab Simulasi + **Perbandingan** multi-skenario | 🚧 |
-| **4** | Takt / Buffer waktu–inventory / cutover Vercel | 🔜 |
+| **3** | Parity tab Simulasi + **Perbandingan** multi-skenario | ✅ |
+| **4** | Takt / Buffer waktu–inventory / Statistik / Manual | ✅ (cutover Vercel **ditunda**) |
 | **5** | PWA/offline (opsional) | 🔜 |
+
+Mode top-level JS (parity Streamlit `st.tabs`):
+
+1. **Simulasi** — LoB, Buffer WIP, Utilisasi, Biaya, Little, Kingman, Inventory/FR  
+2. **Perbandingan** — multi-skenario overlay  
+3. **Takt plan** — Little's Takt Law + wagon chart (bay≠zona)  
+4. **Buffer** — waktu–inventory Iris (jalankan + peta tren)  
+5. **Statistik** — Counter API `parade-tim-kerja.app`  
+6. **Manual** — `MANUAL.md` di browser  
+
+**Belum:** cutover Vercel (outputDirectory → `web/dist`), redirect Streamlit, PWA.
 
 ## Layout repo
 

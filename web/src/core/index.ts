@@ -5,6 +5,8 @@ export * from "./littles";
 export * from "./kingman";
 export * from "./operations";
 export * from "./inventory";
+export * from "./takt";
+export * from "./timeBuffer";
 export {
   runParade,
   cumulativeSeries,

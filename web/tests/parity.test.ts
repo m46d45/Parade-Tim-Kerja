@@ -1,14 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildTaktPlan,
   classroomConfig,
   computeCostMetrics,
+  computeTaktClassroom,
   cumulativeSeries,
   inventoryFillRateMetrics,
+  irisBufferSweep,
+  irisMobilizationGrid,
   kingmanCombined,
   kingmanMetrics,
   littlesLawMetrics,
   littlesOperationsCurve,
+  littlesTaktDuration,
   runParade,
+  runTimeInventoryBuffer,
 } from "../src/core";
 import batch1 from "../fixtures/zf_novar_batch1_z10.json";
 import batch4 from "../fixtures/zf_novar_batch4_z10.json";
@@ -259,5 +265,100 @@ describe("perbandingan multi-skenario", () => {
       classroomConfig({ totalUnits: 10, batchSize: 4, deterministic: true }),
     );
     expect(b1.duration).toBeLessThan(b4.duration);
+  });
+});
+
+describe("takt plan (Little's Takt Law)", () => {
+  it("TD = (TW+TZ−1)×TT classroom defaults TZ=10, te=1 → TD=14", () => {
+    expect(littlesTaktDuration(5, 10, 1)).toBe(14);
+    const r = computeTaktClassroom({
+      tz: 10,
+      capBayPerDay: 4,
+      tPerFloor: 15,
+    });
+    expect(r.baysPerZone).toBe(4);
+    expect(r.capZone).toBeCloseTo(1, 10);
+    expect(r.te).toBeCloseTo(1, 10);
+    expect(r.tdFloor).toBeCloseTo(14, 10);
+    expect(r.ok).toBe(true);
+    expect(r.plan.duration).toBe(14);
+    expect(r.plan.cells).toHaveLength(50);
+    expect(r.plan.cells[0]).toMatchObject({
+      tradeIndex: 0,
+      zone: 1,
+      periodStart: 0,
+      periodEnd: 1,
+    });
+  });
+
+  it("buildTaktPlan cells follow (i+z)×TT", () => {
+    const p = buildTaktPlan({ nTrades: 5, nZones: 10, rate: 1 });
+    expect(p.taktTime).toBe(1);
+    expect(p.cells[p.cells.length - 1]).toMatchObject({
+      tradeIndex: 4,
+      zone: 10,
+      periodStart: 13,
+      periodEnd: 14,
+    });
+  });
+});
+
+describe("buffer waktu–inventory (Iris)", () => {
+  it("no-var tight mobilization: TOS=50, duration≥14, INV>0", () => {
+    const r = runTimeInventoryBuffer({
+      die: "no_variability",
+      mobilization: "0-1-2-3-4",
+      totalUnits: 10,
+      seed: 0,
+    });
+    expect(r.config.zoneFlow).toBe(true);
+    expect(r.config.batchSize).toBe(1);
+    expect(r.totalTimeOnSite).toBe(50);
+    expect(r.totalInventoryTime).toBeGreaterThan(0);
+    expect(r.duration).toBeGreaterThanOrEqual(14);
+  });
+
+  it("looser start → longer duration and ≥ inventory", () => {
+    const tight = runTimeInventoryBuffer({
+      die: "no_variability",
+      mobilization: "0-1-2-3-4",
+      totalUnits: 10,
+      seed: 0,
+    });
+    const wide = runTimeInventoryBuffer({
+      die: "no_variability",
+      mobilization: "0-3-6-9-12",
+      totalUnits: 10,
+      seed: 0,
+    });
+    expect(wide.duration).toBeGreaterThan(tight.duration);
+    expect(wide.totalInventoryTime).toBeGreaterThanOrEqual(
+      tight.totalInventoryTime,
+    );
+  });
+
+  it("irisBufferSweep yields 9 anchor points, tos_floor=50", () => {
+    const grid = irisMobilizationGrid(3);
+    expect(Object.keys(grid)).toHaveLength(81);
+    const rows = irisBufferSweep({
+      totalUnits: 10,
+      seed: 1,
+      nReps: 3,
+    });
+    expect(rows).toHaveLength(9);
+    const labels = new Set(rows.map((r) => r.label));
+    expect(labels.has("medium 0-3-6-9-12")).toBe(true);
+    expect(labels.has("low 0-1-2-3-4")).toBe(true);
+    expect(rows.every((r) => r.tos_floor === 50)).toBe(true);
+  });
+
+  it("ParadeResult exposes totalInventoryTime / totalTimeOnSite", () => {
+    const r = runParade(
+      classroomConfig({ totalUnits: 10, batchSize: 1, deterministic: true }),
+    );
+    expect(r.totalTimeOnSite).toBe(
+      r.tradeMetrics.reduce((a, m) => a + m.timeOnSite, 0),
+    );
+    expect(r.totalInventoryTime).toBeGreaterThan(0);
   });
 });

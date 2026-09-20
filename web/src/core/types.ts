@@ -57,6 +57,10 @@ export interface ParadeResult {
   systemThroughput: number;
   idealDuration: number;
   idealLastTradeCumulative: number[];
+  /** Σ_t Σ_interfaces WIP(t) — Iris inventory time. */
+  totalInventoryTime: number;
+  /** Σ_trades time_on_site. */
+  totalTimeOnSite: number;
 }
 
 export const DEFAULT_TRADE_NAMES = [

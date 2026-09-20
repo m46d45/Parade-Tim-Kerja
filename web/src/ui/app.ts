@@ -34,6 +34,12 @@ import { buildLittlesLegend, drawLittlesChart } from "./littlesChart";
 import { drawOperationsChart, snapConwip } from "./operationsChart";
 import { buildUtilLegend, drawUtilChart } from "./utilChart";
 import { mountCompare } from "./compareApp";
+import { mountManual } from "./manualApp";
+import { bumpSessionRuns, mountStats } from "./statsApp";
+import { mountTakt } from "./taktApp";
+import { mountTimeBuffer } from "./timeBufferApp";
+
+type AppMode = "sim" | "compare" | "takt" | "buffer" | "stats" | "manual";
 
 type TabId =
   | "lob"
@@ -408,7 +414,7 @@ export function mountApp(root: HTMLElement): void {
   chartWrap2.append(canvas2);
 
   const note = el("p", { className: "note" }, [
-    "Parity Streamlit: LoB (detail+penuh), Buffer (garis+stacked), Utilisasi, Biaya, Little (CONWIP+kurva), Kingman, Inventory/FR. ",
+    "Parity Streamlit: Simulasi, Perbandingan, Takt plan, Buffer waktu–inventory, Statistik, Manual. ",
     el(
       "a",
       {
@@ -416,9 +422,9 @@ export function mountApp(root: HTMLElement): void {
         target: "_blank",
         rel: "noopener",
       },
-      ["Streamlit lengkap"],
+      ["Streamlit (jaring pengaman)"],
     ),
-    ".",
+    " · cutover Vercel belum.",
   ]);
   const statsLine = el("p", { className: "note", id: "stats" }, ["Memuat statistik…"]);
 
@@ -464,9 +470,20 @@ export function mountApp(root: HTMLElement): void {
 
   const simLayout = el("div", { className: "layout" }, [sidebar, main]);
   const compareHost = el("div", { className: "compare-host hidden" });
-  const modeSim = el("button", { className: "mode-tab active", type: "button" }, ["Simulasi"]);
-  const modeCmp = el("button", { className: "mode-tab", type: "button" }, ["Perbandingan"]);
-  const modeTabs = el("div", { className: "mode-tabs" }, [modeSim, modeCmp]);
+  const taktHost = el("div", { className: "mode-host hidden" });
+  const bufferHost = el("div", { className: "mode-host hidden" });
+  const statsHost = el("div", { className: "mode-host hidden" });
+  const manualHost = el("div", { className: "mode-host hidden" });
+
+  const modeDefs: { id: AppMode; label: string; btn: HTMLButtonElement }[] = [
+    { id: "sim", label: "Simulasi", btn: el("button", { className: "mode-tab active", type: "button" }, ["Simulasi"]) as HTMLButtonElement },
+    { id: "compare", label: "Perbandingan", btn: el("button", { className: "mode-tab", type: "button" }, ["Perbandingan"]) as HTMLButtonElement },
+    { id: "takt", label: "Takt plan", btn: el("button", { className: "mode-tab", type: "button" }, ["Takt plan"]) as HTMLButtonElement },
+    { id: "buffer", label: "Buffer", btn: el("button", { className: "mode-tab", type: "button" }, ["Buffer"]) as HTMLButtonElement },
+    { id: "stats", label: "Statistik", btn: el("button", { className: "mode-tab", type: "button" }, ["Statistik"]) as HTMLButtonElement },
+    { id: "manual", label: "Manual", btn: el("button", { className: "mode-tab", type: "button" }, ["Manual"]) as HTMLButtonElement },
+  ];
+  const modeTabs = el("div", { className: "mode-tabs" }, modeDefs.map((m) => m.btn));
 
   root.append(
     el("div", { className: "wrap" }, [
@@ -477,27 +494,61 @@ export function mountApp(root: HTMLElement): void {
       modeTabs,
       simLayout,
       compareHost,
+      taktHost,
+      bufferHost,
+      statsHost,
+      manualHost,
     ]),
   );
 
-  let compareMounted = false;
-  function showMode(mode: "sim" | "compare"): void {
-    modeSim.classList.toggle("active", mode === "sim");
-    modeCmp.classList.toggle("active", mode === "compare");
+  const sharedZonesSeed = {
+    getZones: () => Math.max(1, Number(zones.value) || 10),
+    getSeed: () => Number(seed.value) || 12345,
+    getTarif: () => Math.max(0, Number(tarif.value) || 100),
+    getDefaultBatch: () => Math.max(1, Number(batch.value) || 4),
+  };
+
+  const mounted: Record<Exclude<AppMode, "sim">, boolean> = {
+    compare: false,
+    takt: false,
+    buffer: false,
+    stats: false,
+    manual: false,
+  };
+
+  function showMode(mode: AppMode): void {
+    for (const m of modeDefs) m.btn.classList.toggle("active", m.id === mode);
     simLayout.classList.toggle("hidden", mode !== "sim");
     compareHost.classList.toggle("hidden", mode !== "compare");
-    if (mode === "compare" && !compareMounted) {
-      mountCompare(compareHost, {
-        getZones: () => Math.max(1, Number(zones.value) || 10),
-        getSeed: () => Number(seed.value) || 12345,
-        getTarif: () => Math.max(0, Number(tarif.value) || 100),
-        getDefaultBatch: () => Math.max(1, Number(batch.value) || 4),
-      });
-      compareMounted = true;
+    taktHost.classList.toggle("hidden", mode !== "takt");
+    bufferHost.classList.toggle("hidden", mode !== "buffer");
+    statsHost.classList.toggle("hidden", mode !== "stats");
+    manualHost.classList.toggle("hidden", mode !== "manual");
+
+    if (mode === "compare" && !mounted.compare) {
+      mountCompare(compareHost, sharedZonesSeed);
+      mounted.compare = true;
+    }
+    if (mode === "takt" && !mounted.takt) {
+      mountTakt(taktHost);
+      mounted.takt = true;
+    }
+    if (mode === "buffer" && !mounted.buffer) {
+      mountTimeBuffer(bufferHost, sharedZonesSeed);
+      mounted.buffer = true;
+    }
+    if (mode === "stats" && !mounted.stats) {
+      mountStats(statsHost);
+      mounted.stats = true;
+    }
+    if (mode === "manual" && !mounted.manual) {
+      mountManual(manualHost);
+      mounted.manual = true;
     }
   }
-  modeSim.addEventListener("click", () => showMode("sim"));
-  modeCmp.addEventListener("click", () => showMode("compare"));
+  for (const m of modeDefs) {
+    m.btn.addEventListener("click", () => showMode(m.id));
+  }
 
   let lastResult: ParadeResult | null = null;
   let lastCost: CostMetrics | null = null;
@@ -748,6 +799,7 @@ export function mountApp(root: HTMLElement): void {
     setMetrics(lastResult, lastCost);
     redraw();
     void recordSimRun();
+    bumpSessionRuns();
   }
 
   function showTip(
