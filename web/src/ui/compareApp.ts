@@ -11,7 +11,6 @@ import {
   runParade,
   shortVariabilityLabel,
   VARIABILITY_LEVELS,
-  type ParadeResult,
   type VariabilityLevel,
 } from "../core";
 import { recordCompareRun } from "../stats";
@@ -25,6 +24,11 @@ import {
   drawCompareUtil,
   type NamedResult,
 } from "./compareCharts";
+import {
+  compareSummaryRows,
+  downloadCanvasPng,
+  downloadCsv,
+} from "./download";
 
 type CmpTab =
   | "lob"
@@ -39,6 +43,12 @@ type ScenarioDraft = {
   batch: number;
   speed: number;
 };
+
+function fileStamp(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
+}
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -128,6 +138,17 @@ export function mountCompare(
   const summaryHost = el("div", { className: "table-host hidden" });
   const tabs = el("div", { className: "tabs hidden" });
   const legend = el("div", { className: "legend" });
+  const dlBar = el("div", { className: "download-bar hidden" });
+  const dlCsv = el("button", { type: "button", className: "ghost" }, [
+    "Unduh ringkasan CSV",
+  ]);
+  const dlPng = el("button", { type: "button", className: "ghost" }, [
+    "Unduh chart PNG",
+  ]);
+  const dlPng2 = el("button", { type: "button", className: "ghost hidden" }, [
+    "Unduh chart 2 PNG",
+  ]);
+  dlBar.append(dlCsv, dlPng, dlPng2);
   const chartWrap = el("div", { className: "chart-wrap hidden" });
   const canvas = el("canvas", { id: "cmp-chart" }) as HTMLCanvasElement;
   chartWrap.append(canvas);
@@ -177,6 +198,7 @@ export function mountCompare(
       summaryHost,
       tabs,
       legend,
+      dlBar,
       chartWrap,
       chartWrap2,
       detailHost,
@@ -344,6 +366,12 @@ export function mountCompare(
     summaryHost.append(table);
   }
 
+  function syncDownloadBar(): void {
+    const has = Boolean(results?.length);
+    dlBar.classList.toggle("hidden", !has);
+    dlPng2.classList.toggle("hidden", !has || chartWrap2.classList.contains("hidden"));
+  }
+
   function redrawCharts(): void {
     if (!results?.length) {
       tabs.classList.add("hidden");
@@ -351,6 +379,7 @@ export function mountCompare(
       chartWrap2.classList.add("hidden");
       detailHost.classList.add("hidden");
       legend.replaceChildren();
+      syncDownloadBar();
       return;
     }
     tabs.classList.remove("hidden");
@@ -425,6 +454,7 @@ export function mountCompare(
       chartWrap2.classList.remove("hidden");
       drawCompareBuffers(canvas2, results, { cssHeight: 240 });
     }
+    syncDownloadBar();
   }
 
   function runCompare(): void {
@@ -486,6 +516,31 @@ export function mountCompare(
     summaryHost.classList.add("hidden");
     summaryHost.replaceChildren();
     redrawCharts();
+  });
+  dlCsv.addEventListener("click", () => {
+    if (!results?.length) return;
+    downloadCsv(
+      `parade-banding-${fileStamp()}.csv`,
+      compareSummaryRows(
+        results,
+        rates(),
+        drafts.slice(0, results.length).map((d) => ({
+          variability: shortVariabilityLabel(d.variability),
+          batch: d.batch,
+        })),
+      ),
+    );
+  });
+  dlPng.addEventListener("click", () => {
+    if (!results?.length) return;
+    downloadCanvasPng(canvas, `parade-banding-${activeTab}-${fileStamp()}.png`);
+  });
+  dlPng2.addEventListener("click", () => {
+    if (!results?.length || chartWrap2.classList.contains("hidden")) return;
+    downloadCanvasPng(
+      canvas2,
+      `parade-banding-${activeTab}-2-${fileStamp()}.png`,
+    );
   });
   nInput.addEventListener("input", () => applyN(Number(nInput.value) || 2));
   runBtn.addEventListener("click", runCompare);

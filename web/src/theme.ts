@@ -65,7 +65,17 @@ export function tradeColor(i: number): string {
   return TRADE_COLORS[i % TRADE_COLORS.length];
 }
 
+/** Map long legacy names → short classroom labels. */
+const SHORT_ALIASES: Record<string, string> = {
+  "Pemasangan Bekisting": "Bekisting",
+  "Pemasangan Tulangan": "Tulangan",
+  "Pengecoran Beton": "Cor",
+  "Pembongkaran Bekisting": "Bongkar",
+  "Finishing Lantai": "Finishing",
+};
+
 export function shortTradeName(name: string, maxLen = 16): string {
-  if (name.length <= maxLen) return name;
-  return `${name.slice(0, maxLen - 1)}…`;
+  const mapped = SHORT_ALIASES[name] ?? name;
+  if (mapped.length <= maxLen) return mapped;
+  return `${mapped.slice(0, maxLen - 1)}…`;
 }

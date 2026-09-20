@@ -2,6 +2,7 @@ import {
   bufferSeries,
   classroomConfig,
   computeCostMetrics,
+  DEFAULT_TRADE_NAMES,
   evaluateAtWip,
   inventoryFillRateMetrics,
   kingmanCombined,
@@ -22,6 +23,11 @@ import {
   hitTestBuffer,
   type BufferHit,
 } from "./bufferChart";
+import {
+  downloadCanvasPng,
+  downloadText,
+  resultWorkbookCsv,
+} from "./download";
 import { buildInventoryLegend, drawInventoryChart } from "./inventoryChart";
 import { buildKingmanLegend, drawKingmanChart } from "./kingmanChart";
 import {
@@ -38,6 +44,12 @@ import { mountManual } from "./manualApp";
 import { bumpSessionRuns, mountStats } from "./statsApp";
 import { mountTakt } from "./taktApp";
 import { mountTimeBuffer } from "./timeBufferApp";
+
+function fileStamp(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
+}
 
 type TabId =
   | "lob"
@@ -391,7 +403,9 @@ export function mountApp(root: HTMLElement): void {
     tarifSliders.push(slider);
     tarifVals.push(val);
     const row = el("div", { className: "slider-row" }, [
-      el("span", { className: "slider-label" }, [`T${i + 1}`]),
+      el("span", { className: "slider-label" }, [
+        `T${i + 1} ${DEFAULT_TRADE_NAMES[i]}`,
+      ]),
       slider,
       val,
     ]);
@@ -478,10 +492,24 @@ export function mountApp(root: HTMLElement): void {
 
   const chips = el("div", { className: "chips" });
   for (let i = 0; i < 5; i++) {
-    const c = el("span", { className: i === 1 ? "chip t2" : "chip" }, [`T${i + 1}`]);
+    const c = el("span", { className: i === 1 ? "chip t2" : "chip" }, [
+      `T${i + 1} ${DEFAULT_TRADE_NAMES[i]}`,
+    ]);
     c.style.background = tradeColor(i);
     chips.append(c);
   }
+
+  const dlBar = el("div", { className: "download-bar" });
+  const dlCsv = el("button", { type: "button", className: "ghost" }, [
+    "Unduh CSV (Excel)",
+  ]);
+  const dlPng = el("button", { type: "button", className: "ghost" }, [
+    "Unduh chart PNG",
+  ]);
+  const dlPng2 = el("button", { type: "button", className: "ghost hidden" }, [
+    "Unduh chart 2 PNG",
+  ]);
+  dlBar.append(dlCsv, dlPng, dlPng2);
 
   const sidebar = el("aside", { className: "panel" }, [
     el("h2", {}, ["Kontrol"]),
@@ -508,6 +536,7 @@ export function mountApp(root: HTMLElement): void {
     metrics2,
     littleControls,
     legend,
+    dlBar,
     subTitle,
     chartWrap,
     chartWrap2,
@@ -751,6 +780,11 @@ export function mountApp(root: HTMLElement): void {
     redraw();
   }
 
+  function syncDownloadBar(): void {
+    const dual = !chartWrap2.classList.contains("hidden");
+    dlPng2.classList.toggle("hidden", !dual);
+  }
+
   function redraw(): void {
     if (!lastResult || !lastCost) return;
     tip.classList.add("hidden");
@@ -768,6 +802,7 @@ export function mountApp(root: HTMLElement): void {
       renderLegendItems(legend, buildLegendItems(lastResult));
       tableHost.classList.add("hidden");
       tableHost.replaceChildren();
+      syncDownloadBar();
       return;
     }
 
@@ -779,6 +814,7 @@ export function mountApp(root: HTMLElement): void {
       drawBufferStackedChart(canvas2, lastResult, { cssHeight: 260 });
       renderLegendItems(legend, buildBufferLegend(lastResult));
       renderBufferPeakTable(tableHost, lastResult);
+      syncDownloadBar();
       return;
     }
 
@@ -786,6 +822,7 @@ export function mountApp(root: HTMLElement): void {
       drawUtilChart(canvas, lastResult);
       renderLegendItems(legend, buildUtilLegend(lastResult));
       renderUtilCostTables(tableHost, lastResult, lastCost);
+      syncDownloadBar();
       return;
     }
 
@@ -811,6 +848,7 @@ export function mountApp(root: HTMLElement): void {
         );
       }
       tableHost.append(noteEl);
+      syncDownloadBar();
       return;
     }
 
@@ -818,6 +856,7 @@ export function mountApp(root: HTMLElement): void {
       drawKingmanChart(canvas, lastResult, { cssHeight: 340 });
       renderLegendItems(legend, buildKingmanLegend(lastResult));
       renderKingmanTable(tableHost, lastResult);
+      syncDownloadBar();
       return;
     }
 
@@ -825,6 +864,7 @@ export function mountApp(root: HTMLElement): void {
       drawInventoryChart(canvas, lastResult, { cssHeight: 340 });
       renderLegendItems(legend, buildInventoryLegend(lastResult));
       renderInventoryTable(tableHost, lastResult);
+      syncDownloadBar();
       return;
     }
   }
@@ -901,6 +941,21 @@ export function mountApp(root: HTMLElement): void {
   for (const [id, btn] of tabBtns) {
     btn.addEventListener("click", () => setTab(id));
   }
+  dlCsv.addEventListener("click", () => {
+    if (!lastResult) return;
+    downloadText(
+      `parade-simulasi-${fileStamp()}.csv`,
+      resultWorkbookCsv(lastResult, rates()),
+    );
+  });
+  dlPng.addEventListener("click", () => {
+    if (!lastResult) return;
+    downloadCanvasPng(canvas, `parade-${activeTab}-${fileStamp()}.png`);
+  });
+  dlPng2.addEventListener("click", () => {
+    if (!lastResult || chartWrap2.classList.contains("hidden")) return;
+    downloadCanvasPng(canvas2, `parade-${activeTab}-2-${fileStamp()}.png`);
+  });
   runBtn.addEventListener("click", run);
   zones.addEventListener("input", () => {
     zonesVal.textContent = String(zones.value);

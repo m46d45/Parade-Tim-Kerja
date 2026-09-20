@@ -64,9 +64,9 @@ export interface ParadeResult {
 }
 
 export const DEFAULT_TRADE_NAMES = [
-  "Pemasangan Bekisting",
-  "Pemasangan Tulangan",
-  "Pengecoran Beton",
-  "Pembongkaran Bekisting",
-  "Finishing Lantai",
+  "Bekisting",
+  "Tulangan",
+  "Cor",
+  "Bongkar",
+  "Finishing",
 ] as const;
