@@ -450,10 +450,12 @@ class ParadeResult:
     max_buffer: List[int]  # max WIP observed at each interface
     total_idle_capacity: int
     system_throughput: float  # total_units / duration
-    ideal_duration: float  # total_units / mean_capacity of bottleneck (same mean)
+    ideal_duration: float  # baseline no-var duration (same handoff/batch/zone_flow)
     total_standby_used: int = 0
     total_inventory_time: int = 0  # Σ_t Σ_interfaces WIP(t)
     total_time_on_site: int = 0  # Σ_trades time_on_site
+    # Last-trade cumulative of the no-var baseline (index 0 = period 0); for LoB Ideal line
+    ideal_last_trade_cumulative: List[int] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         """JSON-serialisable summary (history included)."""
@@ -482,6 +484,7 @@ class ParadeResult:
             "duration": self.duration,
             "system_throughput": self.system_throughput,
             "ideal_duration": self.ideal_duration,
+            "ideal_last_trade_cumulative": list(self.ideal_last_trade_cumulative),
             "total_idle_capacity": self.total_idle_capacity,
             "total_standby_used": self.total_standby_used,
             "total_inventory_time": self.total_inventory_time,
@@ -540,6 +543,70 @@ class ParadeResult:
             for i in range(n):
                 series[i].append(rec.production[i])
         return series
+
+
+# ---------------------------------------------------------------------------
+# Ideal baseline (option A: same rules, no variability)
+# ---------------------------------------------------------------------------
+
+def build_ideal_twin_config(config: ParadeConfig) -> ParadeConfig:
+    """
+    Deterministic twin of ``config``: same handoff, batch, zone_flow, takt,
+    and mobilization — each trade locked to its mean / base_speed.
+    """
+    trades: List[TradeConfig] = []
+    for t in config.trades:
+        if config.zone_flow:
+            speed = float(t.base_speed if t.base_speed is not None else t.mean)
+            speed = max(speed, 1e-9)
+            trades.append(
+                TradeConfig(
+                    name=t.name,
+                    low=speed,
+                    high=speed,
+                    p_high=0.5,
+                    base_speed=speed,
+                    deterministic=True,
+                )
+            )
+        else:
+            m = max(float(t.mean), 1e-9)
+            trades.append(
+                TradeConfig(
+                    name=t.name,
+                    low=m,
+                    high=m,
+                    p_high=0.5,
+                    base_speed=m,
+                    deterministic=True,
+                )
+            )
+    return ParadeConfig(
+        trades=trades,
+        total_units=config.total_units,
+        seed=0,
+        takt_rate=config.takt_rate,
+        standby_capacity=config.standby_capacity,
+        same_period_handoff=config.same_period_handoff,
+        staggered_mobilization=config.staggered_mobilization,
+        mobilization_offsets=config.mobilization_offsets,
+        zone_flow=config.zone_flow,
+        batch_size=config.batch_size,
+    )
+
+
+def _compute_ideal_baseline(config: ParadeConfig) -> Tuple[float, List[int]]:
+    """Return (ideal_duration, last-trade cumulative series incl. period 0)."""
+    twin_cfg = build_ideal_twin_config(config)
+    twin = ParadeOfTrades(twin_cfg)
+    baseline = twin.run(compute_ideal=False)
+    return float(baseline.duration), list(baseline.ideal_last_trade_cumulative)
+
+
+def run_ideal_baseline(config: ParadeConfig) -> ParadeResult:
+    """Public helper: full no-var baseline result under the same parade rules."""
+    twin_cfg = build_ideal_twin_config(config)
+    return ParadeOfTrades(twin_cfg).run(compute_ideal=False)
 
 
 # ---------------------------------------------------------------------------
@@ -982,7 +1049,7 @@ class ParadeOfTrades:
         self.history.append(rec)
         return rec
 
-    def run(self, max_periods: Optional[int] = None) -> ParadeResult:
+    def run(self, max_periods: Optional[int] = None, *, compute_ideal: bool = True) -> ParadeResult:
         """
         Run until completion (or ``max_periods`` safety limit).
 
@@ -992,6 +1059,10 @@ class ParadeOfTrades:
             Optional hard stop. Default is a generous bound based on
             total_units and minimum capacity so pathological configs
             cannot hang forever.
+        compute_ideal :
+            If True (default), attach no-var baseline duration and last-trade
+            LoB series (same handoff/batch/zone_flow). Set False when *this*
+            run is already the ideal twin (avoids recursion).
         """
         if max_periods is None:
             min_cap = min(float(t.low) for t in self.config.trades)
@@ -1023,14 +1094,14 @@ class ParadeOfTrades:
                 )
             self.step()
 
-        self._result = self._build_result()
+        self._result = self._build_result(compute_ideal=compute_ideal)
         return self._result
 
     def get_result(self) -> ParadeResult:
         """Return result for the current state (complete or partial)."""
-        return self._build_result()
+        return self._build_result(compute_ideal=True)
 
-    def _build_result(self) -> ParadeResult:
+    def _build_result(self, *, compute_ideal: bool = True) -> ParadeResult:
         total = self.config.total_units
         metrics: List[TradeMetrics] = []
         for i, t in enumerate(self.config.trades):
@@ -1065,41 +1136,21 @@ class ParadeOfTrades:
                 )
             )
 
-        # Ideal: with takt, use effective mean ≈ max(mean_die, takt) when standby
-        # covers shortfall to takt; else classic bottleneck mean.
-        if self.config.takt_enabled and self.config.standby_capacity > 0:
-            # Approximate expected effective capacity under 50/50 die
-            eff_means = []
-            for t in self.config.trades:
-                # E[effective] = 0.5 * (max(low+standby_cover, low) + high)
-                lo_eff = t.low + min(
-                    self.config.standby_capacity,
-                    max(0, (self.config.takt_rate or 0) - t.low),
-                )
-                hi_eff = t.high + min(
-                    self.config.standby_capacity,
-                    max(0, (self.config.takt_rate or 0) - t.high),
-                )
-                eff_means.append(0.5 * (lo_eff + hi_eff))
-            bottleneck_mean = min(eff_means) if eff_means else DEFAULT_MEAN_CAPACITY
-        else:
-            means = [t.mean for t in self.config.trades]
-            bottleneck_mean = min(means) if means else DEFAULT_MEAN_CAPACITY
-
-        ideal = total / bottleneck_mean if bottleneck_mean > 0 else float("inf")
-        # Pipeline fill: last trade cannot finish until first units have passed
-        # every upstream handoff lag (next-period) and/or staggered starts.
-        pipeline_lags = 0
-        if not self.config.same_period_handoff:
-            pipeline_lags = max(pipeline_lags, self.config.n_trades - 1)
-        if self.config.staggered_mobilization:
-            pipeline_lags = max(pipeline_lags, self.config.n_trades - 1)
-        ideal += pipeline_lags
-
         duration = self.period
         throughput = total / duration if duration > 0 else 0.0
         inv_time = sum(sum(rec.buffers) for rec in self.history)
         tos = sum(m.time_on_site for m in metrics)
+
+        if compute_ideal:
+            ideal_duration, ideal_last = _compute_ideal_baseline(self.config)
+        else:
+            # This run *is* the baseline twin
+            ideal_duration = float(duration)
+            cum = [[0] for _ in range(self.config.n_trades)]
+            for rec in self.history:
+                for i in range(self.config.n_trades):
+                    cum[i].append(int(rec.cumulative[i]))
+            ideal_last = list(cum[-1]) if cum else [0]
 
         return ParadeResult(
             config=self.config,
@@ -1109,10 +1160,11 @@ class ParadeOfTrades:
             max_buffer=list(self.max_buffer),
             total_idle_capacity=sum(self._total_idle),
             system_throughput=throughput,
-            ideal_duration=ideal,
+            ideal_duration=float(ideal_duration),
             total_standby_used=sum(self._total_standby),
             total_inventory_time=int(inv_time),
             total_time_on_site=int(tos),
+            ideal_last_trade_cumulative=list(ideal_last),
         )
 
     # -- reporting ----------------------------------------------------------
@@ -1133,7 +1185,7 @@ class ParadeOfTrades:
         print(f"  Mode             : {cfg.mode_label()}")
         print(f"  Duration         : {r.duration} periods")
         print(f"  Ideal duration   : {r.ideal_duration:.1f} periods "
-              f"(total / min mean capacity)")
+              f"(tanpa var; handoff/batch sama)")
         print(f"  Delay vs ideal   : {r.duration - r.ideal_duration:+.1f} periods")
         print(f"  Throughput       : {r.system_throughput:.3f} units/period")
         print(f"  Total idle cap.  : {r.total_idle_capacity} unit-periods")

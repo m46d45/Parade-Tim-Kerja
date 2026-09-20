@@ -218,20 +218,38 @@ def plot_line_of_balance(
         )
 
     if show_ideal:
-        mean_cap = min(t.mean for t in result.config.trades)
-        if mean_cap > 0:
-            # Ideal guide: X may be fractional; endpoints on integer zona
+        ideal_ys = list(getattr(result, "ideal_last_trade_cumulative", None) or [])
+        if len(ideal_ys) >= 2:
+            ideal_xs = list(range(len(ideal_ys)))
+            batch = getattr(result.config, "batch_size", 1)
             ax.plot(
-                [0, total / mean_cap], [0, total],
-                color="0.45", linestyle=":", linewidth=1.6,
-                label=f"Ideal (bottleneck {mean_cap:g} zona/periode)",
+                ideal_xs,
+                ideal_ys,
+                color="0.35",
+                linestyle=":",
+                linewidth=1.8,
+                label=f"Ideal (tanpa var, batch={batch}, T terakhir)",
+                zorder=2,
             )
+        else:
+            # Fallback if baseline missing (partial run)
+            mean_cap = min(t.mean for t in result.config.trades)
+            if mean_cap > 0:
+                ax.plot(
+                    [0, total / mean_cap], [0, total],
+                    color="0.45", linestyle=":", linewidth=1.6,
+                    label=f"Ideal kapasitas ({mean_cap:g}/periode)",
+                )
 
     ax.axhline(total, color="0.7", linestyle="--", linewidth=1.0, alpha=0.8)
-    ax.set_xlim(0, max(periods) if periods else 1)
+    x_end = max(periods) if periods else 1
+    ideal_ys = list(getattr(result, "ideal_last_trade_cumulative", None) or [])
+    if show_ideal and ideal_ys:
+        x_end = max(x_end, len(ideal_ys) - 1)
+    ax.set_xlim(0, x_end)
     ax.set_ylim(0, total * 1.06)
     ax.set_title(title or "Line of Balance — zona diskrit vs periode")
-    _style_lob_axes(ax, n_periods=n_per, total_zones=total)
+    _style_lob_axes(ax, n_periods=x_end + 1, total_zones=total)
 
     # Speed legend callout
     notes = []
@@ -449,8 +467,8 @@ def plot_run(
         0.01,
         -0.01,
         (
-            f"Ideal duration: {result.ideal_duration:.1f}  ·  "
-            f"Delay: {result.duration - result.ideal_duration:+.1f}  ·  "
+            f"Ideal (tanpa var): {result.ideal_duration:.1f}  ·  "
+            f"Delay vs ideal: {result.duration - result.ideal_duration:+.1f}  ·  "
             f"Total idle: {result.total_idle_capacity}  ·  "
             f"Peak simultaneous WIP: {peak_wip}  ·  "
             f"Max buffer per interface: {result.max_buffer}"
@@ -487,16 +505,28 @@ def plot_comparison_lob(
 
     first = next(iter(results.values()))
     total = max(r.config.total_units for r in results.values())
-    mean_cap = min(float(t.mean) for t in first.config.trades)
-    if mean_cap > 0:
+    ideal_ys = list(getattr(first, "ideal_last_trade_cumulative", None) or [])
+    if len(ideal_ys) >= 2:
+        batch = getattr(first.config, "batch_size", 1)
         ax.plot(
-            [0, total / mean_cap],
-            [0, total],
-            color="0.5",
+            list(range(len(ideal_ys))),
+            ideal_ys,
+            color="0.45",
             linestyle=":",
-            linewidth=1.5,
-            label=f"Ideal ({mean_cap:g}/periode) dari (0,0)",
+            linewidth=1.6,
+            label=f"Ideal (tanpa var, batch={batch})",
         )
+    else:
+        mean_cap = min(float(t.mean) for t in first.config.trades)
+        if mean_cap > 0:
+            ax.plot(
+                [0, total / mean_cap],
+                [0, total],
+                color="0.5",
+                linestyle=":",
+                linewidth=1.5,
+                label=f"Ideal kapasitas ({mean_cap:g}/periode)",
+            )
 
     # Distinct cycle if names are Skenario N (not in PRESET_COLORS)
     fallback_colors = ["#2563eb", "#ea580c", "#16a34a", "#dc2626", "#7c3aed", "#0891b2"]
