@@ -209,7 +209,7 @@ Laboratorium **time–inventory buffer** pada **parade zona–tim** (bukan dadu)
 
 ## 9. Line of Balance (LOB)
 
-X = periode, Y = zona kumulatif; mulai (0,0); kemiringan ≈ laju.
+X = **periode (0 = awal)**, Y = **zona kumulatif (dari 0)**; mulai (0,0); kemiringan ≈ laju. Tick minor tiap periode.
 
 ---
 

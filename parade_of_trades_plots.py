@@ -98,6 +98,47 @@ def _apply_axes_style(ax: Axes) -> None:
     ax.yaxis.set_major_locator(mticker.MaxNLocator(integer=True))
 
 
+def _style_lob_axes(
+    ax: Axes,
+    *,
+    n_periods: Optional[int] = None,
+    total_zones: Optional[int] = None,
+    xlabel: str = "Periode (0 = awal)",
+    ylabel: str = "Zona kumulatif (dari 0)",
+) -> None:
+    """
+    Label and tick LoB axes to match the 0-based engine series.
+
+    Series index 0 is period 0 (all zeros). Major ticks stay readable;
+    minor ticks mark every period so slopes are easier to read.
+    """
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+
+    if n_periods is not None and n_periods <= 50:
+        major_step = 1 if n_periods <= 24 else 2
+        ax.xaxis.set_major_locator(mticker.MultipleLocator(major_step))
+    else:
+        ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True, nbins=16))
+    # Always mark every period on the minor grid (matches engine discrete steps).
+    ax.xaxis.set_minor_locator(mticker.MultipleLocator(1))
+
+    if total_zones is not None and total_zones <= 40:
+        ax.yaxis.set_major_locator(mticker.MultipleLocator(1))
+        if total_zones <= 24:
+            ax.yaxis.set_minor_locator(mticker.MultipleLocator(1))
+        else:
+            ax.yaxis.set_minor_locator(mticker.AutoMinorLocator())
+    else:
+        ax.yaxis.set_major_locator(mticker.MaxNLocator(integer=True, nbins=12))
+        ax.yaxis.set_minor_locator(mticker.AutoMinorLocator())
+
+    ax.grid(True, which="major", linestyle="--", alpha=0.5)
+    ax.grid(True, which="minor", linestyle=":", alpha=0.28)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+
 def _ensure_parent(path: Union[str, Path]) -> Path:
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -182,19 +223,8 @@ def plot_line_of_balance(
     ax.axhline(total, color="0.7", linestyle="--", linewidth=1.0, alpha=0.8)
     ax.set_xlim(0, max(periods) if periods else 1)
     ax.set_ylim(0, total * 1.06)
-    ax.set_xlabel("Periode (1, 2, 3, …)")
-    ax.set_ylabel("Zona kumulatif (1, 2, 3, …)")
     ax.set_title(title or "Line of Balance — kemiringan = kecepatan")
-
-    if n_per <= 50:
-        ax.xaxis.set_major_locator(mticker.MultipleLocator(1 if n_per <= 24 else 2))
-    else:
-        ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True, nbins=16))
-    if total <= 40:
-        ax.yaxis.set_major_locator(mticker.MultipleLocator(1))
-    else:
-        ax.yaxis.set_major_locator(mticker.MaxNLocator(integer=True, nbins=12))
-    ax.grid(True, which="major", linestyle="--", alpha=0.5)
+    _style_lob_axes(ax, n_periods=n_per, total_zones=total)
 
     # Speed legend callout
     notes = []
@@ -212,8 +242,6 @@ def plot_line_of_balance(
         )
 
     ax.legend(loc="lower right", fontsize=7.5, framealpha=0.92)
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
     return ax
 
 
@@ -247,15 +275,14 @@ def plot_line_of_balance_detail(
     ax.set_xlim(0, end)
     ymax = max(max(cum_full[i][end] for i in range(n)), 1)
     ax.set_ylim(0, min(total, ymax + 2) * 1.1)
-    ax.set_xlabel("Periode")
-    ax.set_ylabel("Zona (kumulatif)")
     ax.set_title(title or f"Detail LOB — periode 0–{end} (garis lurus = kecepatan konstan)")
-    ax.xaxis.set_major_locator(mticker.MultipleLocator(1))
-    ax.yaxis.set_major_locator(mticker.MultipleLocator(1))
-    ax.grid(True, which="major", linestyle="--", alpha=0.55)
+    _style_lob_axes(
+        ax,
+        n_periods=len(periods),
+        total_zones=min(total, int(ymax) + 2),
+        ylabel="Zona kumulatif (dari 0)",
+    )
     ax.legend(loc="upper left", fontsize=8, framealpha=0.92)
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
     return ax
 
 
@@ -517,11 +544,14 @@ def plot_comparison_lob(
     ax.axhline(total, color="0.7", linestyle="--", linewidth=1.0, label=None)
     ax.set_xlim(0, max(max_period, 1) * 1.02)
     ax.set_ylim(0, total * 1.08)
-    ax.set_xlabel("Periode (mulai 0)")
-    ax.set_ylabel("Zona kumulatif tim terakhir (mulai 0)")
     ax.set_title(title or "Line of Balance — perbandingan skenario (dari 0,0)")
     ax.legend(loc="lower right", fontsize=8, framealpha=0.92)
-    _apply_axes_style(ax)
+    _style_lob_axes(
+        ax,
+        n_periods=max_period + 1,
+        total_zones=total,
+        ylabel="Zona kumulatif tim terakhir (dari 0)",
+    )
     return ax
 
 
@@ -1482,8 +1512,6 @@ def plot_takt_plan(
             ys = [0] + [rec.cumulative[i] for rec in result.history]
             ax.plot(xs, ys, color=colors[i], linewidth=2.2, label=f"Aktual T{i + 1}")
 
-    ax.set_xlabel("Periode")
-    ax.set_ylabel("Zona kumulatif")
     ax.set_xlim(left=0)
     ax.set_ylim(bottom=0, top=plan.n_zones * 1.05)
     ax.set_title(
@@ -1494,7 +1522,11 @@ def plot_takt_plan(
         )
     )
     ax.legend(loc="upper left", fontsize=7.5, framealpha=0.92, ncol=2)
-    _apply_axes_style(ax)
+    _style_lob_axes(
+        ax,
+        n_periods=int(plan.duration) + 1,
+        total_zones=int(plan.n_zones),
+    )
     return ax
 
 
@@ -1629,11 +1661,15 @@ def plot_tommelein_scenario_lobs(
         ax.axhline(total, color="0.75", linestyle=":", linewidth=0.9)
         ax.set_xlim(left=0)
         ax.set_ylim(0, total * 1.08)
-        ax.set_xlabel("Periode")
         ax.set_title(name, fontsize=10)
         ax.legend(loc="lower right", fontsize=7, framealpha=0.9, ncol=2)
-        _apply_axes_style(ax)
-    axes[0].set_ylabel("Zona kumulatif")
+        _style_lob_axes(
+            ax,
+            n_periods=len(cum[0]) if cum else None,
+            total_zones=total,
+        )
+        if ax is not axes[0]:
+            ax.set_ylabel("")
     fig.suptitle(title or "Tommelein (2020) — LOB per skenario (semua tim)", fontsize=11, y=1.02)
     fig.tight_layout()
     return fig
@@ -1663,11 +1699,14 @@ def plot_tommelein_last_trade_lob(
     ax.axhline(total, color="0.7", linestyle="--", linewidth=1.0)
     ax.set_xlim(0, max_p * 1.05)
     ax.set_ylim(0, total * 1.08)
-    ax.set_xlabel("Periode (mulai 0)")
-    ax.set_ylabel("Zona kumulatif tim terakhir")
     ax.set_title(title or "Tommelein (2020) — LOB tim terakhir")
     ax.legend(loc="lower right", fontsize=8, framealpha=0.92)
-    _apply_axes_style(ax)
+    _style_lob_axes(
+        ax,
+        n_periods=max_p + 1,
+        total_zones=total,
+        ylabel="Zona kumulatif tim terakhir (dari 0)",
+    )
     return ax
 
 
@@ -1703,11 +1742,13 @@ def plot_single_scenario_lob(
     ax.axhline(total, color="0.75", linestyle=":", linewidth=0.9)
     ax.set_xlim(left=0)
     ax.set_ylim(0, total * 1.08)
-    ax.set_xlabel("Periode")
-    ax.set_ylabel("Zona kumulatif")
     ax.set_title(title or "Line of Balance")
     ax.legend(loc="lower right", fontsize=8, framealpha=0.92, ncol=2)
-    _apply_axes_style(ax)
+    _style_lob_axes(
+        ax,
+        n_periods=len(cum[0]) if cum else None,
+        total_zones=total,
+    )
     return ax
 
 
