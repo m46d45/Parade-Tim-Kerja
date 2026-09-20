@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { classroomConfig, cumulativeSeries, runParade } from "../src/core";
+import {
+  classroomConfig,
+  computeCostMetrics,
+  cumulativeSeries,
+  runParade,
+} from "../src/core";
 import batch1 from "../fixtures/zf_novar_batch1_z10.json";
 import batch4 from "../fixtures/zf_novar_batch4_z10.json";
 import speed05 from "../fixtures/zf_novar_batch1_speed05_z6.json";
@@ -59,5 +64,41 @@ describe("zone-flow parity vs Python golden fixtures", () => {
     expect(r.duration).toBeGreaterThanOrEqual(r.idealDuration);
     expect(r.idealDuration).toBe(26);
     expect(cumulativeSeries(r)[0][0]).toBe(0);
+  });
+});
+
+describe("cost metrics (parity vs Python classroom batch=4)", () => {
+  it("no-var: util 100%, total biaya 5000 @ tarif 100", () => {
+    const r = runParade(
+      classroomConfig({
+        totalUnits: 10,
+        batchSize: 4,
+        baseSpeed: 1,
+        seed: 12345,
+        deterministic: true,
+      }),
+    );
+    for (const m of r.tradeMetrics) {
+      expect(m.utilization).toBe(1);
+      expect(m.totalIdle).toBe(0);
+      expect(m.totalProduction).toBe(10);
+    }
+    const cm = computeCostMetrics(r, [100, 100, 100, 100, 100]);
+    expect(cm.totalActive).toBe(5000);
+    expect(cm.totalIdle).toBe(0);
+    expect(cm.totalCost).toBe(5000);
+    for (const t of cm.trades) {
+      expect(t.periodsActive).toBe(10);
+      expect(t.periodsIdle).toBe(0);
+      expect(t.costTotal).toBe(1000);
+    }
+  });
+
+  it("scales with tarif", () => {
+    const r = runParade(
+      classroomConfig({ totalUnits: 10, batchSize: 4, deterministic: true }),
+    );
+    const cm = computeCostMetrics(r, [200, 200, 200, 200, 200]);
+    expect(cm.totalCost).toBe(10000);
   });
 });

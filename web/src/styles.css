@@ -303,3 +303,51 @@ canvas {
   border-color: var(--accent);
   color: #fff;
 }
+
+.hidden {
+  display: none !important;
+}
+
+.table-host {
+  margin-top: 0.85rem;
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.data-table th,
+.data-table td {
+  text-align: left;
+  padding: 0.45rem 0.55rem;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.data-table th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.data-table td:first-child {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.row-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.table-note {
+  margin-top: 0.55rem;
+}

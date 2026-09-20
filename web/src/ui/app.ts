@@ -1,12 +1,14 @@
 import {
   bufferSeries,
   classroomConfig,
+  computeCostMetrics,
   runParade,
+  type CostMetrics,
   type ParadeResult,
   type VariabilityLevel,
 } from "../core";
 import { readDashboard, recordAppSession, recordSimRun } from "../stats";
-import { tradeColor } from "../theme";
+import { shortTradeName, tradeColor } from "../theme";
 import {
   buildBufferLegend,
   drawBufferChart,
@@ -19,6 +21,9 @@ import {
   hitTestLob,
   type LobHit,
 } from "./lobChart";
+import { buildUtilLegend, drawUtilChart } from "./utilChart";
+
+type TabId = "lob" | "buffer" | "util" | "cost";
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -59,6 +64,86 @@ function renderLegendItems(
   }
 }
 
+function fmtNum(n: number): string {
+  return Math.round(n).toLocaleString("id-ID");
+}
+
+function renderCostTable(host: HTMLElement, cm: CostMetrics): void {
+  host.replaceChildren();
+  const table = el("table", { className: "data-table" });
+  const thead = el("thead");
+  thead.append(
+    el("tr", {}, [
+      el("th", {}, ["Tim"]),
+      el("th", {}, ["Tarif"]),
+      el("th", {}, ["Aktif"]),
+      el("th", {}, ["Idle"]),
+      el("th", {}, ["Biaya aktif"]),
+      el("th", {}, ["Biaya idle"]),
+      el("th", {}, ["Total"]),
+    ]),
+  );
+  const tbody = el("tbody");
+  for (const t of cm.trades) {
+    tbody.append(
+      el("tr", {}, [
+        el("td", {}, [
+          el("span", { className: "row-swatch" }, []),
+          `T${t.tradeIndex + 1}: ${shortTradeName(t.name, 16)}`,
+        ]),
+        el("td", {}, [fmtNum(t.costPerPeriod)]),
+        el("td", {}, [String(t.periodsActive)]),
+        el("td", {}, [String(t.periodsIdle)]),
+        el("td", {}, [fmtNum(t.costActive)]),
+        el("td", {}, [fmtNum(t.costIdle)]),
+        el("td", {}, [fmtNum(t.costTotal)]),
+      ]),
+    );
+    const sw = tbody.lastElementChild?.querySelector(".row-swatch") as HTMLElement | null;
+    if (sw) sw.style.background = tradeColor(t.tradeIndex);
+  }
+  table.append(thead, tbody);
+  host.append(table);
+  host.append(
+    el("p", { className: "note table-note" }, [
+      "Aktif = periode berproduksi setelah mulai · Idle = menunggu zona · Biaya = periode × tarif.",
+    ]),
+  );
+}
+
+function renderUtilTable(host: HTMLElement, result: ParadeResult): void {
+  host.replaceChildren();
+  const table = el("table", { className: "data-table" });
+  const thead = el("thead");
+  thead.append(
+    el("tr", {}, [
+      el("th", {}, ["Tim"]),
+      el("th", {}, ["Produksi"]),
+      el("th", {}, ["Idle"]),
+      el("th", {}, ["Utilisasi"]),
+    ]),
+  );
+  const tbody = el("tbody");
+  for (let i = 0; i < result.tradeMetrics.length; i++) {
+    const m = result.tradeMetrics[i];
+    tbody.append(
+      el("tr", {}, [
+        el("td", {}, [
+          el("span", { className: "row-swatch" }, []),
+          `T${i + 1}: ${shortTradeName(m.name, 18)}`,
+        ]),
+        el("td", {}, [String(m.totalProduction)]),
+        el("td", {}, [String(m.totalIdle)]),
+        el("td", {}, [`${(100 * m.utilization).toFixed(1)}%`]),
+      ]),
+    );
+    const sw = tbody.lastElementChild?.querySelector(".row-swatch") as HTMLElement | null;
+    if (sw) sw.style.background = tradeColor(i);
+  }
+  table.append(thead, tbody);
+  host.append(table);
+}
+
 export function mountApp(root: HTMLElement): void {
   root.replaceChildren();
 
@@ -92,6 +177,13 @@ export function mountApp(root: HTMLElement): void {
     value: "12345",
     step: "1",
   });
+  const tarif = el("input", {
+    type: "number",
+    id: "tarif",
+    value: "100",
+    min: "0",
+    step: "10",
+  });
   const runBtn = el("button", { className: "run", type: "button" }, [
     "Jalankan simulasi",
   ]);
@@ -99,14 +191,29 @@ export function mountApp(root: HTMLElement): void {
   const metrics = el("div", { className: "metrics" });
   const legend = el("div", { className: "legend" });
   const title = el("h2", { id: "chart-title" }, ["Line of Balance"]);
+  const tableHost = el("div", { className: "table-host hidden" });
 
-  const tabLob = el("button", { className: "tab active", type: "button", "data-tab": "lob" }, [
-    "Line of Balance",
-  ]);
-  const tabBuf = el("button", { className: "tab", type: "button", "data-tab": "buffer" }, [
-    "Buffer / WIP",
-  ]);
-  const tabs = el("div", { className: "tabs" }, [tabLob, tabBuf]);
+  const tabDefs: { id: TabId; label: string }[] = [
+    { id: "lob", label: "Line of Balance" },
+    { id: "buffer", label: "Buffer / WIP" },
+    { id: "util", label: "Utilisasi" },
+    { id: "cost", label: "Biaya" },
+  ];
+  const tabBtns = new Map<TabId, HTMLButtonElement>();
+  const tabs = el("div", { className: "tabs" });
+  for (const t of tabDefs) {
+    const btn = el(
+      "button",
+      {
+        className: t.id === "lob" ? "tab active" : "tab",
+        type: "button",
+        "data-tab": t.id,
+      },
+      [t.label],
+    ) as HTMLButtonElement;
+    tabBtns.set(t.id, btn);
+    tabs.append(btn);
+  }
 
   const chartWrap = el("div", { className: "chart-wrap" });
   const canvas = el("canvas", { id: "chart" }) as HTMLCanvasElement;
@@ -114,7 +221,7 @@ export function mountApp(root: HTMLElement): void {
   chartWrap.append(canvas, tip);
 
   const note = el("p", { className: "note" }, [
-    "Palet Streamlit. Tab Buffer menampilkan WIP antar-tim. Variability memakai seed (ulang = hasil sama di browser). ",
+    "Palet Streamlit. Utilisasi & biaya mengikuti rumus Streamlit (aktif/idle × tarif). ",
     el(
       "a",
       {
@@ -150,6 +257,8 @@ export function mountApp(root: HTMLElement): void {
     variability,
     el("label", { for: "seed" }, ["Seed"]),
     seed,
+    el("label", { for: "tarif" }, ["Tarif / periode (semua tim)"]),
+    tarif,
     runBtn,
     statsLine,
   ]);
@@ -160,6 +269,7 @@ export function mountApp(root: HTMLElement): void {
     metrics,
     legend,
     chartWrap,
+    tableHost,
     note,
   ]);
 
@@ -174,11 +284,17 @@ export function mountApp(root: HTMLElement): void {
   );
 
   let lastResult: ParadeResult | null = null;
-  let activeTab: "lob" | "buffer" = "lob";
+  let lastCost: CostMetrics | null = null;
+  let activeTab: TabId = "lob";
   let lobHits: LobHit[] = [];
   let bufHits: BufferHit[] = [];
 
-  function setMetrics(r: ParadeResult): void {
+  function rates(): number[] {
+    const rate = Math.max(0, Number(tarif.value) || 100);
+    return Array(5).fill(rate);
+  }
+
+  function setMetrics(r: ParadeResult, cm: CostMetrics): void {
     const buf = bufferSeries(r);
     const peak = buf.length
       ? Math.max(
@@ -187,6 +303,28 @@ export function mountApp(root: HTMLElement): void {
           ),
         )
       : 0;
+    const avgUtil =
+      r.tradeMetrics.reduce((s, m) => s + m.utilization, 0) /
+      Math.max(r.tradeMetrics.length, 1);
+
+    if (activeTab === "cost") {
+      metrics.replaceChildren(
+        metric("Biaya aktif", fmtNum(cm.totalActive)),
+        metric("Biaya idle", fmtNum(cm.totalIdle)),
+        metric("Total biaya", fmtNum(cm.totalCost)),
+        metric("Σ idle periode", String(cm.trades.reduce((s, t) => s + t.periodsIdle, 0))),
+      );
+      return;
+    }
+    if (activeTab === "util") {
+      metrics.replaceChildren(
+        metric("Utilisasi ⌀", `${(100 * avgUtil).toFixed(1)}%`),
+        metric("Idle kapasitas", String(r.totalIdleCapacity)),
+        metric("Throughput", r.systemThroughput.toFixed(3)),
+        metric("Peak WIP", String(peak)),
+      );
+      return;
+    }
     metrics.replaceChildren(
       metric("Durasi", String(r.duration)),
       metric("Ideal (tanpa var)", String(r.idealDuration)),
@@ -195,24 +333,53 @@ export function mountApp(root: HTMLElement): void {
     );
   }
 
-  function setTab(tab: "lob" | "buffer"): void {
+  const titles: Record<TabId, string> = {
+    lob: "Line of Balance",
+    buffer: "Buffer / WIP",
+    util: "Utilisasi",
+    cost: "Biaya",
+  };
+
+  function setTab(tab: TabId): void {
     activeTab = tab;
-    tabLob.classList.toggle("active", tab === "lob");
-    tabBuf.classList.toggle("active", tab === "buffer");
-    title.textContent = tab === "lob" ? "Line of Balance" : "Buffer / WIP";
+    for (const [id, btn] of tabBtns) {
+      btn.classList.toggle("active", id === tab);
+    }
+    title.textContent = titles[tab];
+    if (lastResult && lastCost) setMetrics(lastResult, lastCost);
     redraw();
   }
 
   function redraw(): void {
-    if (!lastResult) return;
+    if (!lastResult || !lastCost) return;
     tip.classList.add("hidden");
+    lobHits = [];
+    bufHits = [];
+    const showCanvas = activeTab === "lob" || activeTab === "buffer" || activeTab === "util";
+    chartWrap.classList.toggle("hidden", !showCanvas && activeTab === "cost");
+    // Cost still shows a small stacked summary via canvas? Use table only for cost.
+    if (activeTab === "cost") {
+      chartWrap.classList.add("hidden");
+      tableHost.classList.remove("hidden");
+      legend.replaceChildren();
+      renderCostTable(tableHost, lastCost);
+      return;
+    }
+    chartWrap.classList.remove("hidden");
+    if (activeTab === "util") {
+      tableHost.classList.remove("hidden");
+      drawUtilChart(canvas, lastResult);
+      renderLegendItems(legend, buildUtilLegend(lastResult));
+      renderUtilTable(tableHost, lastResult);
+      return;
+    }
+    tableHost.classList.add("hidden");
+    tableHost.replaceChildren();
     if (activeTab === "lob") {
       lobHits = drawLobChart(canvas, lastResult);
-      bufHits = [];
       renderLegendItems(legend, buildLegendItems(lastResult));
     } else {
       bufHits = drawBufferChart(canvas, lastResult);
-      lobHits = [];
       renderLegendItems(legend, buildBufferLegend(lastResult));
     }
   }
@@ -226,7 +393,8 @@ export function mountApp(root: HTMLElement): void {
       variability: (variability as HTMLSelectElement).value as VariabilityLevel,
     });
     lastResult = runParade(cfg);
-    setMetrics(lastResult);
+    lastCost = computeCostMetrics(lastResult, rates());
+    setMetrics(lastResult, lastCost);
     redraw();
     void recordSimRun();
   }
@@ -264,23 +432,35 @@ export function mountApp(root: HTMLElement): void {
       ], ev);
       return;
     }
-    const hit = hitTestBuffer(canvas, bufHits, ev.clientX, ev.clientY);
-    if (!hit) {
-      tip.classList.add("hidden");
-      canvas.style.cursor = "default";
+    if (activeTab === "buffer") {
+      const hit = hitTestBuffer(canvas, bufHits, ev.clientX, ev.clientY);
+      if (!hit) {
+        tip.classList.add("hidden");
+        canvas.style.cursor = "default";
+        return;
+      }
+      canvas.style.cursor = "crosshair";
+      showTip(hit.label, hit.color, [
+        `Periode: ${hit.period}`,
+        `WIP: ${hit.wip} zona`,
+      ], ev);
       return;
     }
-    canvas.style.cursor = "crosshair";
-    showTip(hit.label, hit.color, [
-      `Periode: ${hit.period}`,
-      `WIP: ${hit.wip} zona`,
-    ], ev);
+    tip.classList.add("hidden");
+    canvas.style.cursor = "default";
   });
   canvas.addEventListener("mouseleave", () => tip.classList.add("hidden"));
 
-  tabLob.addEventListener("click", () => setTab("lob"));
-  tabBuf.addEventListener("click", () => setTab("buffer"));
+  for (const [id, btn] of tabBtns) {
+    btn.addEventListener("click", () => setTab(id));
+  }
   runBtn.addEventListener("click", run);
+  tarif.addEventListener("change", () => {
+    if (!lastResult) return;
+    lastCost = computeCostMetrics(lastResult, rates());
+    setMetrics(lastResult, lastCost);
+    if (activeTab === "cost") redraw();
+  });
   window.addEventListener("resize", () => redraw());
 
   void (async () => {
