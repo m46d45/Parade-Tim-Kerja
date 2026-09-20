@@ -228,3 +228,36 @@ describe("Inventory/FR + operations curve (parity vs Python no-var batch=4)", ()
     }
   });
 });
+
+describe("perbandingan multi-skenario", () => {
+  it("5× variability runs and duration is non-decreasing with var level", () => {
+    const levels = ["none", "low", "medium", "high", "very_high"] as const;
+    const results = levels.map((variability) =>
+      runParade(
+        classroomConfig({
+          totalUnits: 10,
+          batchSize: 4,
+          baseSpeed: 1,
+          seed: 12345,
+          variability,
+        }),
+      ),
+    );
+    expect(results[0].duration).toBe(26);
+    expect(results[0].duration).toBe(results[0].idealDuration);
+    for (const r of results) {
+      expect(r.duration).toBeGreaterThanOrEqual(r.idealDuration);
+      expect(r.idealDuration).toBe(26);
+    }
+  });
+
+  it("batch 1 vs 4: one-piece finishes earlier when no-var", () => {
+    const b1 = runParade(
+      classroomConfig({ totalUnits: 10, batchSize: 1, deterministic: true }),
+    );
+    const b4 = runParade(
+      classroomConfig({ totalUnits: 10, batchSize: 4, deterministic: true }),
+    );
+    expect(b1.duration).toBeLessThan(b4.duration);
+  });
+});

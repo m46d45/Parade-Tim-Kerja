@@ -44,8 +44,21 @@ export const BUFFER_COLORS = [
   "#9d755d",
 ] as const;
 
+export const SCENARIO_COLORS = [
+  "#2563eb",
+  "#ea580c",
+  "#16a34a",
+  "#dc2626",
+  "#7c3aed",
+  "#0891b2",
+] as const;
+
 export function bufferColor(i: number): string {
   return BUFFER_COLORS[i % BUFFER_COLORS.length];
+}
+
+export function scenarioColor(i: number): string {
+  return SCENARIO_COLORS[i % SCENARIO_COLORS.length];
 }
 
 export function tradeColor(i: number): string {

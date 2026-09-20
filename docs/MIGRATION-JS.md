@@ -36,8 +36,8 @@ App JS memakai key yang sama (`src/stats.ts`).
 | **0** | Dokumen, folder `web/`, tooling Vite/TS/Vitest | ✅ |
 | **1** | Port engine zone-flow + ideal baseline; golden parity vs Python | ✅ mulai (deterministik) |
 | **2** | UI shell: LoB detail, Buffer/WIP, seed + variability | ✅ |
-| **3** | Parity tab Simulasi: LoB, Buffer, Utilisasi, Biaya, Little, Kingman, Inventory/FR | 🚧 |
-| **4** | Cutover Vercel + redirect Streamlit | 🔜 |
+| **3** | Parity tab Simulasi + **Perbandingan** multi-skenario | 🚧 |
+| **4** | Takt / Buffer waktu–inventory / cutover Vercel | 🔜 |
 | **5** | PWA/offline (opsional) | 🔜 |
 
 ## Layout repo

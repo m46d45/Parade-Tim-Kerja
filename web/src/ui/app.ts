@@ -33,6 +33,7 @@ import {
 import { buildLittlesLegend, drawLittlesChart } from "./littlesChart";
 import { drawOperationsChart, snapConwip } from "./operationsChart";
 import { buildUtilLegend, drawUtilChart } from "./utilChart";
+import { mountCompare } from "./compareApp";
 
 type TabId =
   | "lob"
@@ -336,8 +337,10 @@ export function mountApp(root: HTMLElement): void {
   (speed as HTMLSelectElement).value = "1";
   const variability = el("select", { id: "var" }, [
     el("option", { value: "none" }, ["Tanpa variability"]),
-    el("option", { value: "low" }, ["Sedang (±25%)"]),
-    el("option", { value: "medium" }, ["Tinggi (±50%)"]),
+    el("option", { value: "low" }, ["Rendah (±25%)"]),
+    el("option", { value: "medium" }, ["Sedang (±50%)"]),
+    el("option", { value: "high" }, ["Tinggi (±75%)"]),
+    el("option", { value: "very_high" }, ["Sangat tinggi (±90%)"]),
   ]);
   (variability as HTMLSelectElement).value = "none";
   const seed = el("input", { type: "number", id: "seed", value: "12345", step: "1" });
@@ -459,15 +462,42 @@ export function mountApp(root: HTMLElement): void {
     note,
   ]);
 
+  const simLayout = el("div", { className: "layout" }, [sidebar, main]);
+  const compareHost = el("div", { className: "compare-host hidden" });
+  const modeSim = el("button", { className: "mode-tab active", type: "button" }, ["Simulasi"]);
+  const modeCmp = el("button", { className: "mode-tab", type: "button" }, ["Perbandingan"]);
+  const modeTabs = el("div", { className: "mode-tabs" }, [modeSim, modeCmp]);
+
   root.append(
     el("div", { className: "wrap" }, [
       el("header", { className: "app-header" }, [
         el("div", { className: "brand" }, ["Parade Tim Kerja"]),
         el("span", { className: "badge" }, ["JS · browser"]),
       ]),
-      el("div", { className: "layout" }, [sidebar, main]),
+      modeTabs,
+      simLayout,
+      compareHost,
     ]),
   );
+
+  let compareMounted = false;
+  function showMode(mode: "sim" | "compare"): void {
+    modeSim.classList.toggle("active", mode === "sim");
+    modeCmp.classList.toggle("active", mode === "compare");
+    simLayout.classList.toggle("hidden", mode !== "sim");
+    compareHost.classList.toggle("hidden", mode !== "compare");
+    if (mode === "compare" && !compareMounted) {
+      mountCompare(compareHost, {
+        getZones: () => Math.max(1, Number(zones.value) || 10),
+        getSeed: () => Number(seed.value) || 12345,
+        getTarif: () => Math.max(0, Number(tarif.value) || 100),
+        getDefaultBatch: () => Math.max(1, Number(batch.value) || 4),
+      });
+      compareMounted = true;
+    }
+  }
+  modeSim.addEventListener("click", () => showMode("sim"));
+  modeCmp.addEventListener("click", () => showMode("compare"));
 
   let lastResult: ParadeResult | null = null;
   let lastCost: CostMetrics | null = null;
@@ -796,7 +826,7 @@ export function mountApp(root: HTMLElement): void {
   void (async () => {
     await recordAppSession();
     const dash = await readDashboard();
-    statsLine.textContent = `Statistik (Counter): sim_runs=${dash.sim_runs ?? 0} · app_sessions=${dash.app_sessions ?? 0}`;
+    statsLine.textContent = `Statistik (Counter): sim_runs=${dash.sim_runs ?? 0} · compare_runs=${dash.compare_runs ?? 0} · app_sessions=${dash.app_sessions ?? 0}`;
   })();
 
   run();
