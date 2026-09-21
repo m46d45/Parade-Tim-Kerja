@@ -1,33 +1,35 @@
 # Migrasi Parade Tim Kerja → JavaScript (browser)
 
-**Status:** Fase 0–1 dimulai (fondasi + engine zone-flow deterministik).  
+**Status:** Cutover Vercel **selesai** — URL kanonis = app JS.  
 **Repo:** tetap `Parade-Tim-Kerja` (satu repo).  
 **Nama produk:** tetap **Parade Tim Kerja** (jangan diganti).
 
 ## Tujuan
 
-1. Pengguna buka URL kanonis → **langsung simulasi** (bukan landing → Streamlit).
-2. Simulasi berjalan **di browser** (tidak tergantung server Streamlit untuk compute).
-3. Statistik Counter API (`parade-tim-kerja.app`) **tetap** — key yang sama.
-4. Streamlit tetap hidup sementara sebagai jaring pengaman + redirect nanti.
+1. Pengguna buka URL kanonis → **langsung simulasi** (bukan landing → Streamlit). ✅  
+2. Simulasi berjalan **di browser** (tidak tergantung server Streamlit untuk compute). ✅  
+3. Statistik Counter API (`parade-tim-kerja.app`) **tetap** — key yang sama. ✅  
+4. Streamlit tetap hidup sementara sebagai redirect + jaring (`?legacy=1`). ✅  
 
 ## URL & hosting
 
-| URL | Peran target |
-|-----|----------------|
-| Domain Vercel (sekarang landing `public/`) | App JS penuh (cutover) |
-| `parade-tim-kerja.streamlit.app` | Redirect / pengumuman setelah cutover |
+| URL | Peran |
+|-----|--------|
+| https://parade-tim-kerja.vercel.app/ | **Kanonis** — app JS (`web/dist`) |
+| https://parade-tim-kerja.vercel.app/kelas/ | Animasi kelas |
+| https://parade-tim-kerja.vercel.app/landing/ | Halaman tentang (ex-landing) |
+| `parade-tim-kerja.streamlit.app` | Redirect → Vercel (`?legacy=1` = UI Streamlit lama) |
 | Counter NS `parade-tim-kerja.app` | Jangan diubah |
 
 ## Statistik (jangan putus)
 
-Key yang sudah dipakai landing + Streamlit:
+Key yang sudah dipakai landing + Streamlit + app JS:
 
 - `landing_visits`, `landing_unique`
 - `app_visits`, `app_sessions`
 - `sim_runs`, `compare_runs`
 
-App JS memakai key yang sama (`src/stats.ts`).
+App JS memakai key yang sama (`web/src/stats.ts`).
 
 ## Fase
 
@@ -37,34 +39,31 @@ App JS memakai key yang sama (`src/stats.ts`).
 | **1** | Port engine zone-flow + ideal baseline; golden parity vs Python | ✅ |
 | **2** | UI shell: LoB detail, Buffer/WIP, seed + variability | ✅ |
 | **3** | Parity tab Simulasi + **Perbandingan** multi-skenario | ✅ |
-| **4** | Takt / Buffer waktu–inventory / Statistik / Manual | ✅ (cutover Vercel **ditunda**) |
+| **4** | Takt / Buffer waktu–inventory / Statistik / Manual | ✅ |
+| **4b** | Cutover Vercel + redirect Streamlit | ✅ |
 | **5** | PWA/offline (opsional) | 🔜 |
 
-Mode top-level JS (parity Streamlit `st.tabs`):
+Mode top-level JS:
 
 1. **Simulasi** — LoB, Buffer WIP, Utilisasi, Biaya, Little, Kingman, Inventory/FR  
 2. **Perbandingan** — multi-skenario overlay  
 3. **Takt plan** — Little's Takt Law + wagon chart (bay≠zona)  
-4. **Buffer** — waktu–inventory Iris (jalankan + peta tren)  
-5. **Statistik** — Counter API `parade-tim-kerja.app`  
+4. **Buffer** — waktu–inventory Iris  
+5. **Statistik** — Counter API  
 6. **Manual** — `MANUAL.md` di browser  
-
-**Belum:** cutover Vercel (outputDirectory → `web/dist`), redirect Streamlit, PWA.
 
 ## Layout repo
 
 ```text
-web/                 # App JS (Vite + TypeScript)
-  src/core/          # Engine (port dari parade_of_trades_core.py)
+web/                 # App JS (Vite + TypeScript) — output Vercel
+  src/core/          # Engine
   src/stats.ts       # Counter API (NS sama)
   src/ui/            # UI browser
-  fixtures/          # Golden JSON dari Python
-  tests/             # Vitest parity
-scripts/
-  export_golden_fixtures.py
-docs/MIGRATION-JS.md # Dokumen ini
-app.py               # Streamlit (tetap sampai cutover)
-public/              # Landing statis (tetap sampai Fase 2/4)
+  public/kelas →     # symlink ke ../../public/kelas
+  public/landing/    # halaman tentang
+app.py               # Streamlit redirect (+ ?legacy=1)
+vercel.json          # build web → web/dist
+docs/MIGRATION-JS.md
 ```
 
 ## Pengembangan lokal
@@ -72,36 +71,12 @@ public/              # Landing statis (tetap sampai Fase 2/4)
 ```bash
 cd web
 npm install
-npm test          # parity vs fixtures
-npm run dev       # UI shell
+npm test
+npm run dev
 ```
 
-Regenerate golden (Python oracle):
+## Cutover Vercel (sudah)
 
-```bash
-python3 scripts/export_golden_fixtures.py
-```
-
-## Palet (sumber kebenaran)
-
-Ikuti **Streamlit app**, bukan landing gelap:
-
-| Token | Nilai | Sumber |
-|-------|-------|--------|
-| Background | `#ffffff` / `#f0f4f8` | `.streamlit/config.toml` |
-| Primary / teks | `#1a365d` / `#1a202c` | config.toml |
-| Header navy | `#0f2744` → `#1a365d` → `#234e76` | banner `app.py` |
-| Tim T1–T5 | `#3b82f6` `#f59e0b` `#10b981` `#ef4444` `#8b5cf6` | banner `app.py` |
-
-Lihat `web/src/theme.ts`.
-
-- Python = sumber kebenaran selama migrasi.
-- Fase 1 fokus **zone_flow + deterministic** (tanpa ketergantungan RNG Python).
-- Variability ber-seed: belakangan (RNG portabel bersama) atau bandingkan distribusi, bukan bit-exact dulu.
-
-## Cutover Vercel (nanti)
-
-1. `web` build → output ke folder yang di-serve Vercel.
-2. Update `vercel.json` `outputDirectory` / build command.
-3. Hapus CTA “Buka simulasi Streamlit” dari jalur utama.
-4. Streamlit: halaman redirect ke domain Vercel.
+1. ✅ `vercel.json`: `installCommand` / `buildCommand` di `web`, `outputDirectory` `web/dist`  
+2. ✅ CTA utama → `/` (app JS), bukan Streamlit  
+3. ✅ Streamlit: redirect ke Vercel; `?legacy=1` untuk UI lama  

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib
+import json
 import math
 import tempfile
 from pathlib import Path
@@ -89,6 +90,24 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# Cutover: simulasi kanonis di Vercel (JS). Streamlit = redirect + jaring (?legacy=1).
+_CANONICAL_APP = "https://parade-tim-kerja.vercel.app"
+if st.query_params.get("legacy") != "1":
+    st.title("Parade Tim Kerja telah pindah")
+    st.markdown(
+        f"Simulasi utama sekarang berjalan di browser (tanpa server Streamlit):\n\n"
+        f"**[{_CANONICAL_APP}]({_CANONICAL_APP})**"
+    )
+    st.link_button("Buka simulasi", _CANONICAL_APP, type="primary")
+    st.caption("Pengembang: tambahkan `?legacy=1` pada URL Streamlit untuk UI lama.")
+    components.html(
+        "<script>window.location.replace("
+        + json.dumps(_CANONICAL_APP)
+        + ");</script>",
+        height=0,
+    )
+    st.stop()
 
 PRESET_OPTIONS = list(CAPACITY_PRESETS.keys())
 VAR_FACTORS = {

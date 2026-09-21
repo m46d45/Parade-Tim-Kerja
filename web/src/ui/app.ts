@@ -476,17 +476,10 @@ export function mountApp(root: HTMLElement): void {
   chartWrap2.append(canvas2);
 
   const note = el("p", { className: "note" }, [
-    "Parity Streamlit: Simulasi, Perbandingan, Takt plan, Buffer waktu–inventory, Statistik, Manual. ",
-    el(
-      "a",
-      {
-        href: "https://parade-tim-kerja.streamlit.app/",
-        target: "_blank",
-        rel: "noopener",
-      },
-      ["Streamlit (jaring pengaman)"],
-    ),
-    " · cutover Vercel belum.",
+    "Simulasi zone-flow di browser · ",
+    el("a", { href: "/kelas/" }, ["Animasi kelas"]),
+    " · ",
+    el("a", { href: "/landing/" }, ["Tentang"]),
   ]);
   const statsLine = el("p", { className: "note", id: "stats" }, ["Memuat statistik…"]);
 

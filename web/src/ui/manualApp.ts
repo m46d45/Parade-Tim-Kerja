@@ -185,7 +185,7 @@ export function mountManual(root: HTMLElement): void {
       body,
       el("hr"),
       el("p", { className: "note" }, [
-        "Build JS · zone-flow · 5 tim · batch default 4 · tanpa cutover Vercel",
+        "Parade Tim Kerja · zone-flow · 5 tim · batch default 4",
       ]),
     ]),
   );
