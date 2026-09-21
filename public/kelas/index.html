@@ -195,6 +195,46 @@ h1 {
 }
 .zone.has-work { background: #eff6ff; border-color: #93c5fd; }
 .zone.done-soft { background: #ecfdf5; border-color: #6ee7b7; }
+.zone.wip-mark {
+  background: #fffbeb;
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.45);
+}
+.zone .wip-badge {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: .62rem;
+  font-weight: 800;
+  color: #92400e;
+  background: #fde68a;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.product.wip-mark {
+  outline: 3px solid #f59e0b;
+  outline-offset: 3px;
+  border-radius: 4px;
+  z-index: 4;
+}
+.product.wip-mark::after {
+  content: "WIP";
+  position: absolute;
+  top: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: .58rem;
+  font-weight: 800;
+  color: #92400e;
+  background: #fde68a;
+  padding: 1px 5px;
+  border-radius: 999px;
+}
+.product.static {
+  transition: none;
+}
 /* Tim mengambang di atas floor — geser horizontal mulus */
 .team-layer {
   position: absolute; inset: 16px 10px 40px;
@@ -317,9 +357,9 @@ const copy = {
     conclude: "Kesimpulan: manufaktur menambah nilai di stasiun; konstruksi menggerakkan tim melewati zona yang diam."
   },
   wip: {
-    observe: "WIP = kerja yang sudah dikerjakan hulu, belum diambil hilir.",
-    hint: "Kiri: produk merah sudah keluar S1, belum dikerjakan S2. Kanan: Z1 sudah dilepas Bekisting, Tulangan belum masuk Z1.",
-    conclude: "Kesimpulan: WIP ada di antara stasiun/tim — lihat produk (manufaktur) atau zona antar-handoff (konstruksi)."
+    observe: "WIP = produk/zona yang sudah dikerjakan hulu, belum diambil hilir — yang ditandai.",
+    hint: "Kiri: tandai produk merah di antara S1 dan S2. Kanan: Z2 sudah selesai Bekisting, Tul masih di Z1 → WIP = Z2.",
+    conclude: "Kesimpulan: WIP bukan stok gudang — itu kerja antar stasiun/tim yang menunggu diambil."
   },
   inventory: {
     observe: "Inventory = bahan menunggu, belum menjadi WIP proses.",
@@ -474,6 +514,17 @@ function clearStaticExtras() {
   document.getElementById("con-inv").hidden = true;
   document.querySelectorAll(".m-st").forEach((s) => s.classList.remove("idle"));
   sceneCon.querySelectorAll(":scope > .team").forEach((n) => n.remove());
+  // hapus produk ekstra (tab WIP)
+  sceneMfg.querySelectorAll(".product.extra").forEach((n) => n.remove());
+  const main = document.getElementById("mfg-product");
+  if (main) {
+    main.classList.remove("wip-mark", "static");
+    main.style.display = "";
+  }
+  document.querySelectorAll("#con-floor .zone").forEach((z) => {
+    z.classList.remove("wip-mark");
+    z.querySelectorAll(".wip-badge").forEach((b) => b.remove());
+  });
 }
 
 /**
@@ -566,16 +617,48 @@ function stopProduksi() {
   prodGen += 1;
 }
 
+function makeProduct(segs, leftPct, { wip = false, extra = false } = {}) {
+  const p = el(`<div class="product static${extra ? " extra" : ""}${wip ? " wip-mark" : ""}" style="left:${leftPct}%">
+    <div class="seg r${segs.includes("r") ? " on" : ""}" data-seg="r"></div>
+    <div class="seg o${segs.includes("o") ? " on" : ""}" data-seg="o"></div>
+    <div class="seg b${segs.includes("b") ? " on" : ""}" data-seg="b"></div>
+  </div>`);
+  if (segs.length === 0) p.classList.add("empty");
+  return p;
+}
+
 function showWip() {
   stopProduksi();
   clearStaticExtras();
   hideAllTeams();
-  moveProductTo(38);
-  setSegs(["r"]);
-  document.getElementById("mfg-step").textContent = "WIP: sudah S1 (merah), belum diambil S2";
+
+  // Sembunyikan produk animasi tunggal; tampilkan 4 produk snapshot
+  const main = document.getElementById("mfg-product");
+  main.style.display = "none";
+
+  // S1 kerja: merah di depan S1
+  sceneMfg.append(makeProduct(["r"], POS.s1, { extra: true }));
+  // WIP (ditandai): merah di antara S1 dan S2
+  const mid = (POS.s1 + POS.s2) / 2;
+  sceneMfg.append(makeProduct(["r"], mid, { extra: true, wip: true }));
+  // S2 kerja: merah+orange di depan S2
+  sceneMfg.append(makeProduct(["r", "o"], POS.s2, { extra: true }));
+  // S3 kerja: merah+orange+biru di depan S3
+  sceneMfg.append(makeProduct(["r", "o", "b"], POS.s3, { extra: true }));
+
+  document.getElementById("mfg-step").textContent =
+    "WIP = produk merah di antara S1–S2 (ditandai). S1/S2/S3 sedang kerja produk di depan masing-masing.";
+
+  // Konstruksi: Tul kerja di Z1; Bek di Z2 dan Z2 sudah selesai Bekisting → WIP = Z2
+  placeTeamSnap("Tul", 1, "tul");
   placeTeamSnap("Bek", 2, "bek");
-  markDone(1);
-  document.getElementById("con-step").textContent = "WIP: Z1 sudah Bekisting, Tulangan belum masuk Z1";
+  const z2 = document.querySelector("#con-floor .zone[data-z='2']");
+  z2.classList.add("wip-mark", "done-soft");
+  z2.append(el(`<div class="wip-badge">WIP = Z2</div>`));
+  document.querySelector("#con-floor .zone[data-z='1']").classList.add("has-work");
+
+  document.getElementById("con-step").textContent =
+    "Bek sudah di Z2 & Z2 selesai Bekisting; Tul masih kerja di Z1 → WIP = Z2";
 }
 
 function showInventory() {
