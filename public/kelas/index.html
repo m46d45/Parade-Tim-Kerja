@@ -285,6 +285,25 @@ h1 {
 .team.cor { background: var(--cor); top: 68%; }
 .team.fin { background: var(--fin); top: 36%; }
 .team.idle { outline: 3px solid var(--waste); outline-offset: 2px; }
+.team.idle::after {
+  content: "waste";
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: .55rem;
+  font-weight: 800;
+  color: #991b1b;
+  background: #fecaca;
+  padding: 1px 5px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.m-st.idle .lab::after {
+  content: " · waste";
+  color: var(--waste);
+  font-weight: 800;
+}
 .done-mark {
   position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
   font-size: .58rem; font-weight: 800; color: #059669;
@@ -404,9 +423,9 @@ const copy = {
     conclude: "Kesimpulan: inventory ≠ WIP. Inventory = stok di luar proses; WIP = handoff antar stasiun/tim."
   },
   waste: {
-    observe: "Waste waktu = orang menunggu (bukan material).",
-    hint: "Kiri: S2 idle menunggu produk dari S1. Kanan: Bek sudah di Z2 tapi idle — Tul masih di Z1; Cor menunggu di luar.",
-    conclude: "Kesimpulan: waste sering muncul saat handoff tidak sinkron — tim sudah di lokasi tapi belum bisa kerja."
+    observe: "Waste waktu = orang/stasiun menunggu (bukan material).",
+    hint: "Kiri: S1 & S3 kerja; S2 kosong (idle = waste). Kanan: Tul idle di Z2 (= waste); Cor kerja di Z1 (bukan waste).",
+    conclude: "Kesimpulan: waste = menunggu karena handoff tidak sinkron — orang sudah di lokasi tapi belum bisa kerja."
   }
 };
 
@@ -761,15 +780,21 @@ function showWaste() {
   stopProduksi();
   clearStaticExtras();
   hideAllTeams();
+
+  // Manufaktur: S1 kerja merah; S2 kosong (waste); S3 kerja RGB
+  const main = document.getElementById("mfg-product");
+  main.style.display = "none";
   document.querySelector('.m-st[data-st="s2"]').classList.add("idle");
-  moveProductTo(38);
-  setSegs(["r"]);
-  document.getElementById("mfg-step").textContent = "Waste: S2 idle — menunggu produk dari S1";
-  placeTeamSnap("Tul", 1, "tul");
-  placeTeamSnap("Bek", 2, "bek", true);
-  const off = el(`<div class="team cor idle visible" style="left:auto;right:8px;top:12px;transform:none;opacity:1">Cor↓</div>`);
-  sceneCon.append(off);
-  document.getElementById("con-step").textContent = "Waste: Bek idle di Z2 (tunggu Tul di Z1); Cor menunggu di luar";
+  sceneMfg.append(makeProduct(["r"], POS.s1, { extra: true }));
+  sceneMfg.append(makeProduct(["r", "o", "b"], POS.s3, { extra: true }));
+  document.getElementById("mfg-step").textContent =
+    "Waste: S2 kosong/idle (tidak ada produk). S1 & S3 sedang kerja.";
+
+  // Konstruksi: Cor kerja di Z1 (bukan waste); Tul idle di Z2 (= waste); bukan Bek
+  placeTeamSnap("Cor", 1, "cor");
+  placeTeamSnap("Tul", 2, "tul", true);
+  document.getElementById("con-step").textContent =
+    "Waste: Tul idle di Z2. Cor kerja di Z1 (bukan waste) — bukan Bek.";
 }
 
 function setTab(id) {
