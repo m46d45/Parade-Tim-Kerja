@@ -149,12 +149,20 @@ h1 {
   display: flex; flex-direction: column-reverse; gap: 2px;
   align-items: stretch; width: 28px;
   transform: translate(-50%, -50%);
-  transition: left .55s ease;
+  transition: left 1.1s ease-in-out;
+  z-index: 2;
 }
 .product .seg {
-  height: 10px; border-radius: 3px; display: none;
+  height: 10px; border-radius: 3px;
+  display: none;
+  transform: scaleX(0.2);
+  transform-origin: center;
+  transition: transform .35s ease;
 }
-.product .seg.on { display: block; }
+.product .seg.on {
+  display: block;
+  transform: scaleX(1);
+}
 .product .seg.r { background: var(--s1); }
 .product .seg.o { background: var(--s2); }
 .product .seg.b { background: var(--s3); }
@@ -187,19 +195,26 @@ h1 {
 }
 .zone.has-work { background: #eff6ff; border-color: #93c5fd; }
 .zone.done-soft { background: #ecfdf5; border-color: #6ee7b7; }
+/* Tim mengambang di atas floor — geser horizontal mulus */
+.team-layer {
+  position: absolute; inset: 16px 10px 40px;
+  pointer-events: none; z-index: 3;
+}
 .team {
-  position: absolute; left: 50%; transform: translateX(-50%);
+  position: absolute;
   min-width: 40px; height: 28px; padding: 0 6px; border-radius: 8px;
   color: #fff; font-size: .62rem; font-weight: 800;
   display: grid; place-items: center; white-space: nowrap;
-  transition: top .45s ease, opacity .3s ease;
+  transform: translateX(-50%);
+  transition: left 1.1s ease-in-out, opacity .45s ease;
+  opacity: 0;
 }
-.team.bek { background: var(--bek); }
-.team.tul { background: var(--tul); }
-.team.cor { background: var(--cor); }
-.team.fin { background: var(--fin); }
+.team.visible { opacity: 1; }
+.team.bek { background: var(--bek); top: 36%; }
+.team.tul { background: var(--tul); top: 52%; }
+.team.cor { background: var(--cor); top: 68%; }
+.team.fin { background: var(--fin); top: 36%; }
 .team.idle { outline: 3px solid var(--waste); outline-offset: 2px; }
-.team.hidden { display: none; }
 .done-mark {
   position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
   font-size: .58rem; font-weight: 800; color: #059669;
@@ -285,46 +300,21 @@ h1 {
 
 <script>
 /**
- * Frame berpasangan (kiri–kanan) agar cerita sinkron.
- * Manufaktur: warna produk bertambah saat tiba di stasiun.
- * Konstruksi: Bek maju dulu; zona yang ditinggalkan diisi tim berikutnya.
+ * Produksi (tab 0):
+ * - Manufaktur: gerak dulu dengan warna lama; warna baru hanya setelah tiba di depan stasiun.
+ * - Konstruksi: tim geser mulus ke kanan (Z1→Z4); tim baru muncul di zona yang ditinggalkan.
  */
-const FRAMES = [
-  {
-    mfg: { left: 12, segs: [], label: "bahan masuk (belum di stasiun)" },
-    con: { bek: 1, tul: 0, cor: 0, fin: 0, label: "Bek di Z1" },
-  },
-  {
-    mfg: { left: 22, segs: ["r"], label: "di S1 → dapat merah" },
-    con: { bek: 1, tul: 0, cor: 0, fin: 0, label: "Bek masih di Z1 (kerja)" },
-  },
-  {
-    mfg: { left: 38, segs: ["r"], label: "menuju S2 (sudah merah)" },
-    con: { bek: 2, tul: 1, cor: 0, fin: 0, label: "Bek → Z2; Tul muncul di Z1" },
-  },
-  {
-    mfg: { left: 50, segs: ["r", "o"], label: "di S2 → +orange" },
-    con: { bek: 2, tul: 1, cor: 0, fin: 0, label: "Bek di Z2; Tul di Z1" },
-  },
-  {
-    mfg: { left: 66, segs: ["r", "o"], label: "menuju S3 (merah+orange)" },
-    con: { bek: 3, tul: 2, cor: 1, fin: 0, label: "Bek → Z3; Tul → Z2; Cor muncul di Z1" },
-  },
-  {
-    mfg: { left: 78, segs: ["r", "o", "b"], label: "di S3 → +biru" },
-    con: { bek: 4, tul: 3, cor: 2, fin: 1, label: "Bek → Z4; Tul → Z3; Cor → Z2; Fin di Z1" },
-  },
-  {
-    mfg: { left: 90, segs: ["r", "o", "b"], label: "produk jadi (3 warna)" },
-    con: { bek: 0, tul: 4, cor: 3, fin: 2, label: "Bek selesai; Tul → Z4; Cor → Z3; Fin → Z2" },
-  },
-];
+const POS = { start: 12, s1: 22, s2: 50, s3: 78, end: 90 };
+/** Pusat zona 1..4 dalam % lebar floor */
+function zoneLeft(z) {
+  return ((z - 0.5) / 4) * 100;
+}
 
 const copy = {
   produksi: {
-    observe: "Kiri: produk bertambah warna tiap stasiun. Kanan: tim bergerak antar zona — Bek dulu, lalu Tul mengisi zona yang ditinggalkan.",
-    hint: "Hitung: setelah Bek ke Z2, apakah Tul sudah ada di Z1?",
-    conclude: "Kesimpulan: manufaktur menambah nilai pada produk yang berjalan; konstruksi lantai menggerakkan tim melewati zona yang diam."
+    observe: "Kiri: warna baru muncul baru setelah produk tiba di depan stasiun. Kanan: tim bergeser mulus ke kanan.",
+    hint: "Lihat: orange/biru tidak muncul di perjalanan — hanya saat berhenti di S2/S3.",
+    conclude: "Kesimpulan: manufaktur menambah nilai di stasiun; konstruksi menggerakkan tim melewati zona yang diam."
   },
   wip: {
     observe: "WIP = kerja yang sudah dikerjakan hulu, belum diambil hilir.",
@@ -346,13 +336,17 @@ const copy = {
 const sceneMfg = document.getElementById("scene-mfg");
 const sceneCon = document.getElementById("scene-con");
 let tab = "produksi";
-let timer = null;
-let step = 0;
+let prodTimer = null;
+let prodGen = 0;
 
 function el(html) {
   const t = document.createElement("template");
   t.innerHTML = html.trim();
   return t.content.firstElementChild;
+}
+
+function wait(ms) {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
 function renderMfgShell() {
@@ -364,7 +358,7 @@ function renderMfgShell() {
       <div class="m-st s3" data-st="s3"><div class="box">S3</div><div class="lab">Stasiun 3</div></div>
     </div>`),
     el(`<div class="belt"></div>`),
-    el(`<div class="product" id="mfg-product">
+    el(`<div class="product empty" id="mfg-product" style="left:${POS.start}%">
       <div class="seg r" data-seg="r"></div>
       <div class="seg o" data-seg="o"></div>
       <div class="seg b" data-seg="b"></div>
@@ -381,37 +375,88 @@ function renderConShell() {
   for (let z = 1; z <= 4; z++) {
     floor.append(el(`<div class="zone" data-z="${z}"><span class="zn">Z${z}</span></div>`));
   }
+  const layer = el(`<div class="team-layer" id="team-layer">
+    <div class="team bek" data-team="bek">Bek</div>
+    <div class="team tul" data-team="tul">Tul</div>
+    <div class="team cor" data-team="cor">Cor</div>
+    <div class="team fin" data-team="fin">Fin</div>
+  </div>`);
   sceneCon.append(
     floor,
+    layer,
     el(`<div class="inv-row" id="con-inv" hidden></div>`),
     el(`<div class="step-label" id="con-step"></div>`),
   );
 }
 
-function setProduct(segs, left, empty) {
+function setSegs(segs) {
   const p = document.getElementById("mfg-product");
-  p.style.left = left + "%";
-  p.classList.toggle("empty", !!empty);
+  p.classList.toggle("empty", segs.length === 0);
   ["r", "o", "b"].forEach((k) => {
-    p.querySelector(`[data-seg="${k}"]`).classList.toggle("on", segs.includes(k));
+    const seg = p.querySelector(`[data-seg="${k}"]`);
+    const on = segs.includes(k);
+    if (on) {
+      seg.classList.add("on");
+      // force reflow so scale animation plays when newly added
+      void seg.offsetWidth;
+      seg.style.transform = "scaleX(1)";
+    } else {
+      seg.classList.remove("on");
+      seg.style.transform = "scaleX(0.2)";
+    }
   });
 }
 
-function clearTeams() {
-  document.querySelectorAll("#con-floor .team, #con-floor .done-mark").forEach((n) => n.remove());
+function moveProductTo(leftPct) {
+  const p = document.getElementById("mfg-product");
+  p.style.left = leftPct + "%";
+}
+
+/** zone 1..4, or 0 = sembunyikan. firstAppear: muncul di zona tanpa animasi dari kiri. */
+function setTeamZone(cls, zone, { idle = false, firstAppear = false } = {}) {
+  const t = document.querySelector(`#team-layer .team[data-team="${cls}"]`);
+  if (!t) return;
+  t.classList.toggle("idle", idle);
+  if (!zone || zone < 1) {
+    t.classList.remove("visible");
+    return;
+  }
+  const left = zoneLeft(zone);
+  if (firstAppear || !t.classList.contains("visible")) {
+    t.style.transition = "none";
+    t.style.left = left + "%";
+    void t.offsetWidth;
+    t.style.transition = "";
+    t.classList.add("visible");
+  } else {
+    t.style.left = left + "%";
+    t.classList.add("visible");
+  }
+  // highlight zona
+  document.querySelectorAll("#con-floor .zone").forEach((z) => z.classList.remove("has-work"));
+  ["bek", "tul", "cor", "fin"].forEach((k) => {
+    const elT = document.querySelector(`#team-layer .team[data-team="${k}"]`);
+    if (!elT || !elT.classList.contains("visible")) return;
+    const zl = parseFloat(elT.style.left);
+    const zi = Math.round((zl / 100) * 4 + 0.5);
+    const zEl = document.querySelector(`#con-floor .zone[data-z="${zi}"]`);
+    if (zEl) zEl.classList.add("has-work");
+  });
+}
+
+function hideAllTeams() {
+  document.querySelectorAll("#team-layer .team").forEach((t) => {
+    t.classList.remove("visible", "idle");
+  });
   document.querySelectorAll("#con-floor .zone").forEach((z) => {
     z.classList.remove("has-work", "done-soft");
   });
+  document.querySelectorAll("#con-floor .done-mark").forEach((n) => n.remove());
 }
 
-function placeTeam(name, zone, cls, idle) {
-  if (!zone || zone < 1 || zone > 4) return;
-  const zEl = document.querySelector(`#con-floor .zone[data-z="${zone}"]`);
-  zEl.classList.add("has-work");
-  const tops = { bek: "36%", tul: "52%", cor: "68%", fin: "36%" };
-  const t = el(`<div class="team ${cls}${idle ? " idle" : ""}">${name}</div>`);
-  t.style.top = tops[cls];
-  zEl.append(t);
+function placeTeamSnap(name, zone, cls, idle) {
+  // dipakai tab non-produksi: tampilkan via layer juga
+  setTeamZone(cls, zone, { idle, firstAppear: true });
 }
 
 function markDone(zone) {
@@ -423,54 +468,128 @@ function markDone(zone) {
   }
 }
 
-/** Snapshot produksi animasi */
-function showProduksi(i) {
-  const f = FRAMES[i % FRAMES.length];
-  const m = f.mfg;
-  const c = f.con;
+function clearStaticExtras() {
   document.getElementById("mfg-stock-l").hidden = true;
   document.getElementById("mfg-stock-r").hidden = true;
-  document.querySelectorAll(".m-st").forEach((s) => s.classList.remove("idle"));
-  setProduct(m.segs, m.left, m.segs.length === 0);
-  document.getElementById("mfg-step").textContent = m.label;
-
-  clearTeams();
   document.getElementById("con-inv").hidden = true;
-  placeTeam("Bek", c.bek, "bek");
-  placeTeam("Tul", c.tul, "tul");
-  placeTeam("Cor", c.cor, "cor");
-  placeTeam("Fin", c.fin, "fin");
-  document.getElementById("con-step").textContent = c.label;
+  document.querySelectorAll(".m-st").forEach((s) => s.classList.remove("idle"));
+  sceneCon.querySelectorAll(":scope > .team").forEach((n) => n.remove());
 }
 
-/** WIP: produk merah antar S1–S2; konstruksi Z1 sudah ditinggal Bek, Tul belum masuk */
-function showWip() {
-  document.getElementById("mfg-stock-l").hidden = true;
-  document.getElementById("mfg-stock-r").hidden = true;
-  document.querySelectorAll(".m-st").forEach((s) => s.classList.remove("idle"));
-  setProduct(["r"], 38, false);
-  document.getElementById("mfg-step").textContent = "WIP: sudah S1 (merah), belum diambil S2";
+/**
+ * Satu siklus produksi:
+ * gerak → tiba → baru tambah warna / geser tim.
+ */
+async function runProduksiCycle(gen) {
+  const MOVE = 1100;
+  const DWELL = 700;
 
-  clearTeams();
-  document.getElementById("con-inv").hidden = true;
-  // Bek sudah di Z2; Z1 menunggu Tul (belum muncul) = WIP lokasi
-  placeTeam("Bek", 2, "bek");
+  clearStaticExtras();
+  hideAllTeams();
+
+  // reset produk
+  moveProductTo(POS.start);
+  setSegs([]);
+  document.getElementById("mfg-step").textContent = "bahan masuk";
+  setTeamZone("bek", 1, { firstAppear: true });
+  document.getElementById("con-step").textContent = "Bek di Z1";
+  await wait(DWELL);
+  if (gen !== prodGen) return;
+
+  // → S1 (masih kosong), lalu +merah
+  document.getElementById("mfg-step").textContent = "menuju S1…";
+  moveProductTo(POS.s1);
+  await wait(MOVE);
+  if (gen !== prodGen) return;
+  setSegs(["r"]);
+  document.getElementById("mfg-step").textContent = "tiba di S1 → +merah";
+  document.getElementById("con-step").textContent = "Bek kerja di Z1";
+  await wait(DWELL);
+  if (gen !== prodGen) return;
+
+  // → S2 (hanya merah), bersamaan Bek→Z2 & Tul muncul Z1
+  document.getElementById("mfg-step").textContent = "menuju S2 (masih merah)…";
+  moveProductTo(POS.s2);
+  setTeamZone("bek", 2); // mulus ke kanan
+  setTeamZone("tul", 1, { firstAppear: true });
+  document.getElementById("con-step").textContent = "Bek → Z2; Tul muncul di Z1";
+  await wait(MOVE);
+  if (gen !== prodGen) return;
+  setSegs(["r", "o"]);
+  document.getElementById("mfg-step").textContent = "tiba di S2 → +orange";
+  await wait(DWELL);
+  if (gen !== prodGen) return;
+
+  // → S3 (merah+orange), Bek→Z3 Tul→Z2 Cor muncul Z1
+  document.getElementById("mfg-step").textContent = "menuju S3 (merah+orange)…";
+  moveProductTo(POS.s3);
+  setTeamZone("bek", 3);
+  setTeamZone("tul", 2);
+  setTeamZone("cor", 1, { firstAppear: true });
+  document.getElementById("con-step").textContent = "Bek → Z3; Tul → Z2; Cor muncul di Z1";
+  await wait(MOVE);
+  if (gen !== prodGen) return;
+  setSegs(["r", "o", "b"]);
+  document.getElementById("mfg-step").textContent = "tiba di S3 → +biru";
+  await wait(DWELL);
+  if (gen !== prodGen) return;
+
+  // ke akhir + lanjut parade
+  document.getElementById("mfg-step").textContent = "produk jadi → keluar";
+  moveProductTo(POS.end);
+  setTeamZone("bek", 4);
+  setTeamZone("tul", 3);
+  setTeamZone("cor", 2);
+  setTeamZone("fin", 1, { firstAppear: true });
+  document.getElementById("con-step").textContent = "Bek → Z4; Tul → Z3; Cor → Z2; Fin di Z1";
+  await wait(MOVE);
+  if (gen !== prodGen) return;
+
+  setTeamZone("bek", 0);
+  setTeamZone("tul", 4);
+  setTeamZone("cor", 3);
+  setTeamZone("fin", 2);
+  document.getElementById("con-step").textContent = "Bek selesai; Tul → Z4; Cor → Z3; Fin → Z2";
+  document.getElementById("mfg-step").textContent = "siklus ulang…";
+  await wait(DWELL + 400);
+}
+
+async function startProduksiLoop() {
+  prodGen += 1;
+  const gen = prodGen;
+  while (gen === prodGen && tab === "produksi") {
+    await runProduksiCycle(gen);
+  }
+}
+
+function stopProduksi() {
+  prodGen += 1;
+}
+
+function showWip() {
+  stopProduksi();
+  clearStaticExtras();
+  hideAllTeams();
+  moveProductTo(38);
+  setSegs(["r"]);
+  document.getElementById("mfg-step").textContent = "WIP: sudah S1 (merah), belum diambil S2";
+  placeTeamSnap("Bek", 2, "bek");
   markDone(1);
   document.getElementById("con-step").textContent = "WIP: Z1 sudah Bekisting, Tulangan belum masuk Z1";
 }
 
-/** Inventory: stok bahan, bukan progress proses */
 function showInventory() {
-  document.querySelectorAll(".m-st").forEach((s) => s.classList.remove("idle"));
-  setProduct([], MFG_POS.start, true);
+  stopProduksi();
+  clearStaticExtras();
+  hideAllTeams();
+  moveProductTo(POS.start);
+  setSegs([]);
   const L = document.getElementById("mfg-stock-l");
   const R = document.getElementById("mfg-stock-r");
   L.hidden = false; R.hidden = false;
   L.textContent = "stok bahan"; L.className = "stock-pile left hot";
   R.textContent = "stok jadi"; R.className = "stock-pile right";
   document.getElementById("mfg-step").textContent = "Inventory: bahan menunggu di ujung ban";
-
-  clearTeams();
   const inv = document.getElementById("con-inv");
   inv.hidden = false;
   inv.replaceChildren(
@@ -478,49 +597,22 @@ function showInventory() {
     el(`<span class="inv-chip off">stok tulangan</span>`),
     el(`<span class="inv-chip off">stok cor</span>`),
   );
-  // zona kosong — belum ada kerja; bahan di luar
   document.getElementById("con-step").textContent = "Inventory: bahan di luar zona, belum jadi WIP handoff";
 }
 
-/** Waste: orang menunggu */
 function showWaste() {
-  document.querySelectorAll(".m-st").forEach((s) => s.classList.remove("idle"));
+  stopProduksi();
+  clearStaticExtras();
+  hideAllTeams();
   document.querySelector('.m-st[data-st="s2"]').classList.add("idle");
-  setProduct(["r"], 38, false);
-  document.getElementById("mfg-stock-l").hidden = true;
-  document.getElementById("mfg-stock-r").hidden = true;
+  moveProductTo(38);
+  setSegs(["r"]);
   document.getElementById("mfg-step").textContent = "Waste: S2 idle — menunggu produk dari S1";
-
-  clearTeams();
-  document.getElementById("con-inv").hidden = true;
-  placeTeam("Tul", 1, "tul");
-  placeTeam("Bek", 2, "bek", true);
-  const off = el(`<div class="team cor idle" style="left:auto;right:8px;top:12px;transform:none">Cor↓</div>`);
+  placeTeamSnap("Tul", 1, "tul");
+  placeTeamSnap("Bek", 2, "bek", true);
+  const off = el(`<div class="team cor idle visible" style="left:auto;right:8px;top:12px;transform:none;opacity:1">Cor↓</div>`);
   sceneCon.append(off);
   document.getElementById("con-step").textContent = "Waste: Bek idle di Z2 (tunggu Tul di Z1); Cor menunggu di luar";
-}
-
-function paint() {
-  // remove stray off-floor markers from waste
-  sceneCon.querySelectorAll(":scope > .team").forEach((n) => n.remove());
-  if (tab === "produksi") showProduksi(step);
-  else if (tab === "wip") showWip();
-  else if (tab === "inventory") showInventory();
-  else showWaste();
-}
-
-function stopTimer() {
-  if (timer) { clearInterval(timer); timer = null; }
-}
-
-function startProduksiLoop() {
-  stopTimer();
-  step = 0;
-  paint();
-  timer = setInterval(() => {
-    step += 1;
-    paint();
-  }, 1400);
 }
 
 function setTab(id) {
@@ -532,9 +624,11 @@ function setTab(id) {
   document.getElementById("observe-main").textContent = c.observe;
   document.getElementById("observe-hint").textContent = c.hint;
   document.getElementById("conclude").innerHTML = c.conclude;
-  stopTimer();
+  stopProduksi();
   if (id === "produksi") startProduksiLoop();
-  else paint();
+  else if (id === "wip") showWip();
+  else if (id === "inventory") showInventory();
+  else showWaste();
 }
 
 renderMfgShell();
