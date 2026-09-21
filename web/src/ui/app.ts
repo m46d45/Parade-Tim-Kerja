@@ -565,7 +565,7 @@ export function mountApp(root: HTMLElement): void {
     "a",
     {
       className: "header-link",
-      href: "/kelas",
+      href: "/kelas/",
       target: "_blank",
       rel: "noopener",
     },
