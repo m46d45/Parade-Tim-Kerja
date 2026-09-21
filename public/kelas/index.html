@@ -425,7 +425,7 @@ const copy = {
   },
   waste: {
     observe: "Waste waktu = orang/stasiun menunggu (bukan material).",
-    hint: "Kiri: S1 & S3 kerja; S2 kosong (idle = waste). Kanan: Tul idle di Z2 (= waste); Cor kerja di Z1 (bukan waste).",
+    hint: "Kiri: S1 & S3 kerja; S2 kosong (idle = waste). Kanan: Bek kerja di Z2; Tul menunggu di Z2 (= waste); Cor kerja di Z1.",
     conclude: "Kesimpulan: waste = menunggu karena handoff tidak sinkron — orang sudah di lokasi tapi belum bisa kerja."
   }
 };
@@ -791,11 +791,12 @@ function showWaste() {
   document.getElementById("mfg-step").textContent =
     "Waste: S2 kosong/idle (tidak ada produk). S1 & S3 sedang kerja.";
 
-  // Konstruksi: Cor kerja di Z1 (bukan waste); Tul idle di Z2 (= waste); bukan Bek
+  // Konstruksi: Bek kerja di Z2; Tul menunggu di Z2 (= waste); Cor kerja di Z1
   placeTeamSnap("Cor", 1, "cor");
+  placeTeamSnap("Bek", 2, "bek");
   placeTeamSnap("Tul", 2, "tul", true);
   document.getElementById("con-step").textContent =
-    "Waste: Tul idle di Z2. Cor kerja di Z1 (bukan waste) — bukan Bek.";
+    "Waste: Bek sedang kerja di Z2; Tul menunggu di Z2 (= waste). Cor kerja di Z1.";
 }
 
 function setTab(id) {
