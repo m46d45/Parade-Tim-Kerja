@@ -60,9 +60,8 @@ export function mountStats(root: HTMLElement): void {
     el("div", { className: "panel mode-panel" }, [
       el("h2", {}, ["Statistik penggunaan"]),
       el("p", { className: "note" }, [
-        "Angka bersifat agregat (tanpa data pribadi). ",
-        "Kunjungan landing dihitung per buka halaman; unik landing = per perangkat (browser). ",
-        "Sesi aplikasi = setiap buka tab. Simulasi = tombol Jalankan yang berhasil.",
+        "Angka agregat dari Counter API yang sama dengan Streamlit (namespace parade-tim-kerja.app), tanpa data pribadi. ",
+        "Kunjungan = landing (historis) + aplikasi. Simulasi = tombol Jalankan yang berhasil (Simulasi + Perbandingan).",
       ]),
       metrics1,
       metrics2,
@@ -82,24 +81,27 @@ export function mountStats(root: HTMLElement): void {
     const appS = dash[KEYS.appSessions] ?? 0;
     const sim = dash[KEYS.simRuns] ?? 0;
     const cmp = dash[KEYS.compareRuns] ?? 0;
-    const totalSim = sim + cmp;
+    const totalSim = dash.total_simulations ?? sim + cmp;
+    const totalVisits = dash.total_visits ?? landing + appV;
 
     metrics1.replaceChildren(
-      metric("Kunjungan landing", String(landing)),
-      metric("Pengunjung landing (unik)", String(landingU)),
+      metric("Kunjungan (total)", String(totalVisits)),
       metric("Kunjungan aplikasi", String(appV)),
       metric("Sesi aplikasi", String(appS)),
+      metric("Landing (historis)", String(landing)),
     );
     metrics2.replaceChildren(
       metric("Simulasi (tab Simulasi)", String(sim)),
       metric("Perbandingan", String(cmp)),
       metric("Total simulasi dijalankan", String(totalSim)),
+      metric("Pengunjung landing unik", String(landingU)),
     );
     sessCap.innerHTML = `Simulasi di sesi Anda saat ini: <strong>${getSessionRuns()}</strong>.`;
 
     const rows = [
-      ["Kunjungan landing", landing],
-      ["Pengunjung unik (landing, per perangkat)", landingU],
+      ["Kunjungan (landing + app)", totalVisits],
+      ["Kunjungan landing (historis)", landing],
+      ["Pengunjung unik landing", landingU],
       ["Kunjungan aplikasi", appV],
       ["Sesi aplikasi", appS],
       ["Run tab Simulasi", sim],
@@ -119,7 +121,7 @@ export function mountStats(root: HTMLElement): void {
     }
     table.append(thead, tbody);
     tableHost.replaceChildren(table);
-    status.textContent = `Namespace Counter: parade-tim-kerja.app · ${new Date().toLocaleTimeString("id-ID")}`;
+    status.textContent = `Counter: parade-tim-kerja.app · ${new Date().toLocaleTimeString("id-ID")}`;
   }
 
   refresh.addEventListener("click", () => void load());

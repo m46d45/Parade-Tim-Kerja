@@ -478,10 +478,24 @@ export function mountApp(root: HTMLElement): void {
   const note = el("p", { className: "note" }, [
     "Simulasi zone-flow di browser · ",
     el("a", { href: "/kelas/" }, ["Animasi kelas"]),
-    " · ",
-    el("a", { href: "/landing/" }, ["Tentang"]),
   ]);
-  const statsLine = el("p", { className: "note", id: "stats" }, ["Memuat statistik…"]);
+  const statsBox = el("div", { className: "sidebar-stats", id: "sidebar-stats" }, [
+    el("div", { className: "sidebar-stats-title" }, ["Penggunaan"]),
+    el("div", { className: "sidebar-stats-row" }, [
+      el("div", { className: "sidebar-stat" }, [
+        el("span", {}, ["Kunjungan"]),
+        el("strong", { id: "stat-visits" }, ["…"]),
+      ]),
+      el("div", { className: "sidebar-stat" }, [
+        el("span", {}, ["Simulasi"]),
+        el("strong", { id: "stat-sims" }, ["…"]),
+      ]),
+    ]),
+    el("p", { className: "sidebar-note" }, [
+      "Total kunjungan (landing + app) dan jumlah simulasi yang dijalankan.",
+    ]),
+  ]);
+  const statsLine = statsBox;
 
   const chips = el("div", { className: "chips" });
   for (let i = 0; i < 5; i++) {
@@ -990,7 +1004,10 @@ export function mountApp(root: HTMLElement): void {
   void (async () => {
     await recordAppSession();
     const dash = await readDashboard();
-    statsLine.textContent = `Statistik (Counter): sim_runs=${dash.sim_runs ?? 0} · compare_runs=${dash.compare_runs ?? 0} · app_sessions=${dash.app_sessions ?? 0}`;
+    const visitsEl = document.getElementById("stat-visits");
+    const simsEl = document.getElementById("stat-sims");
+    if (visitsEl) visitsEl.textContent = String(dash.total_visits ?? 0);
+    if (simsEl) simsEl.textContent = String(dash.total_simulations ?? 0);
   })();
 
   run();

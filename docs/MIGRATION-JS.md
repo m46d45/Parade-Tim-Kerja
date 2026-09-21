@@ -17,7 +17,6 @@
 |-----|--------|
 | https://parade-tim-kerja.vercel.app/ | **Kanonis** — app JS (`web/dist`) |
 | https://parade-tim-kerja.vercel.app/kelas/ | Animasi kelas |
-| https://parade-tim-kerja.vercel.app/landing/ | Halaman tentang (ex-landing) |
 | `parade-tim-kerja.streamlit.app` | Redirect → Vercel (`?legacy=1` = UI Streamlit lama) |
 | Counter NS `parade-tim-kerja.app` | Jangan diubah |
 
@@ -60,7 +59,6 @@ web/                 # App JS (Vite + TypeScript) — output Vercel
   src/stats.ts       # Counter API (NS sama)
   src/ui/            # UI browser
   public/kelas →     # symlink ke ../../public/kelas
-  public/landing/    # halaman tentang
 app.py               # Streamlit redirect (+ ?legacy=1)
 vercel.json          # build web → web/dist
 docs/MIGRATION-JS.md
@@ -80,3 +78,4 @@ npm run dev
 1. ✅ `vercel.json`: `installCommand` / `buildCommand` di `web`, `outputDirectory` `web/dist`  
 2. ✅ CTA utama → `/` (app JS), bukan Streamlit  
 3. ✅ Streamlit: redirect ke Vercel; `?legacy=1` untuk UI lama  
+4. ✅ Landing dihapus (tidak lagi dilayani)  

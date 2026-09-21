@@ -8,9 +8,7 @@
   "trailingSlash": false,
   "rewrites": [
     { "source": "/kelas", "destination": "/kelas/index.html" },
-    { "source": "/kelas/", "destination": "/kelas/index.html" },
-    { "source": "/landing", "destination": "/landing/index.html" },
-    { "source": "/landing/", "destination": "/landing/index.html" }
+    { "source": "/kelas/", "destination": "/kelas/index.html" }
   ],
   "headers": [
     {
