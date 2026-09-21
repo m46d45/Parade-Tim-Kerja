@@ -11,7 +11,7 @@
 <style>
 :root {
   --bg: #f0f4f8;
-  --card: #ffffff;
+  --card: #fff;
   --text: #1a202c;
   --muted: #64748b;
   --border: #d0d7e2;
@@ -19,21 +19,20 @@
   --accent-soft: #2b6cb0;
   --banner0: #0f2744;
   --banner1: #1a365d;
-  --t1: #3b82f6;
-  --t2: #f59e0b;
-  --t3: #10b981;
-  --t4: #8b5cf6;
+  --s1: #ef4444;
+  --s2: #f59e0b;
+  --s3: #3b82f6;
+  --bek: #3b82f6;
+  --tul: #f59e0b;
+  --cor: #10b981;
+  --fin: #8b5cf6;
   --mfg: #0d9488;
-  --wip: #f59e0b;
-  --inv: #64748b;
   --waste: #ef4444;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
   font-family: "DM Sans", system-ui, sans-serif;
-  background:
-    linear-gradient(180deg, rgba(15, 39, 68, 0.06), transparent 180px),
-    var(--bg);
+  background: linear-gradient(180deg, rgba(15,39,68,.06), transparent 180px), var(--bg);
   color: var(--text);
   min-height: 100vh;
   line-height: 1.45;
@@ -41,571 +40,508 @@ body {
 .top {
   background: linear-gradient(135deg, var(--banner0), var(--banner1) 55%, #234e76);
   color: #e8eef7;
-  padding: 0.85rem 1.1rem;
+  padding: .85rem 1.1rem;
 }
 .top-inner {
-  max-width: 1100px;
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
+  max-width: 1100px; margin: 0 auto;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; flex-wrap: wrap;
 }
 .brand {
   font-family: "Instrument Serif", Georgia, serif;
-  font-size: 1.25rem;
-  color: #e8eef7;
-  text-decoration: none;
+  font-size: 1.25rem; color: #e8eef7; text-decoration: none;
 }
 .brand span {
-  display: block;
-  font-family: "DM Sans", sans-serif;
-  font-size: 0.72rem;
-  font-weight: 500;
-  color: rgba(232, 238, 247, 0.78);
-  margin-top: 0.15rem;
+  display: block; font-family: "DM Sans", sans-serif;
+  font-size: .72rem; font-weight: 500;
+  color: rgba(232,238,247,.78); margin-top: .15rem;
 }
-.nav-links { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.nav-links { display: flex; flex-wrap: wrap; gap: .4rem; }
 .nav-links a {
-  font-size: 0.82rem;
-  font-weight: 700;
-  padding: 0.35rem 0.8rem;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.28);
-  background: rgba(0,0,0,0.14);
-  color: rgba(232,238,247,0.92);
-  text-decoration: none;
+  font-size: .82rem; font-weight: 700; padding: .35rem .8rem;
+  border-radius: 999px; border: 1px solid rgba(255,255,255,.28);
+  background: rgba(0,0,0,.14); color: rgba(232,238,247,.92); text-decoration: none;
 }
-.nav-links a.primary {
-  background: #fff;
-  color: var(--accent);
-  border-color: #fff;
-}
-.wrap {
-  max-width: 1100px;
-  margin: 1.1rem auto 2.5rem;
-  padding: 0 1rem;
-}
+.nav-links a.primary { background: #fff; color: var(--accent); border-color: #fff; }
+.wrap { max-width: 1100px; margin: 1.1rem auto 2.5rem; padding: 0 1rem; }
 .panel {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 1.15rem 1.25rem 1.35rem;
-  box-shadow: 0 4px 18px rgba(15, 39, 68, 0.06);
+  background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+  padding: 1.15rem 1.25rem 1.35rem; box-shadow: 0 4px 18px rgba(15,39,68,.06);
 }
 .kicker {
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 0.25rem;
+  font-size: .72rem; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--muted); margin-bottom: .25rem;
 }
 h1 {
   font-family: "Instrument Serif", Georgia, serif;
-  font-size: 1.65rem;
-  color: var(--accent);
-  font-weight: 400;
-  margin-bottom: 0.35rem;
+  font-size: 1.65rem; color: var(--accent); font-weight: 400; margin-bottom: .35rem;
 }
-.lead {
-  color: var(--muted);
-  font-size: 0.92rem;
-  max-width: 46rem;
-  margin-bottom: 1rem;
-}
-.tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-bottom: 0.85rem;
-}
+.lead { color: var(--muted); font-size: .92rem; max-width: 48rem; margin-bottom: 1rem; }
+.tabs { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .85rem; }
 .tabs button {
-  font: inherit;
-  font-size: 0.8rem;
-  font-weight: 700;
-  padding: 0.4rem 0.85rem;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--muted);
-  cursor: pointer;
+  font: inherit; font-size: .8rem; font-weight: 700; padding: .4rem .85rem;
+  border-radius: 999px; border: 1px solid var(--border); background: var(--bg);
+  color: var(--muted); cursor: pointer;
 }
-.tabs button.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
+.tabs button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 .observe {
-  background: #eef4fb;
-  border: 1px solid #c5d4e8;
-  border-radius: 12px;
-  padding: 0.7rem 0.9rem;
-  margin-bottom: 1rem;
-  font-size: 0.88rem;
+  background: #eef4fb; border: 1px solid #c5d4e8; border-radius: 12px;
+  padding: .7rem .9rem; margin-bottom: 1rem; font-size: .88rem;
 }
 .observe strong { color: var(--accent); }
-.observe .hint {
-  display: block;
-  margin-top: 0.25rem;
-  color: var(--muted);
-  font-size: 0.82rem;
-}
-.compare {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-}
-@media (max-width: 820px) {
-  .compare { grid-template-columns: 1fr; }
-}
+.observe .hint { display: block; margin-top: .25rem; color: var(--muted); font-size: .82rem; }
+.compare { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 820px) { .compare { grid-template-columns: 1fr; } }
 .side {
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 0.85rem;
-  background: #fafbfc;
-  min-height: 280px;
+  border: 1px solid var(--border); border-radius: 14px; padding: .85rem;
+  background: #fafbfc; min-height: 300px;
 }
 .side h2 {
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 0.55rem;
+  font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; margin-bottom: .55rem;
 }
 .side.mfg h2 { color: var(--mfg); }
 .side.con h2 { color: var(--accent-soft); }
 .scene {
-  position: relative;
-  height: 210px;
-  border-radius: 10px;
-  background: #fff;
-  border: 1px dashed var(--border);
-  overflow: hidden;
+  position: relative; height: 230px; border-radius: 10px;
+  background: #fff; border: 1px dashed var(--border); overflow: hidden;
 }
 .legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem 0.75rem;
-  margin-top: 0.55rem;
-  font-size: 0.72rem;
-  color: var(--muted);
+  display: flex; flex-wrap: wrap; gap: .35rem .75rem;
+  margin-top: .55rem; font-size: .72rem; color: var(--muted);
 }
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-}
-.dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  display: inline-block;
-}
+.chip { display: inline-flex; align-items: center; gap: .3rem; }
+.dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
 .conclude {
-  margin-top: 1rem;
-  padding-top: 0.85rem;
-  border-top: 1px solid var(--border);
-  font-size: 0.88rem;
-  color: var(--text);
+  margin-top: 1rem; padding-top: .85rem; border-top: 1px solid var(--border);
+  font-size: .88rem;
 }
 .conclude em { color: var(--accent); font-style: normal; font-weight: 700; }
+.foot { margin-top: .85rem; font-size: .78rem; color: var(--muted); }
+.step-label {
+  position: absolute; left: 8px; bottom: 6px;
+  font-size: .65rem; font-weight: 700; color: var(--muted);
+}
 
-/* ——— Manufacturing belt ——— */
+/* —— Manufaktur —— */
+.m-stations {
+  position: absolute; left: 0; right: 0; top: 22px;
+  display: flex; justify-content: space-around; padding: 0 8%;
+}
+.m-st {
+  width: 56px; text-align: center;
+}
+.m-st .box {
+  width: 48px; height: 48px; margin: 0 auto 4px; border-radius: 12px;
+  display: grid; place-items: center; color: #fff; font-weight: 800; font-size: .75rem;
+}
+.m-st.s1 .box { background: var(--s1); }
+.m-st.s2 .box { background: var(--s2); }
+.m-st.s3 .box { background: var(--s3); }
+.m-st .lab { font-size: .65rem; color: var(--muted); font-weight: 600; }
+.m-st.idle .box { outline: 3px solid var(--waste); outline-offset: 2px; }
 .belt {
-  position: absolute;
-  left: 8%;
-  right: 8%;
-  top: 58%;
-  height: 14px;
-  background: repeating-linear-gradient(
-    90deg, #cbd5e1 0 10px, #94a3b8 10px 14px
-  );
+  position: absolute; left: 8%; right: 8%; top: 58%; height: 16px;
+  background: repeating-linear-gradient(90deg, #cbd5e1 0 10px, #94a3b8 10px 14px);
   border-radius: 4px;
 }
-.belt-arrow {
-  position: absolute;
-  left: 10%;
-  bottom: 14%;
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: var(--mfg);
+.product {
+  position: absolute; top: 48%;
+  display: flex; flex-direction: column-reverse; gap: 2px;
+  align-items: stretch; width: 28px;
+  transform: translate(-50%, -50%);
+  transition: left .55s ease;
 }
-.station {
-  position: absolute;
-  top: 18%;
-  width: 52px;
-  text-align: center;
+.product .seg {
+  height: 10px; border-radius: 3px; display: none;
 }
-.station .worker {
-  width: 42px;
-  height: 42px;
-  margin: 0 auto 4px;
-  border-radius: 12px;
-  display: grid;
-  place-items: center;
-  color: #fff;
-  font-size: 0.68rem;
-  font-weight: 800;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+.product .seg.on { display: block; }
+.product .seg.r { background: var(--s1); }
+.product .seg.o { background: var(--s2); }
+.product .seg.b { background: var(--s3); }
+.product.empty {
+  width: 22px; height: 22px; border: 2px dashed #94a3b8; border-radius: 4px;
+  background: #f8fafc;
 }
-.station .label {
-  font-size: 0.65rem;
-  color: var(--muted);
-  font-weight: 600;
+.product.empty .seg { display: none !important; }
+.stock-pile {
+  position: absolute; bottom: 28px; font-size: .62rem; font-weight: 700;
+  padding: 3px 8px; border-radius: 999px; background: #e2e8f0; color: #475569;
 }
-.s1 { left: 14%; }
-.s2 { left: 42%; }
-.s3 { left: 70%; }
-.s1 .worker { background: #ef4444; }
-.s2 .worker { background: #f59e0b; }
-.s3 .worker { background: #3b82f6; }
-.part {
-  position: absolute;
-  top: 54%;
-  width: 18px;
-  height: 18px;
-  border-radius: 4px;
-  background: #ef4444;
-  transform: translateY(-50%);
-}
-.buf {
-  position: absolute;
-  top: 72%;
-  width: 36px;
-  height: 22px;
-  border: 2px dashed #94a3b8;
-  border-radius: 4px;
-  font-size: 0.58rem;
-  color: var(--muted);
-  display: grid;
-  place-items: center;
-  font-weight: 700;
-}
-.buf.bahan { left: 6%; }
-.buf.wip1 { left: 30%; }
-.buf.wip2 { left: 58%; }
-.buf.jadi { left: 84%; }
-.buf.filled { background: #fef3c7; border-color: var(--wip); color: #92400e; }
-.buf.stock { background: #e2e8f0; border-style: solid; }
-.idle-ring {
-  box-shadow: 0 0 0 3px var(--waste);
-  animation: pulse 1.2s ease-in-out infinite;
-}
-@keyframes pulse {
-  0%, 100% { box-shadow: 0 0 0 3px rgba(239,68,68,0.35); }
-  50% { box-shadow: 0 0 0 5px rgba(239,68,68,0.7); }
-}
-@keyframes flow {
-  0% { left: 16%; }
-  33% { left: 44%; }
-  66% { left: 72%; }
-  100% { left: 88%; }
-}
-.part.flow { animation: flow 4.5s linear infinite; }
-.part.park-wip { left: 34%; background: var(--wip); }
-.part.park-end { left: 86%; background: #22c55e; }
+.stock-pile.left { left: 10px; }
+.stock-pile.right { right: 10px; }
+.stock-pile.hot { background: #fde68a; color: #92400e; }
+.stock-pile.gone { opacity: .35; text-decoration: line-through; }
 
-/* ——— Construction floor: 4 zones ——— */
+/* —— Konstruksi 4 zona —— */
 .floor {
-  position: absolute;
-  inset: 18px 10px 36px;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
+  position: absolute; inset: 16px 10px 40px;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
 }
 .zone {
-  border: 1.5px solid #c5d4e8;
-  border-radius: 8px;
-  background: #f8fafc;
-  position: relative;
-  padding: 4px;
+  border: 1.5px solid #c5d4e8; border-radius: 10px; background: #f8fafc;
+  position: relative; min-height: 140px;
 }
 .zone .zn {
-  position: absolute;
-  top: 4px;
-  left: 6px;
-  font-size: 0.65rem;
-  font-weight: 800;
-  color: var(--muted);
+  position: absolute; top: 6px; left: 8px;
+  font-size: .7rem; font-weight: 800; color: var(--muted);
 }
-.zone.done { background: #ecfdf5; border-color: #6ee7b7; }
-.zone.wip-zone { background: #fffbeb; border-color: #fcd34d; }
-.zone.active { border-color: var(--accent-soft); background: #eff6ff; }
+.zone.has-work { background: #eff6ff; border-color: #93c5fd; }
+.zone.done-soft { background: #ecfdf5; border-color: #6ee7b7; }
 .team {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 36px;
-  height: 28px;
-  border-radius: 8px;
-  color: #fff;
-  font-size: 0.58rem;
-  font-weight: 800;
-  display: grid;
-  place-items: center;
-  white-space: nowrap;
-  padding: 0 2px;
+  position: absolute; left: 50%; transform: translateX(-50%);
+  min-width: 40px; height: 28px; padding: 0 6px; border-radius: 8px;
+  color: #fff; font-size: .62rem; font-weight: 800;
+  display: grid; place-items: center; white-space: nowrap;
+  transition: top .45s ease, opacity .3s ease;
 }
-.team.bek { background: var(--t1); top: 28%; }
-.team.tul { background: var(--t2); top: 48%; }
-.team.cor { background: var(--t3); top: 68%; }
-.team.fin { background: var(--t4); top: 28%; }
-.stock-row {
-  position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: 6px;
-  display: flex;
-  gap: 6px;
-  justify-content: center;
+.team.bek { background: var(--bek); }
+.team.tul { background: var(--tul); }
+.team.cor { background: var(--cor); }
+.team.fin { background: var(--fin); }
+.team.idle { outline: 3px solid var(--waste); outline-offset: 2px; }
+.team.hidden { display: none; }
+.done-mark {
+  position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+  font-size: .58rem; font-weight: 800; color: #059669;
 }
-.stock {
-  font-size: 0.58rem;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 999px;
-  background: #e2e8f0;
-  color: #475569;
+.inv-row {
+  position: absolute; left: 10px; right: 10px; bottom: 8px;
+  display: flex; gap: 6px; justify-content: center; flex-wrap: wrap;
 }
-.stock.on { background: #fde68a; color: #92400e; }
-.stock.off { opacity: 0.35; text-decoration: line-through; }
-.waiting {
-  position: absolute;
-  right: 8px;
-  top: 8px;
-  font-size: 0.58rem;
-  font-weight: 800;
-  color: var(--waste);
-  background: #fee2e2;
-  border-radius: 999px;
-  padding: 2px 6px;
+.inv-chip {
+  font-size: .62rem; font-weight: 700; padding: 3px 8px; border-radius: 999px;
+  background: #e2e8f0; color: #475569;
 }
-.scene[data-tab] .show-produksi,
-.scene[data-tab] .show-wip,
-.scene[data-tab] .show-inventory,
-.scene[data-tab] .show-waste { display: none; }
-.scene[data-tab="produksi"] .show-produksi { display: block; }
-.scene[data-tab="wip"] .show-wip { display: block; }
-.scene[data-tab="inventory"] .show-inventory { display: block; }
-.scene[data-tab="waste"] .show-waste { display: block; }
-.scene .layer { display: none; height: 100%; }
-.scene[data-tab="produksi"] .layer.produksi,
-.scene[data-tab="wip"] .layer.wip,
-.scene[data-tab="inventory"] .layer.inventory,
-.scene[data-tab="waste"] .layer.waste { display: block; }
-.foot {
-  margin-top: 0.85rem;
-  font-size: 0.78rem;
-  color: var(--muted);
-}
+.inv-chip.on { background: #fde68a; color: #92400e; }
+.inv-chip.off { opacity: .35; text-decoration: line-through; }
 </style>
 </head>
 <body>
-  <header class="top">
-    <div class="top-inner">
-      <a class="brand" href="/">Parade Tim Kerja
-        <span>Animasi kelas · lantai beton bertulang</span>
-      </a>
-      <nav class="nav-links">
-        <a href="/">Landing</a>
-        <a class="primary" href="https://parade-tim-kerja.streamlit.app/" target="_blank" rel="noopener">Buka simulasi</a>
-      </nav>
+<header class="top">
+  <div class="top-inner">
+    <a class="brand" href="/">Parade Tim Kerja
+      <span>Animasi kelas · lantai beton bertulang · 4 zona</span>
+    </a>
+    <nav class="nav-links">
+      <a href="/">Landing</a>
+      <a class="primary" href="https://parade-tim-kerja.streamlit.app/" target="_blank" rel="noopener">Buka simulasi</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="panel">
+    <p class="kicker">Klip perbandingan</p>
+    <h1>Manufaktur vs Konstruksi lantai</h1>
+    <p class="lead">
+      <strong>Manufaktur:</strong> stasiun diam — produk bergerak dan <em>warna bertambah</em> tiap stasiun
+      (merah → +orange → +biru).
+      <strong>Konstruksi:</strong> zona diam (Z1–Z4) — tim parade bergerak:
+      Bek Z1→Z2→…; setelah Bek ke Z2, Tul muncul di Z1; begitu seterusnya.
+    </p>
+
+    <div class="tabs" role="tablist">
+      <button type="button" class="active" data-tab="produksi">0 · Produksi</button>
+      <button type="button" data-tab="wip">1 · WIP</button>
+      <button type="button" data-tab="inventory">2 · Inventory</button>
+      <button type="button" data-tab="waste">3 · Waste</button>
     </div>
-  </header>
 
-  <main class="wrap">
-    <div class="panel">
-      <p class="kicker">Klip perbandingan</p>
-      <h1>Manufaktur vs Konstruksi lantai</h1>
-      <p class="lead">
-        Manufaktur: pekerja diam, produk berjalan.
-        Konstruksi lantai: pekerja berjalan, produk (zona) diam.
-        Satuan lokasi di sini = <strong>4 zona</strong> (Z1–Z4) pada satu lantai beton bertulang.
-      </p>
-
-      <div class="tabs" role="tablist" aria-label="Topik klip">
-        <button type="button" class="active" data-tab="produksi" role="tab" aria-selected="true">0 · Produksi</button>
-        <button type="button" data-tab="wip" role="tab" aria-selected="false">1 · WIP</button>
-        <button type="button" data-tab="inventory" role="tab" aria-selected="false">2 · Inventory</button>
-        <button type="button" data-tab="waste" role="tab" aria-selected="false">3 · Waste</button>
-      </div>
-
-      <div class="observe" id="observe">
-        <strong>Amati:</strong> <span id="observe-main"></span>
-        <span class="hint" id="observe-hint"></span>
-      </div>
-
-      <div class="compare">
-        <!-- MANUFACTURING -->
-        <section class="side mfg" aria-label="Manufaktur">
-          <h2>Manufaktur — produk di ban</h2>
-          <div class="scene" id="scene-mfg" data-tab="produksi">
-            <div class="layer produksi">
-              <div class="station s1"><div class="worker">S1</div><div class="label">Stasiun 1</div></div>
-              <div class="station s2"><div class="worker">S2</div><div class="label">Stasiun 2</div></div>
-              <div class="station s3"><div class="worker">S3</div><div class="label">Stasiun 3</div></div>
-              <div class="belt"></div>
-              <div class="part flow" aria-hidden="true"></div>
-              <div class="buf bahan">bahan</div>
-              <div class="buf wip1">WIP</div>
-              <div class="buf wip2">WIP</div>
-              <div class="buf jadi">jadi</div>
-              <div class="belt-arrow">produk →</div>
-            </div>
-            <div class="layer wip">
-              <div class="station s1"><div class="worker">S1</div><div class="label">Selesai</div></div>
-              <div class="station s2"><div class="worker">S2</div><div class="label">Belum ambil</div></div>
-              <div class="station s3"><div class="worker">S3</div><div class="label">Menunggu</div></div>
-              <div class="belt"></div>
-              <div class="part park-wip" title="WIP antar stasiun"></div>
-              <div class="buf bahan">bahan</div>
-              <div class="buf wip1 filled">WIP</div>
-              <div class="buf wip2">WIP</div>
-              <div class="buf jadi">jadi</div>
-              <div class="belt-arrow">benda di antara S1→S2</div>
-            </div>
-            <div class="layer inventory">
-              <div class="station s1"><div class="worker">S1</div><div class="label">Siap</div></div>
-              <div class="station s2"><div class="worker">S2</div><div class="label">Siap</div></div>
-              <div class="station s3"><div class="worker">S3</div><div class="label">Siap</div></div>
-              <div class="belt"></div>
-              <div class="buf bahan stock">stok</div>
-              <div class="buf wip1">—</div>
-              <div class="buf wip2">—</div>
-              <div class="buf jadi stock">stok jadi</div>
-              <div class="belt-arrow">bahan menunggu di ujung ban</div>
-            </div>
-            <div class="layer waste">
-              <div class="station s1"><div class="worker">S1</div><div class="label">Kerja</div></div>
-              <div class="station s2"><div class="worker idle-ring">S2</div><div class="label">Idle</div></div>
-              <div class="station s3"><div class="worker">S3</div><div class="label">Siap</div></div>
-              <div class="belt"></div>
-              <div class="part park-wip"></div>
-              <div class="buf bahan">bahan</div>
-              <div class="buf wip1 filled">WIP</div>
-              <div class="buf wip2">WIP</div>
-              <div class="buf jadi">jadi</div>
-              <div class="belt-arrow">orang menunggu di stasiun</div>
-            </div>
-          </div>
-          <div class="legend">
-            <span class="chip"><span class="dot" style="background:#ef4444"></span>S1</span>
-            <span class="chip"><span class="dot" style="background:#f59e0b"></span>S2</span>
-            <span class="chip"><span class="dot" style="background:#3b82f6"></span>S3</span>
-            <span>Produk bergerak di ban</span>
-          </div>
-        </section>
-
-        <!-- CONSTRUCTION -->
-        <section class="side con" aria-label="Konstruksi lantai">
-          <h2>Konstruksi — lantai 4 zona</h2>
-          <div class="scene" id="scene-con" data-tab="produksi">
-            <div class="layer produksi">
-              <div class="floor">
-                <div class="zone active"><span class="zn">Z1</span><div class="team bek">Bek</div></div>
-                <div class="zone"><span class="zn">Z2</span><div class="team tul">Tul</div></div>
-                <div class="zone"><span class="zn">Z3</span><div class="team cor">Cor</div></div>
-                <div class="zone"><span class="zn">Z4</span><div class="team fin">Fin</div></div>
-              </div>
-              <div class="stock-row"><span class="stock">tim bergerak → zona diam</span></div>
-            </div>
-            <div class="layer wip">
-              <div class="floor">
-                <div class="zone done"><span class="zn">Z1</span><div class="team bek" style="opacity:.35">Bek</div></div>
-                <div class="zone wip-zone"><span class="zn">Z2</span><div class="team bek">Bek✓</div></div>
-                <div class="zone active"><span class="zn">Z3</span><div class="team tul">Tul</div></div>
-                <div class="zone"><span class="zn">Z4</span></div>
-              </div>
-              <div class="stock-row"><span class="stock on">WIP: Z2 sudah Bekisting, Tulangan belum masuk</span></div>
-            </div>
-            <div class="layer inventory">
-              <div class="floor">
-                <div class="zone"><span class="zn">Z1</span></div>
-                <div class="zone"><span class="zn">Z2</span></div>
-                <div class="zone"><span class="zn">Z3</span></div>
-                <div class="zone"><span class="zn">Z4</span></div>
-              </div>
-              <div class="stock-row">
-                <span class="stock off">tulangan</span>
-                <span class="stock on">bekisting</span>
-                <span class="stock off">cor</span>
-              </div>
-            </div>
-            <div class="layer waste">
-              <div class="floor">
-                <div class="zone active"><span class="zn">Z1</span><div class="team tul">Tul</div></div>
-                <div class="zone"><span class="zn">Z2</span><div class="team bek idle-ring">Bek</div><div class="waiting">idle</div></div>
-                <div class="zone"><span class="zn">Z3</span></div>
-                <div class="zone"><span class="zn">Z4</span><div class="team cor" style="opacity:.5">Cor</div></div>
-              </div>
-              <div class="stock-row"><span class="stock on">Bekisting di Z2 menunggu Tulangan selesai di Z1</span></div>
-            </div>
-          </div>
-          <div class="legend">
-            <span class="chip"><span class="dot" style="background:var(--t1)"></span>Bekisting</span>
-            <span class="chip"><span class="dot" style="background:var(--t2)"></span>Tulangan</span>
-            <span class="chip"><span class="dot" style="background:var(--t3)"></span>Cor</span>
-            <span class="chip"><span class="dot" style="background:var(--t4)"></span>Finishing</span>
-            <span>Z1 → Z4</span>
-          </div>
-        </section>
-      </div>
-
-      <p class="conclude" id="conclude"></p>
-      <p class="foot">
-        Parade singkat di klip ini: Bekisting → Tulangan → Cor → Finishing pada empat zona.
-        Di simulasi penuh ada lima tim (termasuk Bongkar); prinsip zona-flow-nya sama.
-      </p>
+    <div class="observe">
+      <strong>Amati:</strong> <span id="observe-main"></span>
+      <span class="hint" id="observe-hint"></span>
     </div>
-  </main>
+
+    <div class="compare">
+      <section class="side mfg">
+        <h2>Manufaktur — produk di ban</h2>
+        <div class="scene" id="scene-mfg"></div>
+        <div class="legend">
+          <span class="chip"><span class="dot" style="background:var(--s1)"></span>S1 merah</span>
+          <span class="chip"><span class="dot" style="background:var(--s2)"></span>S2 orange</span>
+          <span class="chip"><span class="dot" style="background:var(--s3)"></span>S3 biru</span>
+        </div>
+      </section>
+      <section class="side con">
+        <h2>Konstruksi — lantai 4 zona</h2>
+        <div class="scene" id="scene-con"></div>
+        <div class="legend">
+          <span class="chip"><span class="dot" style="background:var(--bek)"></span>Bekisting</span>
+          <span class="chip"><span class="dot" style="background:var(--tul)"></span>Tulangan</span>
+          <span class="chip"><span class="dot" style="background:var(--cor)"></span>Cor</span>
+          <span class="chip"><span class="dot" style="background:var(--fin)"></span>Finishing</span>
+          <span>Z1 → Z4</span>
+        </div>
+      </section>
+    </div>
+
+    <p class="conclude" id="conclude"></p>
+    <p class="foot">
+      Parade singkat di klip: Bekisting → Tulangan → Cor → Finishing pada empat zona.
+      Simulasi penuh memakai lima tim (termasuk Bongkar); prinsip zona-flow sama.
+    </p>
+  </div>
+</main>
 
 <script>
+/**
+ * Frame berpasangan (kiri–kanan) agar cerita sinkron.
+ * Manufaktur: warna produk bertambah saat tiba di stasiun.
+ * Konstruksi: Bek maju dulu; zona yang ditinggalkan diisi tim berikutnya.
+ */
+const FRAMES = [
+  {
+    mfg: { left: 12, segs: [], label: "bahan masuk (belum di stasiun)" },
+    con: { bek: 1, tul: 0, cor: 0, fin: 0, label: "Bek di Z1" },
+  },
+  {
+    mfg: { left: 22, segs: ["r"], label: "di S1 → dapat merah" },
+    con: { bek: 1, tul: 0, cor: 0, fin: 0, label: "Bek masih di Z1 (kerja)" },
+  },
+  {
+    mfg: { left: 38, segs: ["r"], label: "menuju S2 (sudah merah)" },
+    con: { bek: 2, tul: 1, cor: 0, fin: 0, label: "Bek → Z2; Tul muncul di Z1" },
+  },
+  {
+    mfg: { left: 50, segs: ["r", "o"], label: "di S2 → +orange" },
+    con: { bek: 2, tul: 1, cor: 0, fin: 0, label: "Bek di Z2; Tul di Z1" },
+  },
+  {
+    mfg: { left: 66, segs: ["r", "o"], label: "menuju S3 (merah+orange)" },
+    con: { bek: 3, tul: 2, cor: 1, fin: 0, label: "Bek → Z3; Tul → Z2; Cor muncul di Z1" },
+  },
+  {
+    mfg: { left: 78, segs: ["r", "o", "b"], label: "di S3 → +biru" },
+    con: { bek: 4, tul: 3, cor: 2, fin: 1, label: "Bek → Z4; Tul → Z3; Cor → Z2; Fin di Z1" },
+  },
+  {
+    mfg: { left: 90, segs: ["r", "o", "b"], label: "produk jadi (3 warna)" },
+    con: { bek: 0, tul: 4, cor: 3, fin: 2, label: "Bek selesai; Tul → Z4; Cor → Z3; Fin → Z2" },
+  },
+];
+
 const copy = {
   produksi: {
-    observe: "Bandingkan arah aliran: di kiri benda yang bergerak; di kanan tim yang bergeser antar Z1–Z4.",
-    hint: "Produk konstruksi di sini = zona lantai yang selesai dikerjakan.",
-    conclude: "Kesimpulan: di lantai beton bertulang, pekerjaan berulang terjadi antar zona — tim parade bergerak, lokasi (zona) tetap."
+    observe: "Kiri: produk bertambah warna tiap stasiun. Kanan: tim bergerak antar zona — Bek dulu, lalu Tul mengisi zona yang ditinggalkan.",
+    hint: "Hitung: setelah Bek ke Z2, apakah Tul sudah ada di Z1?",
+    conclude: "Kesimpulan: manufaktur menambah nilai pada produk yang berjalan; konstruksi lantai menggerakkan tim melewati zona yang diam."
   },
   wip: {
-    observe: "Cari benda/zona yang sudah dikerjakan hulu tapi belum diambil hilir.",
-    hint: "Kiri: kotak WIP antar S1→S2. Kanan: Z2 sudah Bekisting, Tulangan belum masuk.",
-    conclude: "Kesimpulan: WIP = kerja antar-tim di lokasi (zona), bukan stok gudang."
+    observe: "WIP = kerja yang sudah dikerjakan hulu, belum diambil hilir.",
+    hint: "Kiri: produk merah sudah keluar S1, belum dikerjakan S2. Kanan: Z1 sudah dilepas Bekisting, Tulangan belum masuk Z1.",
+    conclude: "Kesimpulan: WIP ada di antara stasiun/tim — lihat produk (manufaktur) atau zona antar-handoff (konstruksi)."
   },
   inventory: {
-    observe: "Lihat bahan yang menunggu, bukan progress di zona.",
-    hint: "Kiri: stok di ujung ban. Kanan: stok bekisting masih ada; tulangan & cor habis/belum siap.",
-    conclude: "Kesimpulan: inventory = bahan menunggu lokasi; bedakan dari WIP antar tim."
+    observe: "Inventory = bahan menunggu, belum menjadi WIP proses.",
+    hint: "Kiri: stok di ujung ban. Kanan: stok bekisting/tulangan/cor menunggu di luar zona.",
+    conclude: "Kesimpulan: inventory ≠ WIP. Inventory = stok bahan; WIP = pekerjaan antar stasiun/tim."
   },
   waste: {
-    observe: "Lihat orang yang menunggu (bukan material).",
-    hint: "Kiri: S2 idle. Kanan: Bekisting sudah di Z2 tapi masih idle karena Tulangan belum selesai di Z1; Cor menunggu di luar.",
-    conclude: "Kesimpulan: waste waktu = orang menunggu — sering muncul saat handoff antar zona/tim tidak sinkron."
+    observe: "Waste waktu = orang menunggu (bukan material).",
+    hint: "Kiri: S2 idle menunggu produk dari S1. Kanan: Bek sudah di Z2 tapi idle — Tul masih di Z1; Cor menunggu di luar.",
+    conclude: "Kesimpulan: waste sering muncul saat handoff tidak sinkron — tim sudah di lokasi tapi belum bisa kerja."
   }
 };
 
-const tabs = document.querySelectorAll(".tabs button");
 const sceneMfg = document.getElementById("scene-mfg");
 const sceneCon = document.getElementById("scene-con");
-const observeMain = document.getElementById("observe-main");
-const observeHint = document.getElementById("observe-hint");
-const conclude = document.getElementById("conclude");
+let tab = "produksi";
+let timer = null;
+let step = 0;
 
-function setTab(id) {
-  tabs.forEach((b) => {
-    const on = b.dataset.tab === id;
-    b.classList.toggle("active", on);
-    b.setAttribute("aria-selected", on ? "true" : "false");
-  });
-  sceneMfg.dataset.tab = id;
-  sceneCon.dataset.tab = id;
-  const c = copy[id];
-  observeMain.textContent = c.observe;
-  observeHint.textContent = c.hint;
-  conclude.innerHTML = c.conclude;
+function el(html) {
+  const t = document.createElement("template");
+  t.innerHTML = html.trim();
+  return t.content.firstElementChild;
 }
 
-tabs.forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
+function renderMfgShell() {
+  sceneMfg.replaceChildren();
+  sceneMfg.append(
+    el(`<div class="m-stations">
+      <div class="m-st s1" data-st="s1"><div class="box">S1</div><div class="lab">Stasiun 1</div></div>
+      <div class="m-st s2" data-st="s2"><div class="box">S2</div><div class="lab">Stasiun 2</div></div>
+      <div class="m-st s3" data-st="s3"><div class="box">S3</div><div class="lab">Stasiun 3</div></div>
+    </div>`),
+    el(`<div class="belt"></div>`),
+    el(`<div class="product" id="mfg-product">
+      <div class="seg r" data-seg="r"></div>
+      <div class="seg o" data-seg="o"></div>
+      <div class="seg b" data-seg="b"></div>
+    </div>`),
+    el(`<div class="stock-pile left" id="mfg-stock-l" hidden></div>`),
+    el(`<div class="stock-pile right" id="mfg-stock-r" hidden></div>`),
+    el(`<div class="step-label" id="mfg-step"></div>`),
+  );
+}
+
+function renderConShell() {
+  sceneCon.replaceChildren();
+  const floor = el(`<div class="floor" id="con-floor"></div>`);
+  for (let z = 1; z <= 4; z++) {
+    floor.append(el(`<div class="zone" data-z="${z}"><span class="zn">Z${z}</span></div>`));
+  }
+  sceneCon.append(
+    floor,
+    el(`<div class="inv-row" id="con-inv" hidden></div>`),
+    el(`<div class="step-label" id="con-step"></div>`),
+  );
+}
+
+function setProduct(segs, left, empty) {
+  const p = document.getElementById("mfg-product");
+  p.style.left = left + "%";
+  p.classList.toggle("empty", !!empty);
+  ["r", "o", "b"].forEach((k) => {
+    p.querySelector(`[data-seg="${k}"]`).classList.toggle("on", segs.includes(k));
+  });
+}
+
+function clearTeams() {
+  document.querySelectorAll("#con-floor .team, #con-floor .done-mark").forEach((n) => n.remove());
+  document.querySelectorAll("#con-floor .zone").forEach((z) => {
+    z.classList.remove("has-work", "done-soft");
+  });
+}
+
+function placeTeam(name, zone, cls, idle) {
+  if (!zone || zone < 1 || zone > 4) return;
+  const zEl = document.querySelector(`#con-floor .zone[data-z="${zone}"]`);
+  zEl.classList.add("has-work");
+  const tops = { bek: "36%", tul: "52%", cor: "68%", fin: "36%" };
+  const t = el(`<div class="team ${cls}${idle ? " idle" : ""}">${name}</div>`);
+  t.style.top = tops[cls];
+  zEl.append(t);
+}
+
+function markDone(zone) {
+  if (!zone) return;
+  const zEl = document.querySelector(`#con-floor .zone[data-z="${zone}"]`);
+  zEl.classList.add("done-soft");
+  if (!zEl.querySelector(".done-mark")) {
+    zEl.append(el(`<div class="done-mark">handoff</div>`));
+  }
+}
+
+/** Snapshot produksi animasi */
+function showProduksi(i) {
+  const f = FRAMES[i % FRAMES.length];
+  const m = f.mfg;
+  const c = f.con;
+  document.getElementById("mfg-stock-l").hidden = true;
+  document.getElementById("mfg-stock-r").hidden = true;
+  document.querySelectorAll(".m-st").forEach((s) => s.classList.remove("idle"));
+  setProduct(m.segs, m.left, m.segs.length === 0);
+  document.getElementById("mfg-step").textContent = m.label;
+
+  clearTeams();
+  document.getElementById("con-inv").hidden = true;
+  placeTeam("Bek", c.bek, "bek");
+  placeTeam("Tul", c.tul, "tul");
+  placeTeam("Cor", c.cor, "cor");
+  placeTeam("Fin", c.fin, "fin");
+  document.getElementById("con-step").textContent = c.label;
+}
+
+/** WIP: produk merah antar S1–S2; konstruksi Z1 sudah ditinggal Bek, Tul belum masuk */
+function showWip() {
+  document.getElementById("mfg-stock-l").hidden = true;
+  document.getElementById("mfg-stock-r").hidden = true;
+  document.querySelectorAll(".m-st").forEach((s) => s.classList.remove("idle"));
+  setProduct(["r"], 38, false);
+  document.getElementById("mfg-step").textContent = "WIP: sudah S1 (merah), belum diambil S2";
+
+  clearTeams();
+  document.getElementById("con-inv").hidden = true;
+  // Bek sudah di Z2; Z1 menunggu Tul (belum muncul) = WIP lokasi
+  placeTeam("Bek", 2, "bek");
+  markDone(1);
+  document.getElementById("con-step").textContent = "WIP: Z1 sudah Bekisting, Tulangan belum masuk Z1";
+}
+
+/** Inventory: stok bahan, bukan progress proses */
+function showInventory() {
+  document.querySelectorAll(".m-st").forEach((s) => s.classList.remove("idle"));
+  setProduct([], MFG_POS.start, true);
+  const L = document.getElementById("mfg-stock-l");
+  const R = document.getElementById("mfg-stock-r");
+  L.hidden = false; R.hidden = false;
+  L.textContent = "stok bahan"; L.className = "stock-pile left hot";
+  R.textContent = "stok jadi"; R.className = "stock-pile right";
+  document.getElementById("mfg-step").textContent = "Inventory: bahan menunggu di ujung ban";
+
+  clearTeams();
+  const inv = document.getElementById("con-inv");
+  inv.hidden = false;
+  inv.replaceChildren(
+    el(`<span class="inv-chip on">stok bekisting</span>`),
+    el(`<span class="inv-chip off">stok tulangan</span>`),
+    el(`<span class="inv-chip off">stok cor</span>`),
+  );
+  // zona kosong — belum ada kerja; bahan di luar
+  document.getElementById("con-step").textContent = "Inventory: bahan di luar zona, belum jadi WIP handoff";
+}
+
+/** Waste: orang menunggu */
+function showWaste() {
+  document.querySelectorAll(".m-st").forEach((s) => s.classList.remove("idle"));
+  document.querySelector('.m-st[data-st="s2"]').classList.add("idle");
+  setProduct(["r"], 38, false);
+  document.getElementById("mfg-stock-l").hidden = true;
+  document.getElementById("mfg-stock-r").hidden = true;
+  document.getElementById("mfg-step").textContent = "Waste: S2 idle — menunggu produk dari S1";
+
+  clearTeams();
+  document.getElementById("con-inv").hidden = true;
+  placeTeam("Tul", 1, "tul");
+  placeTeam("Bek", 2, "bek", true);
+  const off = el(`<div class="team cor idle" style="left:auto;right:8px;top:12px;transform:none">Cor↓</div>`);
+  sceneCon.append(off);
+  document.getElementById("con-step").textContent = "Waste: Bek idle di Z2 (tunggu Tul di Z1); Cor menunggu di luar";
+}
+
+function paint() {
+  // remove stray off-floor markers from waste
+  sceneCon.querySelectorAll(":scope > .team").forEach((n) => n.remove());
+  if (tab === "produksi") showProduksi(step);
+  else if (tab === "wip") showWip();
+  else if (tab === "inventory") showInventory();
+  else showWaste();
+}
+
+function stopTimer() {
+  if (timer) { clearInterval(timer); timer = null; }
+}
+
+function startProduksiLoop() {
+  stopTimer();
+  step = 0;
+  paint();
+  timer = setInterval(() => {
+    step += 1;
+    paint();
+  }, 1400);
+}
+
+function setTab(id) {
+  tab = id;
+  document.querySelectorAll(".tabs button").forEach((b) => {
+    b.classList.toggle("active", b.dataset.tab === id);
+  });
+  const c = copy[id];
+  document.getElementById("observe-main").textContent = c.observe;
+  document.getElementById("observe-hint").textContent = c.hint;
+  document.getElementById("conclude").innerHTML = c.conclude;
+  stopTimer();
+  if (id === "produksi") startProduksiLoop();
+  else paint();
+}
+
+renderMfgShell();
+renderConShell();
+document.querySelectorAll(".tabs button").forEach((b) => {
+  b.addEventListener("click", () => setTab(b.dataset.tab));
+});
 setTab("produksi");
 </script>
 </body>
