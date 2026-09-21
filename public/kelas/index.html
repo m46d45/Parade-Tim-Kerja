@@ -280,15 +280,16 @@ h1 {
   opacity: 0;
 }
 .team.visible { display: grid; opacity: 1; }
-.team.bek { background: var(--bek); top: 36%; }
-.team.tul { background: var(--tul); top: 52%; }
+.team.bek { background: var(--bek); top: 32%; }
+.team.tul { background: var(--tul); top: 58%; }
 .team.cor { background: var(--cor); top: 68%; }
 .team.fin { background: var(--fin); top: 36%; }
 .team.idle { outline: 3px solid var(--waste); outline-offset: 2px; }
 .team.idle::after {
   content: "waste";
   position: absolute;
-  top: -14px;
+  top: auto;
+  bottom: -15px;
   left: 50%;
   transform: translateX(-50%);
   font-size: .55rem;
@@ -511,8 +512,9 @@ function moveProductTo(leftPct) {
   p.style.left = leftPct + "%";
 }
 
-/** zone 1..4, or 0 = sembunyikan. firstAppear: muncul di zona tanpa animasi dari kiri. */
-function setTeamZone(cls, zone, { idle = false, firstAppear = false } = {}) {
+/** zone 1..4, or 0 = sembunyikan. firstAppear: muncul di zona tanpa animasi dari kiri.
+ *  offsetPct: geser horizontal dalam zona (supaya dua tim di zona sama tidak numpuk). */
+function setTeamZone(cls, zone, { idle = false, firstAppear = false, offsetPct = 0 } = {}) {
   const t = document.querySelector(`#team-layer .team[data-team="${cls}"]`);
   if (!t) return;
   t.classList.toggle("idle", idle);
@@ -520,7 +522,7 @@ function setTeamZone(cls, zone, { idle = false, firstAppear = false } = {}) {
     t.classList.remove("visible");
     return;
   }
-  const left = zoneLeft(zone);
+  const left = zoneLeft(zone) + offsetPct;
   if (firstAppear || !t.classList.contains("visible")) {
     t.style.transition = "none";
     t.style.left = left + "%";
@@ -537,7 +539,7 @@ function setTeamZone(cls, zone, { idle = false, firstAppear = false } = {}) {
     const elT = document.querySelector(`#team-layer .team[data-team="${k}"]`);
     if (!elT || !elT.classList.contains("visible")) return;
     const zl = parseFloat(elT.style.left);
-    const zi = Math.round((zl / 100) * 4 + 0.5);
+    const zi = Math.min(4, Math.max(1, Math.round((zl / 100) * 4 + 0.5)));
     const zEl = document.querySelector(`#con-floor .zone[data-z="${zi}"]`);
     if (zEl) zEl.classList.add("has-work");
   });
@@ -553,9 +555,8 @@ function hideAllTeams() {
   document.querySelectorAll("#con-floor .done-mark").forEach((n) => n.remove());
 }
 
-function placeTeamSnap(name, zone, cls, idle) {
-  // dipakai tab non-produksi: tampilkan via layer juga
-  setTeamZone(cls, zone, { idle, firstAppear: true });
+function placeTeamSnap(name, zone, cls, idle, offsetPct = 0) {
+  setTeamZone(cls, zone, { idle, firstAppear: true, offsetPct });
 }
 
 function markDone(zone) {
@@ -791,10 +792,10 @@ function showWaste() {
   document.getElementById("mfg-step").textContent =
     "Waste: S2 kosong/idle (tidak ada produk). S1 & S3 sedang kerja.";
 
-  // Konstruksi: Bek kerja di Z2; Tul menunggu di Z2 (= waste); Cor kerja di Z1
+  // Konstruksi: Bek & Tul sama-sama di Z2 (berdampingan); Bek kerja, Tul menunggu (= waste)
   placeTeamSnap("Cor", 1, "cor");
-  placeTeamSnap("Bek", 2, "bek");
-  placeTeamSnap("Tul", 2, "tul", true);
+  placeTeamSnap("Bek", 2, "bek", false, -7);  // kiri dalam Z2
+  placeTeamSnap("Tul", 2, "tul", true, 7);    // kanan dalam Z2 + badge waste
   document.getElementById("con-step").textContent =
     "Waste: Bek sedang kerja di Z2; Tul menunggu di Z2 (= waste). Cor kerja di Z1.";
 }
