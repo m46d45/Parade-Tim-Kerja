@@ -117,14 +117,8 @@ h1 {
 }
 .conclude em { color: var(--accent); font-style: normal; font-weight: 700; }
 .foot { margin-top: .85rem; font-size: .78rem; color: var(--muted); }
-.step-label {
-  position: absolute; left: 8px; right: 8px; bottom: 4px;
-  font-size: .62rem; font-weight: 700; color: var(--muted);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  z-index: 5; pointer-events: none;
-  background: linear-gradient(90deg, rgba(255,255,255,.92), rgba(255,255,255,.75));
-  padding: 1px 4px; border-radius: 4px;
-}
+.step-label { display: none; } /* caption scene hanya catatan internal — disembunyikan */
+.observe .hint { display: none; }
 
 /* —— Manufaktur —— */
 .m-stations {
@@ -347,22 +341,19 @@ h1 {
     <p class="kicker">Klip perbandingan</p>
     <h1>Manufaktur vs Konstruksi lantai</h1>
     <p class="lead">
-      <strong>Manufaktur:</strong> stasiun diam — produk bergerak dan <em>warna bertambah</em> tiap stasiun
-      (merah → +orange → +biru).
-      <strong>Konstruksi:</strong> zona diam (Z1–Z4) — tim parade bergerak:
-      Bek Z1→Z2→…; setelah Bek ke Z2, Tul muncul di Z1; begitu seterusnya.
+      <strong>Manufaktur:</strong> stasiun diam — produk bergerak dan bertambah warna tiap stasiun.
+      <strong>Konstruksi:</strong> zona diam (Z1–Z4) — tim bergerak melewati zona.
     </p>
 
     <div class="tabs" role="tablist">
-      <button type="button" class="active" data-tab="produksi">0 · Produksi</button>
-      <button type="button" data-tab="wip">1 · WIP</button>
-      <button type="button" data-tab="inventory">2 · Inventory</button>
-      <button type="button" data-tab="waste">3 · Waste</button>
+      <button type="button" class="active" data-tab="produksi">Produksi</button>
+      <button type="button" data-tab="wip">WIP</button>
+      <button type="button" data-tab="inventory">Inventory</button>
+      <button type="button" data-tab="waste">Waste</button>
     </div>
 
     <div class="observe">
       <strong>Amati:</strong> <span id="observe-main"></span>
-      <span class="hint" id="observe-hint"></span>
     </div>
 
     <div class="compare">
@@ -389,10 +380,6 @@ h1 {
     </div>
 
     <p class="conclude" id="conclude"></p>
-    <p class="foot">
-      Parade singkat di klip: Bekisting → Tulangan → Cor → Finishing pada empat zona.
-      Simulasi penuh memakai lima tim (termasuk Bongkar); prinsip zona-flow sama.
-    </p>
   </div>
 </main>
 
@@ -410,24 +397,20 @@ function zoneLeft(z) {
 
 const copy = {
   produksi: {
-    observe: "Kiri: warna baru muncul baru setelah produk tiba di depan stasiun. Kanan: tim bergeser mulus ke kanan.",
-    hint: "Lihat: orange/biru tidak muncul di perjalanan — hanya saat berhenti di S2/S3.",
-    conclude: "Kesimpulan: manufaktur menambah nilai di stasiun; konstruksi menggerakkan tim melewati zona yang diam."
+    observe: "Warna produk bertambah di stasiun; tim konstruksi bergeser antar zona.",
+    conclude: "Manufaktur menambah nilai di stasiun. Konstruksi menggerakkan tim melewati zona yang diam."
   },
   wip: {
-    observe: "WIP = produk/zona yang sudah dikerjakan hulu, belum diambil hilir — yang ditandai.",
-    hint: "Kiri: tandai produk merah di antara S1 dan S2. Kanan: Bek sudah lanjut ke Z3; Z2 kosong (selesai Bekisting), Tul masih di Z1 → WIP = Z2.",
-    conclude: "Kesimpulan: WIP = handoff antar stasiun/tim yang menunggu diambil — bukan inventory bahan."
+    observe: "WIP = sudah dikerjakan hulu, belum diambil hilir.",
+    conclude: "WIP adalah handoff antar stasiun atau tim — bukan inventory."
   },
   inventory: {
-    observe: "Inventory = bahan/produk menunggu di luar proses aktif.",
-    hint: "Kiri: stok bahan + stok jadi (RGB menumpuk di kanan). Kanan: stok bekisting & stok tulangan di luar zona — stok cor tidak ada.",
-    conclude: "Kesimpulan: inventory ≠ WIP. Inventory = stok di luar proses; WIP = handoff antar stasiun/tim."
+    observe: "Inventory = bahan atau produk jadi yang menunggu di luar proses.",
+    conclude: "Inventory ≠ WIP. Inventory di luar proses; WIP di antara stasiun/tim."
   },
   waste: {
-    observe: "Waste waktu = orang/stasiun menunggu (bukan material).",
-    hint: "Kiri: S1 & S3 kerja; S2 kosong (idle = waste). Kanan: Bek kerja di Z2; Tul menunggu di Z2 (= waste); Cor kerja di Z1.",
-    conclude: "Kesimpulan: waste = menunggu karena handoff tidak sinkron — orang sudah di lokasi tapi belum bisa kerja."
+    observe: "Waste waktu = orang atau stasiun yang menunggu.",
+    conclude: "Waste muncul saat handoff tidak sinkron — sudah di lokasi tapi belum bisa kerja."
   }
 };
 
@@ -712,8 +695,7 @@ function showWip() {
   // S3 kerja: merah+orange+biru di depan S3
   sceneMfg.append(makeProduct(["r", "o", "b"], POS.s3, { extra: true }));
 
-  document.getElementById("mfg-step").textContent =
-    "WIP = produk merah di antara S1–S2 (ditandai). S1/S2/S3 sedang kerja produk di depan masing-masing.";
+  document.getElementById("mfg-step").textContent = "";
 
   // Konstruksi: Bek selesai Z2 → sudah di Z3; Z2 kosong = WIP; Tul masih di Z1
   placeTeamSnap("Tul", 1, "tul");
@@ -721,10 +703,9 @@ function showWip() {
   const z2 = document.querySelector("#con-floor .zone[data-z='2']");
   z2.classList.remove("has-work"); // Z2 kosong — tidak ada tim
   z2.classList.add("wip-mark", "done-soft");
-  z2.append(el(`<div class="wip-badge">WIP = Z2</div>`));
+  z2.append(el(`<div class="wip-badge">WIP</div>`));
 
-  document.getElementById("con-step").textContent =
-    "Bek selesai Z2 → sudah di Z3; Z2 kosong; Tul masih di Z1 → WIP = Z2";
+  document.getElementById("con-step").textContent = "";
 }
 
 function showInventory() {
@@ -757,8 +738,7 @@ function showInventory() {
   }
   R.replaceChildren(el(`<div class="stock-lab">stok jadi</div>`), stack);
 
-  document.getElementById("mfg-step").textContent =
-    "Inventory: stok bahan (kiri) & stok jadi RGB menumpuk (kanan)";
+  document.getElementById("mfg-step").textContent = "";
 
   // Konstruksi: stok di luar zona — Bekisting + Tulangan; Cor tidak ada
   const floor = document.getElementById("con-floor");
@@ -770,12 +750,11 @@ function showInventory() {
   inv.hidden = false;
   inv.querySelectorAll(".inv-chip").forEach((n) => n.remove());
   inv.append(
-    el(`<div class="inv-chip">Stok Bekisting<small>siap dipakai</small></div>`),
-    el(`<div class="inv-chip">Stok Tulangan<small>siap dipakai</small></div>`),
+    el(`<div class="inv-chip">Stok Bekisting</div>`),
+    el(`<div class="inv-chip">Stok Tulangan</div>`),
   );
 
-  document.getElementById("con-step").textContent =
-    "Inventory: stok Bekisting & Tulangan di luar zona — stok Cor tidak ada";
+  document.getElementById("con-step").textContent = "";
 }
 
 function showWaste() {
@@ -789,15 +768,13 @@ function showWaste() {
   document.querySelector('.m-st[data-st="s2"]').classList.add("idle");
   sceneMfg.append(makeProduct(["r"], POS.s1, { extra: true }));
   sceneMfg.append(makeProduct(["r", "o", "b"], POS.s3, { extra: true }));
-  document.getElementById("mfg-step").textContent =
-    "Waste: S2 kosong/idle (tidak ada produk). S1 & S3 sedang kerja.";
+  document.getElementById("mfg-step").textContent = "";
 
   // Konstruksi: Bek tengah Z2 (kerja); Tul pinggir Z2 dekat Z1 (= waste); Cor di Z1
   placeTeamSnap("Cor", 1, "cor");
   placeTeamSnap("Bek", 2, "bek", false, 0);   // tengah Z2
   placeTeamSnap("Tul", 2, "tul", true, -9);   // pinggir Z2 dekat Z1
-  document.getElementById("con-step").textContent =
-    "Waste: Bek sedang kerja di tengah Z2; Tul menunggu di pinggir Z2 dekat Z1 (= waste). Cor kerja di Z1.";
+  document.getElementById("con-step").textContent = "";
 }
 
 function setTab(id) {
@@ -807,8 +784,7 @@ function setTab(id) {
   });
   const c = copy[id];
   document.getElementById("observe-main").textContent = c.observe;
-  document.getElementById("observe-hint").textContent = c.hint;
-  document.getElementById("conclude").innerHTML = c.conclude;
+  document.getElementById("conclude").textContent = c.conclude;
   stopProduksi();
   if (id === "produksi") startProduksiLoop();
   else if (id === "wip") showWip();
