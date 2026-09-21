@@ -792,12 +792,12 @@ function showWaste() {
   document.getElementById("mfg-step").textContent =
     "Waste: S2 kosong/idle (tidak ada produk). S1 & S3 sedang kerja.";
 
-  // Konstruksi: Bek & Tul sama-sama di Z2 (berdampingan); Bek kerja, Tul menunggu (= waste)
+  // Konstruksi: Bek tengah Z2 (kerja); Tul pinggir Z2 dekat Z1 (= waste); Cor di Z1
   placeTeamSnap("Cor", 1, "cor");
-  placeTeamSnap("Bek", 2, "bek", false, -7);  // kiri dalam Z2
-  placeTeamSnap("Tul", 2, "tul", true, 7);    // kanan dalam Z2 + badge waste
+  placeTeamSnap("Bek", 2, "bek", false, 0);   // tengah Z2
+  placeTeamSnap("Tul", 2, "tul", true, -9);   // pinggir Z2 dekat Z1
   document.getElementById("con-step").textContent =
-    "Waste: Bek sedang kerja di Z2; Tul menunggu di Z2 (= waste). Cor kerja di Z1.";
+    "Waste: Bek sedang kerja di tengah Z2; Tul menunggu di pinggir Z2 dekat Z1 (= waste). Cor kerja di Z1.";
 }
 
 function setTab(id) {
