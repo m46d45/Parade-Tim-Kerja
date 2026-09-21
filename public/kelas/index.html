@@ -118,8 +118,12 @@ h1 {
 .conclude em { color: var(--accent); font-style: normal; font-weight: 700; }
 .foot { margin-top: .85rem; font-size: .78rem; color: var(--muted); }
 .step-label {
-  position: absolute; left: 8px; bottom: 6px;
-  font-size: .65rem; font-weight: 700; color: var(--muted);
+  position: absolute; left: 8px; right: 8px; bottom: 4px;
+  font-size: .62rem; font-weight: 700; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  z-index: 5; pointer-events: none;
+  background: linear-gradient(90deg, rgba(255,255,255,.92), rgba(255,255,255,.75));
+  padding: 1px 4px; border-radius: 4px;
 }
 
 /* —— Manufaktur —— */
@@ -172,18 +176,43 @@ h1 {
 }
 .product.empty .seg { display: none !important; }
 .stock-pile {
-  position: absolute; bottom: 28px; font-size: .62rem; font-weight: 700;
-  padding: 3px 8px; border-radius: 999px; background: #e2e8f0; color: #475569;
+  position: absolute; top: 44%; z-index: 3;
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  transform: translateY(-50%);
 }
-.stock-pile.left { left: 10px; }
-.stock-pile.right { right: 10px; }
-.stock-pile.hot { background: #fde68a; color: #92400e; }
-.stock-pile.gone { opacity: .35; text-decoration: line-through; }
+.stock-pile.left { left: 6px; }
+.stock-pile.right { right: 6px; }
+.stock-pile .stock-lab {
+  font-size: .58rem; font-weight: 800; padding: 2px 7px; border-radius: 999px;
+  background: #e2e8f0; color: #475569; white-space: nowrap;
+}
+.stock-pile.hot .stock-lab { background: #fde68a; color: #92400e; }
+.stock-pile .raw-box {
+  width: 20px; height: 18px; border: 2px dashed #94a3b8; border-radius: 4px;
+  background: #f8fafc;
+}
+.stock-pile .fg-stack {
+  display: flex; flex-direction: column-reverse; gap: 4px;
+  align-items: center;
+}
+.stock-pile .fg-item {
+  display: flex; flex-direction: column-reverse; gap: 1px;
+  width: 24px;
+}
+.stock-pile .fg-item .seg {
+  display: block; height: 7px; border-radius: 2px; transform: none;
+}
+.stock-pile .fg-item .seg.r { background: var(--s1); }
+.stock-pile .fg-item .seg.o { background: var(--s2); }
+.stock-pile .fg-item .seg.b { background: var(--s3); }
 
 /* —— Konstruksi 4 zona —— */
 .floor {
   position: absolute; inset: 16px 10px 40px;
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+}
+.floor.with-inv {
+  left: 108px; /* ruang untuk stok di luar zona */
 }
 .zone {
   border: 1.5px solid #c5d4e8; border-radius: 10px; background: #f8fafc;
@@ -240,6 +269,7 @@ h1 {
   position: absolute; inset: 16px 10px 40px;
   pointer-events: none; z-index: 3;
 }
+.team-layer.with-inv { left: 108px; }
 .team {
   position: absolute;
   min-width: 40px; height: 28px; padding: 0 6px; border-radius: 8px;
@@ -259,16 +289,23 @@ h1 {
   position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
   font-size: .58rem; font-weight: 800; color: #059669;
 }
-.inv-row {
-  position: absolute; left: 10px; right: 10px; bottom: 8px;
-  display: flex; gap: 6px; justify-content: center; flex-wrap: wrap;
+.inv-aside {
+  position: absolute; left: 8px; top: 20px; bottom: 26px; width: 92px;
+  display: flex; flex-direction: column; gap: 8px; justify-content: flex-start;
+  padding-top: 4px;
+  z-index: 4;
+}
+.inv-aside .inv-title {
+  font-size: .55rem; font-weight: 800; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--muted); text-align: center;
 }
 .inv-chip {
-  font-size: .62rem; font-weight: 700; padding: 3px 8px; border-radius: 999px;
-  background: #e2e8f0; color: #475569;
+  font-size: .58rem; font-weight: 700; padding: 8px 6px; border-radius: 8px;
+  background: #fde68a; color: #92400e; text-align: center; line-height: 1.3;
+  border: 1px solid #f59e0b;
 }
-.inv-chip.on { background: #fde68a; color: #92400e; }
-.inv-chip.off { opacity: .35; text-decoration: line-through; }
+.inv-chip small { display: block; font-weight: 600; opacity: .85; font-size: .52rem; margin-top: 2px; }
+.inv-row { display: none; } /* legacy, diganti inv-aside */
 </style>
 </head>
 <body>
@@ -362,9 +399,9 @@ const copy = {
     conclude: "Kesimpulan: WIP = handoff antar stasiun/tim yang menunggu diambil — bukan inventory bahan."
   },
   inventory: {
-    observe: "Inventory = bahan menunggu, belum menjadi WIP proses.",
-    hint: "Kiri: stok di ujung ban. Kanan: stok bekisting/tulangan/cor menunggu di luar zona.",
-    conclude: "Kesimpulan: inventory ≠ WIP. Inventory = stok bahan; WIP = pekerjaan antar stasiun/tim."
+    observe: "Inventory = bahan/produk menunggu di luar proses aktif.",
+    hint: "Kiri: stok bahan + stok jadi (RGB menumpuk di kanan). Kanan: stok bekisting & stok tulangan di luar zona — stok cor tidak ada.",
+    conclude: "Kesimpulan: inventory ≠ WIP. Inventory = stok di luar proses; WIP = handoff antar stasiun/tim."
   },
   waste: {
     observe: "Waste waktu = orang menunggu (bukan material).",
@@ -424,7 +461,9 @@ function renderConShell() {
   sceneCon.append(
     floor,
     layer,
-    el(`<div class="inv-row" id="con-inv" hidden></div>`),
+    el(`<div class="inv-aside" id="con-inv" hidden>
+      <div class="inv-title">Stok di luar</div>
+    </div>`),
     el(`<div class="step-label" id="con-step"></div>`),
   );
 }
@@ -511,7 +550,13 @@ function markDone(zone) {
 function clearStaticExtras() {
   document.getElementById("mfg-stock-l").hidden = true;
   document.getElementById("mfg-stock-r").hidden = true;
-  document.getElementById("con-inv").hidden = true;
+  document.getElementById("mfg-stock-l").replaceChildren();
+  document.getElementById("mfg-stock-r").replaceChildren();
+  const inv = document.getElementById("con-inv");
+  inv.hidden = true;
+  inv.querySelectorAll(".inv-chip").forEach((n) => n.remove());
+  document.getElementById("con-floor")?.classList.remove("with-inv");
+  document.getElementById("team-layer")?.classList.remove("with-inv");
   document.querySelectorAll(".m-st").forEach((s) => s.classList.remove("idle"));
   sceneCon.querySelectorAll(":scope > .team").forEach((n) => n.remove());
   // hapus produk ekstra (tab WIP)
@@ -650,10 +695,6 @@ function showWip() {
     "WIP = produk merah di antara S1–S2 (ditandai). S1/S2/S3 sedang kerja produk di depan masing-masing.";
 
   // Konstruksi: Bek selesai Z2 → sudah di Z3; Z2 kosong = WIP; Tul masih di Z1
-  const inv = document.getElementById("con-inv");
-  inv.hidden = true;
-  inv.replaceChildren(); // pastikan chip "stok …" (tab Inventory) tidak nyisa
-
   placeTeamSnap("Tul", 1, "tul");
   placeTeamSnap("Bek", 3, "bek");
   const z2 = document.querySelector("#con-floor .zone[data-z='2']");
@@ -669,22 +710,51 @@ function showInventory() {
   stopProduksi();
   clearStaticExtras();
   hideAllTeams();
-  moveProductTo(POS.start);
-  setSegs([]);
+
+  // Manufaktur: stok bahan kiri; stok jadi = tumpukan RGB kanan
+  const main = document.getElementById("mfg-product");
+  main.style.display = "none";
+
   const L = document.getElementById("mfg-stock-l");
   const R = document.getElementById("mfg-stock-r");
-  L.hidden = false; R.hidden = false;
-  L.textContent = "stok bahan"; L.className = "stock-pile left hot";
-  R.textContent = "stok jadi"; R.className = "stock-pile right";
-  document.getElementById("mfg-step").textContent = "Inventory: bahan menunggu di ujung ban";
+  L.hidden = false;
+  R.hidden = false;
+  L.className = "stock-pile left hot";
+  R.className = "stock-pile right";
+  L.replaceChildren(
+    el(`<div class="stock-lab">stok bahan</div>`),
+    el(`<div class="raw-box" title="bahan mentah"></div>`),
+    el(`<div class="raw-box" title="bahan mentah"></div>`),
+  );
+  const stack = el(`<div class="fg-stack"></div>`);
+  for (let i = 0; i < 3; i++) {
+    stack.append(el(`<div class="fg-item">
+      <div class="seg r"></div>
+      <div class="seg o"></div>
+      <div class="seg b"></div>
+    </div>`));
+  }
+  R.replaceChildren(el(`<div class="stock-lab">stok jadi</div>`), stack);
+
+  document.getElementById("mfg-step").textContent =
+    "Inventory: stok bahan (kiri) & stok jadi RGB menumpuk (kanan)";
+
+  // Konstruksi: stok di luar zona — Bekisting + Tulangan; Cor tidak ada
+  const floor = document.getElementById("con-floor");
+  const layer = document.getElementById("team-layer");
+  floor.classList.add("with-inv");
+  layer.classList.add("with-inv");
+
   const inv = document.getElementById("con-inv");
   inv.hidden = false;
-  inv.replaceChildren(
-    el(`<span class="inv-chip on">stok bekisting</span>`),
-    el(`<span class="inv-chip off">stok tulangan</span>`),
-    el(`<span class="inv-chip off">stok cor</span>`),
+  inv.querySelectorAll(".inv-chip").forEach((n) => n.remove());
+  inv.append(
+    el(`<div class="inv-chip">Stok Bekisting<small>siap dipakai</small></div>`),
+    el(`<div class="inv-chip">Stok Tulangan<small>siap dipakai</small></div>`),
   );
-  document.getElementById("con-step").textContent = "Inventory: bahan di luar zona, belum jadi WIP handoff";
+
+  document.getElementById("con-step").textContent =
+    "Inventory: stok Bekisting & Tulangan di luar zona — stok Cor tidak ada";
 }
 
 function showWaste() {
