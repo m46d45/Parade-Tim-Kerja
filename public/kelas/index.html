@@ -358,8 +358,8 @@ const copy = {
   },
   wip: {
     observe: "WIP = produk/zona yang sudah dikerjakan hulu, belum diambil hilir — yang ditandai.",
-    hint: "Kiri: tandai produk merah di antara S1 dan S2. Kanan: Z2 sudah selesai Bekisting, Tul masih di Z1 → WIP = Z2.",
-    conclude: "Kesimpulan: WIP bukan stok gudang — itu kerja antar stasiun/tim yang menunggu diambil."
+    hint: "Kiri: tandai produk merah di antara S1 dan S2. Kanan: Bek sudah lanjut ke Z3; Z2 kosong (selesai Bekisting), Tul masih di Z1 → WIP = Z2.",
+    conclude: "Kesimpulan: WIP = handoff antar stasiun/tim yang menunggu diambil — bukan inventory bahan."
   },
   inventory: {
     observe: "Inventory = bahan menunggu, belum menjadi WIP proses.",
@@ -649,16 +649,20 @@ function showWip() {
   document.getElementById("mfg-step").textContent =
     "WIP = produk merah di antara S1–S2 (ditandai). S1/S2/S3 sedang kerja produk di depan masing-masing.";
 
-  // Konstruksi: Tul kerja di Z1; Bek di Z2 dan Z2 sudah selesai Bekisting → WIP = Z2
+  // Konstruksi: Bek selesai Z2 → sudah di Z3; Z2 kosong = WIP; Tul masih di Z1
+  const inv = document.getElementById("con-inv");
+  inv.hidden = true;
+  inv.replaceChildren(); // pastikan chip "stok …" (tab Inventory) tidak nyisa
+
   placeTeamSnap("Tul", 1, "tul");
-  placeTeamSnap("Bek", 2, "bek");
+  placeTeamSnap("Bek", 3, "bek");
   const z2 = document.querySelector("#con-floor .zone[data-z='2']");
+  z2.classList.remove("has-work"); // Z2 kosong — tidak ada tim
   z2.classList.add("wip-mark", "done-soft");
   z2.append(el(`<div class="wip-badge">WIP = Z2</div>`));
-  document.querySelector("#con-floor .zone[data-z='1']").classList.add("has-work");
 
   document.getElementById("con-step").textContent =
-    "Bek sudah di Z2 & Z2 selesai Bekisting; Tul masih kerja di Z1 → WIP = Z2";
+    "Bek selesai Z2 → sudah di Z3; Z2 kosong; Tul masih di Z1 → WIP = Z2";
 }
 
 function showInventory() {
