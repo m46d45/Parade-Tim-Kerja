@@ -1,11 +1,17 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "installCommand": "echo \"skip install (static landing)\"",
-  "buildCommand": "echo \"skip build (static landing)\"",
-  "outputDirectory": "public",
+  "installCommand": "cd web && npm ci",
+  "buildCommand": "cd web && npm run build",
+  "outputDirectory": "web/dist",
   "cleanUrls": true,
   "trailingSlash": false,
+  "rewrites": [
+    { "source": "/kelas", "destination": "/kelas/index.html" },
+    { "source": "/kelas/", "destination": "/kelas/index.html" },
+    { "source": "/landing", "destination": "/landing/index.html" },
+    { "source": "/landing/", "destination": "/landing/index.html" }
+  ],
   "headers": [
     {
       "source": "/assets/(.*)",

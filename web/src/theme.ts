@@ -1,0 +1,81 @@
+/**
+ * App visual tokens — match Streamlit Parade Tim Kerja.
+ *
+ * Shell: .streamlit/config.toml (light theme)
+ * Team chips / UI accents: parade banner in app.py
+ *   --t1:#3b82f6 --t2:#f59e0b --t3:#10b981 --t4:#ef4444 --t5:#8b5cf6
+ *   --bg0:#0f2744 --bg1:#1a365d (banner strip only)
+ */
+
+/** Primary UI trade colors (Streamlit banner / classroom chips). */
+export const TRADE_COLORS = [
+  "#3b82f6", // T1
+  "#f59e0b", // T2
+  "#10b981", // T3
+  "#ef4444", // T4
+  "#8b5cf6", // T5
+  "#8c564b",
+  "#e377c2",
+] as const;
+
+/** Ideal baseline on light charts */
+export const IDEAL_COLOR = "#64748b";
+
+/** Streamlit theme (config.toml) */
+export const APP = {
+  primary: "#1a365d",
+  background: "#ffffff",
+  secondaryBackground: "#f0f4f8",
+  text: "#1a202c",
+  muted: "#64748b",
+  border: "#d0d7e2",
+  banner0: "#0f2744",
+  banner1: "#1a365d",
+  banner2: "#234e76",
+} as const;
+
+/** Buffer / interface colors (parade_of_trades_plots.BUFFER_COLORS) */
+export const BUFFER_COLORS = [
+  "#4c78a8",
+  "#f58518",
+  "#54a24b",
+  "#e45756",
+  "#b279a2",
+  "#9d755d",
+] as const;
+
+export const SCENARIO_COLORS = [
+  "#2563eb",
+  "#ea580c",
+  "#16a34a",
+  "#dc2626",
+  "#7c3aed",
+  "#0891b2",
+] as const;
+
+export function bufferColor(i: number): string {
+  return BUFFER_COLORS[i % BUFFER_COLORS.length];
+}
+
+export function scenarioColor(i: number): string {
+  return SCENARIO_COLORS[i % SCENARIO_COLORS.length];
+}
+
+export function tradeColor(i: number): string {
+  return TRADE_COLORS[i % TRADE_COLORS.length];
+}
+
+/** Map long legacy names → short classroom labels. */
+const SHORT_ALIASES: Record<string, string> = {
+  "Pemasangan Bekisting": "Bekisting",
+  "Pemasangan Tulangan": "Tulangan",
+  "Pengecoran Beton": "Cor",
+  "Pembongkaran Bekisting": "Bongkar",
+  "Finishing Lantai": "Finishing",
+};
+
+export function shortTradeName(name: string, maxLen = 16): string {
+  const mapped = SHORT_ALIASES[name] ?? name;
+  if (mapped.length <= maxLen) return mapped;
+  return `${mapped.slice(0, maxLen - 1)}…`;
+}

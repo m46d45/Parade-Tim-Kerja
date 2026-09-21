@@ -1,7 +1,10 @@
 # Landing page Vercel (static)
 
-Simulasi interaktif: https://parade-tim-kerja.streamlit.app/  
+Simulasi interaktif (saat ini): https://parade-tim-kerja.streamlit.app/  
 Landing statis: folder `public/` (bukan Python).
+
+**Migrasi JS:** app browser sedang dibangun di `web/` — lihat [docs/MIGRATION-JS.md](docs/MIGRATION-JS.md).  
+Cutover nanti: Vercel akan menyajikan build `web/dist` sebagai simulasi langsung (nama tetap Parade Tim Kerja).
 
 ## Pengaturan Vercel (penting)
 

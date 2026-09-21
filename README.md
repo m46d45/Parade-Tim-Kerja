@@ -4,21 +4,17 @@ Simulasi **Lean Construction** interaktif untuk belajar dampak *variability* dan
 
 Berdasarkan karya **Iris D. Tommelein** dkk. (UC Berkeley), dengan konteks **floor cycle beton Indonesia** (5 trade).
 
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://parade-tim-kerja.streamlit.app/)
 [![GitHub](https://img.shields.io/badge/GitHub-Parade--Tim--Kerja-181717?logo=github)](https://github.com/m46d45/Parade-Tim-Kerja)
-<!-- Setelah deploy: ganti URL badge di atas dengan link app Anda, contoh:
-https://YOUR-APP-NAME.streamlit.app
--->
+[![Vercel](https://img.shields.io/badge/Vercel-live-black?logo=vercel)](https://parade-tim-kerja.vercel.app/)
 
 ## Coba aplikasinya
 
-> Setelah deploy ke Streamlit Community Cloud, taruh link publik di sini:
->
-> **🌐 Simulasi (Streamlit):** https://parade-tim-kerja.streamlit.app/  
-> **🏠 Landing (Vercel):** hubungkan repo ini ke Vercel → menyajikan `index.html`  
-> **📖 Manual:** tab **Manual** di dalam app
+> **🌐 Simulasi (browser):** https://parade-tim-kerja.vercel.app/  
+> **🎬 Animasi kelas:** https://parade-tim-kerja.vercel.app/kelas/  
+> **ℹ️ Tentang:** https://parade-tim-kerja.vercel.app/landing/  
+> **📖 Manual:** tab **Manual** di dalam simulasi  
 
-Mahasiswa **tidak perlu menginstal Python** — cukup buka link di browser.
+Mahasiswa **tidak perlu menginstal apa pun** — cukup buka link di browser.
 
 ## Untuk siapa
 
@@ -28,48 +24,61 @@ Mahasiswa **tidak perlu menginstal Python** — cukup buka link di browser.
 
 ## Fitur (zone-flow classroom)
 
-| Tab | Fungsi |
-|-----|--------|
-| **Simulasi** | Satu skenario zone-flow: kecepatan + variability **per zona**, LOB / WIP / utilization |
-| **Perbandingan** | Bandingkan **2–5** skenario (mis. kelima level variability) |
-| **Manual** | Panduan belajar + tentang model |
+| Mode | Fungsi |
+|------|--------|
+| **Simulasi** | Satu skenario zone-flow: kapasitas + variability, Location-based Schedule / WIP / utilization |
+| **Perbandingan** | Bandingkan **2–5** skenario |
+| **Takt plan** | Little's Takt Law + wagon chart |
+| **Buffer** | Buffer waktu–inventory (Iris) |
+| **Statistik** | Counter kunjungan / sesi |
+| **Manual** | Panduan belajar |
+| **/kelas** | Animasi manufaktur vs konstruksi (Produksi / WIP / Inventory / Waste) |
 
-**Batch handoff** default **4 zona** (sidebar; 1 = one-piece flow).  
+**Batch handoff** default **4 zona** (1 = one-piece flow).  
 Default demo: **20 zona**, 5 trade floor cycle Indonesia.
 
-## Menjalankan di komputer sendiri (opsional, untuk pengembang)
+## Menjalankan di komputer sendiri (pengembang)
+
+### App JS (kanonis)
 
 ```bash
 git clone https://github.com/m46d45/Parade-Tim-Kerja.git
+cd Parade-Tim-Kerja/web
+npm install
+npm run dev
+```
+
+Buka http://localhost:5173
+
+### Streamlit (legacy / jaring pengaman)
+
+```bash
 cd Parade-Tim-Kerja
 python -m pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Buka http://localhost:8501
+Cloud Streamlit mengarahkan ke Vercel. UI lama: tambahkan `?legacy=1` pada URL Streamlit.
 
 ## Struktur repo
 
 ```text
-parade-of-trades/
-├── app.py                         # Streamlit UI (entry point cloud)
-├── parade_of_trades_core.py       # Engine simulasi
-├── parade_of_trades_plots.py      # Visualisasi
-├── parade_of_trades_analysis.py   # Replikasi & export
-├── MANUAL.md                      # Manual belajar mahasiswa
-├── requirements.txt
-├── assets/                        # Banner & logo
-└── test_*.py                      # Unit tests
+Parade-Tim-Kerja/
+├── web/                 # App JS (Vite + TypeScript) — kanonis di Vercel
+├── public/kelas/        # Animasi kelas (disalin ke web/public)
+├── app.py               # Streamlit redirect (+ ?legacy=1)
+├── parade_of_trades_*.py
+├── docs/MIGRATION-JS.md
+└── vercel.json          # build web → web/dist
 ```
 
-## Deploy (Streamlit Community Cloud)
+## Deploy (Vercel)
 
-1. Push repo ini ke GitHub (public disarankan untuk cloud gratis).  
-2. Buka [https://share.streamlit.io](https://share.streamlit.io) → login dengan GitHub.  
-3. **New app** → pilih repo → Main file: `app.py` → Deploy.  
-4. Tunggu build selesai; salin URL `*.streamlit.app` ke bagian atas README ini.
+1. Hubungkan repo ke Vercel.  
+2. `vercel.json` memakai `installCommand` / `buildCommand` di folder `web`, output `web/dist`.  
+3. Domain: https://parade-tim-kerja.vercel.app/
 
-Detail langkah: lihat file [DEPLOY.md](DEPLOY.md).
+Detail migrasi: [docs/MIGRATION-JS.md](docs/MIGRATION-JS.md).
 
 ## Referensi
 
@@ -80,6 +89,4 @@ Detail langkah: lihat file [DEPLOY.md](DEPLOY.md).
 
 ## Lisensi & kredit
 
-Konsep game: Tommelein / Riley / Howell / Choo (UC Berkeley P2SL).  
-Implementasi web ini: proyek edukasi independen.  
-Untuk pembelajaran dan workshop non-komersial. Cantumkan sitasi paper di atas saat dipakai di tugas/publikasi.
+Lihat repo GitHub untuk lisensi dan kredit penuh.
