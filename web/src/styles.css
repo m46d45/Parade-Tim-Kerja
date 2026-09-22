@@ -589,6 +589,47 @@ canvas {
 .sidebar-note {
   margin: 0.15rem 0 0.35rem;
   font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.sidebar-stats {
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.sidebar-stats-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 0.45rem;
+}
+
+.sidebar-stats-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+}
+
+.sidebar-stat {
+  background: #e8eef5;
+  border-radius: 10px;
+  padding: 0.55rem 0.65rem;
+}
+
+.sidebar-stat span {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
+.sidebar-stat strong {
+  display: block;
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  line-height: 1.2;
+  margin-top: 0.15rem;
 }
 
 .conwip-pred {

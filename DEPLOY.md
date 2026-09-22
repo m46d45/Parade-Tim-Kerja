@@ -14,7 +14,6 @@ Mahasiswa cukup membuka URL live.
 4. Path penting:
    - `/` — simulasi
    - `/kelas/` — animasi kelas
-   - `/landing/` — halaman tentang
 
 Setelah push ke `main`, Vercel build otomatis.
 

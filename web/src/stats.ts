@@ -55,5 +55,14 @@ export async function readDashboard(): Promise<Record<string, number>> {
   const entries = await Promise.all(
     Object.values(KEYS).map(async (k) => [k, (await read(k)) ?? 0] as const),
   );
-  return Object.fromEntries(entries);
+  const s = Object.fromEntries(entries);
+  const sim = s[KEYS.simRuns] ?? 0;
+  const cmp = s[KEYS.compareRuns] ?? 0;
+  const landing = s[KEYS.landingVisits] ?? 0;
+  const app = s[KEYS.appVisits] ?? 0;
+  return {
+    ...s,
+    total_simulations: sim + cmp,
+    total_visits: landing + app,
+  };
 }

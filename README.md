@@ -11,7 +11,6 @@ Berdasarkan karya **Iris D. Tommelein** dkk. (UC Berkeley), dengan konteks **flo
 
 > **🌐 Simulasi (browser):** https://parade-tim-kerja.vercel.app/  
 > **🎬 Animasi kelas:** https://parade-tim-kerja.vercel.app/kelas/  
-> **ℹ️ Tentang:** https://parade-tim-kerja.vercel.app/landing/  
 > **📖 Manual:** tab **Manual** di dalam simulasi  
 
 Mahasiswa **tidak perlu menginstal apa pun** — cukup buka link di browser.
